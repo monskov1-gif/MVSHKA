@@ -158,6 +158,20 @@
   .choiceOpt:active { background:#7a1030; color:#fff; transform:translateY(1px); }
   .choiceOpt .tag { display:block; color:#a86a80; font-size:10.5px; letter-spacing:1.5px; margin-bottom:3px; }
 
+  /* Options unlocked by a hidden stat — coloured by which stat opened them */
+  .choiceOpt.gated { border-width:1px; border-style:solid; position:relative; }
+  .choiceOpt.gated .tag { color:var(--gate); font-weight:bold; }
+  .choiceOpt.gated:active { background:var(--gateSolid); color:#fff; }
+  #gateHint {
+    display:none;
+    border:1px dashed var(--gate, #e8b84a);
+    background:var(--gateDim, rgba(232,184,74,.10));
+    color:#e8d8c0; font-size:11.5px; line-height:1.5;
+    padding:9px 11px; margin:0 0 9px; border-radius:5px;
+  }
+  #gateHint.show { display:block; }
+  #gateHint b { color:var(--gate, #e8b84a); }
+
   /* ==================== TOUCH CONTROLS ==================== */
   #dpad {
     position:absolute; left:16px; bottom:calc(16px + env(safe-area-inset-bottom));
@@ -165,6 +179,7 @@
     transition:opacity .2s;
   }
   #dpad.dim { opacity:.22; pointer-events:none; }
+  #gameContainer.choosing #dpad, #gameContainer.choosing #actionBtn { opacity:0; pointer-events:none; }
   #dpadBase {
     position:absolute; inset:0;
     background:radial-gradient(circle, rgba(80,20,40,.35) 0%, rgba(0,0,0,.15) 70%);
@@ -286,6 +301,7 @@
 
   <div id="choiceBox">
     <div id="choicePrompt"></div>
+    <div id="gateHint"></div>
     <div id="choiceOptions"></div>
   </div>
 
@@ -689,17 +705,31 @@ function freshState() {
 }
 
 /* --- meta save: persists across playthroughs (endings + memory gallery) --- */
-let META = { endings:{}, memories:{}, endingStats:{} };
+let META = { endings:{}, memories:{}, endingStats:{}, hints:{} };
 function loadMeta() {
   try {
     const raw = localStorage.getItem(CONFIG.META_KEY);
     if (raw) {
       const m = JSON.parse(raw);
-      META = { endings:m.endings||{}, memories:m.memories||{}, endingStats:m.endingStats||{} };
+      META = { endings:m.endings||{}, memories:m.memories||{}, endingStats:m.endingStats||{}, hints:m.hints||{} };
     }
   } catch(e) {}
 }
 function saveMeta() { try { localStorage.setItem(CONFIG.META_KEY, JSON.stringify(META)); } catch(e) {} }
+
+/* Presentation for the four hidden stats: how a stat-gated option is coloured
+   and how the game explains, once, why that option appeared at all. */
+const STAT_META = {
+  trustSue:      { label:'ДОВЕРИЕ СЬЮ',  color:'#e8b84a', rgb:'232,184,74',
+                   why:'потому что Сью вам доверяет' },
+  witchAmbition: { label:'ПУТЬ ВЕДЬМЫ',  color:'#c060ff', rgb:'192,96,255',
+                   why:'потому что Ная слишком далеко зашла по пути ведьмы' },
+  humanity:      { label:'ЧЕЛОВЕЧНОСТЬ', color:'#70c090', rgb:'112,192,144',
+                   why:'потому что в Нае ещё осталось человеческое' },
+  hellAffinity:  { label:'СВЯЗЬ С АДОМ', color:'#ff6a3c', rgb:'255,106,60',
+                   why:'потому что Ная уже сроднилась с адом' },
+};
+function gateOpen(o) { return !o.gate || S(o.gate.stat) >= o.gate.min; }
 
 /* --- stat helpers --- */
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -2110,18 +2140,32 @@ const Dialogue = {
     document.getElementById('choicePrompt').textContent = choice.prompt || '';
     document.getElementById('dialogueHint').style.display = 'none';
     opts.innerHTML = '';
-    const list = (choice.options || []).filter(o => !o.when || o.when());
+    const list = (choice.options || []).filter(o => (!o.when || o.when()) && gateOpen(o));
+    let firstGate = null;
     list.forEach(o => {
       const b = document.createElement('button');
       b.className = 'choiceOpt';
-      b.innerHTML = (o.tag ? `<span class="tag">${o.tag}</span>` : '') +
-                    o.text.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      const m = o.gate ? STAT_META[o.gate.stat] : null;
+      let tag = o.tag ? `<span class="tag">${o.tag}</span>` : '';
+      if (m) {
+        b.classList.add('gated');
+        b.style.setProperty('--gate', m.color);
+        b.style.setProperty('--gateSolid', `rgba(${m.rgb},.55)`);
+        b.style.borderColor = m.color;
+        b.style.background = `linear-gradient(180deg, rgba(${m.rgb},.17), rgba(16,6,12,.98))`;
+        b.style.boxShadow = `0 0 12px rgba(${m.rgb},.34), 0 2px 0 rgba(0,0,0,.5)`;
+        tag = `<span class="tag">✦ ${m.label}</span>`;
+        if (!firstGate) firstGate = m;
+      }
+      b.innerHTML = tag + o.text.replace(/&/g,'&amp;').replace(/</g,'&lt;');
       b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); this._pick(o); });
       opts.appendChild(b);
     });
+    this._showGateHint(firstGate);
     box.classList.add('show');
     box.classList.remove('locked');
     box.scrollTop = 0;
+    document.getElementById('gameContainer').classList.add('choosing');
     // lift the dialogue box clear of the options so the line being answered stays readable
     const dbox = document.getElementById('dialogueBox');
     dbox.classList.add('compact');
@@ -2129,6 +2173,26 @@ const Dialogue = {
       const h = box.getBoundingClientRect().height;
       dbox.style.bottom = 'calc(' + Math.round(h + 22) + 'px + env(safe-area-inset-bottom))';
     });
+  },
+  /* Explain the mechanic once, the very first time a stat-gated option shows up. */
+  _showGateHint(m) {
+    const hint = document.getElementById('gateHint');
+    hint.classList.remove('show');
+    if (!m) return;
+    hint.style.setProperty('--gate', m.color);
+    hint.style.setProperty('--gateDim', `rgba(${m.rgb},.10)`);
+    if (META.hints && META.hints.gatedChoice) {
+      // seen before — the colour and the tag are enough on their own
+      return;
+    }
+    hint.innerHTML = '✦ <b>Подсвеченный вариант доступен не всегда.</b><br>' +
+                     'Он открылся, ' + m.why + '. Такие ответы появляются сами — ' +
+                     'из-за того, как вы вели себя раньше, а не потому, что вы их выбрали.';
+    hint.classList.add('show');
+    META.hints = META.hints || {};
+    META.hints.gatedChoice = true;
+    saveMeta();
+    Audio.chime();
   },
   _restoreDialogueBox() {
     const dbox = document.getElementById('dialogueBox');
@@ -2148,6 +2212,8 @@ const Dialogue = {
     setTimeout(() => {
       box.classList.remove('show');
       box.classList.remove('locked');
+      document.getElementById('gameContainer').classList.remove('choosing');
+      document.getElementById('gateHint').classList.remove('show');
       this._restoreDialogueBox();
       this.awaitingChoice = false;
       const follow = o.then || [];
@@ -2188,6 +2254,8 @@ const Dialogue = {
     document.getElementById('dialogueBox').classList.remove('shakeText');
     document.getElementById('tapCatcher').classList.remove('show');
     document.getElementById('choiceBox').classList.remove('show');
+    document.getElementById('gameContainer').classList.remove('choosing');
+    document.getElementById('gateHint').classList.remove('show');
     this._restoreDialogueBox();
     if (Game.mode === 'dialogue') Game.mode = 'explore';
     if (Game.mode !== 'cutscene') UI.dimControls(false);
@@ -3155,6 +3223,16 @@ persuade3: [
           {who:'sue',expr:'sad',text:'Ты молчишь. Это тоже ответ.'},
           {who:'sue',expr:'normal',text:'Дай мне минуту.'},
         ]},
+      { gate:{stat:'humanity', min:62},
+        text:'«Не отвечай сейчас. Подумай неделю.»',
+        stats:{trustSue:+16, humanity:+10, witchAmbition:-8}, counter:{sueRespected:1},
+        then:[
+          {who:'naya',expr:'sad',text:'Не отвечай сейчас. Подумай неделю. Я подожду.'},
+          {who:'sue',expr:'shocked',text:'Неделю? Ная, ты последний месяц не могла подождать и десяти минут.'},
+          {who:'naya',expr:'sad',text:'Знаю. Поэтому и говорю.'},
+          {who:'sue',expr:'sad',text:'...'},
+          {who:'sue',expr:'normal',text:'Мне не нужна неделя. Мне нужно было, чтобы ты её предложила.'},
+        ]},
     ]}},
   ]},
   async ()=>{ addC('persuadeStep'); },
@@ -3445,6 +3523,19 @@ secondAmuletScene: [
           {who:'sue',expr:'sad',text:'Я больше не понимаю, с кем я разговариваю.'},
           {action(){ setFlag('sueSuspects'); }},
         ]},
+      { gate:{stat:'trustSue', min:55},
+        text:'«Останови меня. Пожалуйста, останови меня.»',
+        stats:{trustSue:+10, humanity:+14, witchAmbition:-14},
+        then:[
+          {who:'naya',expr:'sad',text:'Сью. Останови меня.'},
+          {who:'sue',expr:'shocked',text:'Что?'},
+          {who:'naya',expr:'sad',text:'Пожалуйста, останови меня. Я сама не могу. Я пробовала.'},
+          {who:'sue',expr:'sad',text:'...'},
+          {who:'sue',expr:'sad',text:'Хорошо. Тогда слушай меня очень внимательно: мы больше туда не ходим.'},
+          {who:'naya',expr:'sad',text:'Хорошо.'},
+          {who:'sue',expr:'sad',text:'Ты сейчас соврала.'},
+          {who:'naya',expr:'sad',text:'Знаю. Но ты хотя бы попробовала.'},
+        ]},
     ]}},
   ]},
   { dlg:[{who:'naya',expr:'normal',text:'(Остался один. Надо узнать у Женевьевы, где третий.)'}] },
@@ -3564,6 +3655,16 @@ reviveChoice: [
           {who:'naya',expr:'empty',text:'Она бы всё равно не пошла до конца. Она сама сказала — у неё своя жизнь.'},
           {who:'naya',expr:'empty',text:'Ведьма не должна жалеть.'},
           {who:'naya',expr:'shocked',text:'(Я убираю кристалл в карман. Рука не дрожит. Почему рука не дрожит?)'},
+        ]},
+      { gate:{stat:'hellAffinity', min:45},
+        text:'Закончить ритуал прямо на ней.',
+        stats:{humanity:-40, witchAmbition:+30, hellAffinity:+30, trustSue:-40},
+        set:{sueLeftDead:true, reviveChoiceMade:true},
+        then:[
+          {who:'charlotte',expr:'smile',name:'Голос Шарлотты',text:'Умница. Не трать её зря.'},
+          {who:'nayaDark',expr:'empty',text:'Равное за равное. Она уже отдана — значит, круг ещё открыт.'},
+          {who:'nayaDark',expr:'empty',text:'Я раскладываю три амулета вокруг неё. Получается ровно.'},
+          {who:'naya',expr:'shocked',text:'(Я думаю о том, что получается ровно. Вот о чём я сейчас думаю.)'},
         ]},
     ]}},
   ]},
@@ -3726,6 +3827,16 @@ regretScene: [
           {who:'sue',expr:'sad',text:'Тебя зовут Ная. Это я могу подтвердить.'},
           {who:'naya',expr:'smile',text:'(Она пошутила. Это первая шутка за неделю.)'},
         ]},
+      { gate:{stat:'witchAmbition', min:70},
+        text:'«Я бы открыла его раньше. И без тебя.»',
+        stats:{trustSue:-20, witchAmbition:+14, humanity:-14, hellAffinity:+10},
+        then:[
+          {who:'nayaDark',expr:'empty',text:'Я бы открыла его раньше. И без тебя.'},
+          {who:'sue',expr:'shocked',text:'...'},
+          {who:'naya',expr:'shocked',text:'(Я не собиралась этого говорить. Оно сказалось само.)'},
+          {who:'sue',expr:'sad',text:'Вот теперь я слышу, кто со мной разговаривает.'},
+          {who:'sue',expr:'sad',text:'Спасибо. Правда. Мне было важно это услышать.'},
+        ]},
     ]}},
   ]},
   { flag:'talkRegretDone' },
@@ -3814,7 +3925,7 @@ reflectionScene: [
           {who:'charlotte',expr:'angry',text:'Ты понимаешь, что ад тебя не простит?'},
           {who:'naya',expr:'sad',text:'Понимаю. Я уже жила с людьми, которые меня не прощают. Я привыкла.'},
         ]},
-      { when:()=> S('trustSue') >= 60,
+      { gate:{stat:'trustSue', min:60},
         text:'Отдать кристалл Сью.',
         stats:{humanity:+26, witchAmbition:-30, trustSue:+14},
         set:{pathChosen:true, chosenEarthPath:true, gaveCrystalAway:true},
@@ -4551,7 +4662,7 @@ window.addEventListener('load', () => {
         localStorage.removeItem(CONFIG.CHECKPOINT_KEY);
         localStorage.removeItem(CONFIG.META_KEY);
       } catch(e) {}
-      META = { endings:{}, memories:{}, endingStats:{} };
+      META = { endings:{}, memories:{}, endingStats:{}, hints:{} };
       document.getElementById('btnContinue').disabled = true;
       updateEndingCount();
       UI.toast('Всё удалено');
