@@ -1764,9 +1764,11 @@ const Weather = {
   apply(room) {
     const base = room.weather || {};
     const m = this.storyMod();
+    // indoors the story shows up as a haze in the air, not as weather
+    const k = base.indoor ? .3 : 1;
     this.cur = {
       rain:   clamp((base.rain||0)   + (base.indoor ? 0 : m.rain), 0, 1),
-      fog:    clamp((base.fog||0)    + m.fog, 0, 1),
+      fog:    clamp((base.fog||0)    + m.fog * k, 0, base.indoor ? .34 : 1),
       wind:   base.wind === undefined ? .25 : base.wind,
       leaves: base.leaves || 0,
       indoor: !!base.indoor,
@@ -2331,6 +2333,7 @@ nayaRoom: {
 /* ---------------------------------------------------------------- */
 corridor1: {
   name:"Коридор квартиры", music:'home', w:240, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.03, wind:0 }, light:{ tint:'#1a1620', dark:.24 },
   bgPaint(ctx) {
     ctx.fillStyle = '#28202a'; ctx.fillRect(0,0,240,300);
     ctx.fillStyle = '#181018'; ctx.fillRect(0,0,240,45); ctx.fillRect(0,255,240,45);
@@ -2650,6 +2653,7 @@ cafe: {
 /* ---------------------------------------------------------------- */
 hell: {
   name:"Ад", music:'hell', w:240, h:320,
+  zone:'hell', weather:{ indoor:true, rain:0, fog:.30, wind:.1 }, light:{ tint:'#1a0208', dark:.44 },
   bgPaint(ctx) {
     const g = ctx.createRadialGradient(120,160,20,120,160,200);
     g.addColorStop(0,'#4a0810'); g.addColorStop(1,'#100005');
@@ -2719,6 +2723,7 @@ hell: {
 /* ---------------------------------------------------------------- */
 lilithHall: {
   name:"Зал Лиллит", music:'hell', w:240, h:320,
+  zone:'hell', weather:{ indoor:true, rain:0, fog:.26, wind:.1 }, light:{ tint:'#12000a', dark:.50 },
   bgPaint(ctx) {
     ctx.fillStyle = '#0a0408'; ctx.fillRect(0,0,240,320);
     ctx.fillStyle = '#4a0810'; ctx.fillRect(100,20,40,300);
@@ -2818,6 +2823,7 @@ genevieveHouse: {
 /* ---------------------------------------------------------------- */
 communeHall: {
   name:"Коммуна", music:'tense', w:240, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.10, wind:0 }, light:{ tint:'#141c18', dark:.30 },
   bgPaint(ctx) {
     ctx.fillStyle = '#1e2a22'; ctx.fillRect(0,0,240,300);
     ctx.fillStyle = '#141c16'; ctx.fillRect(0,0,240,45);
@@ -3039,6 +3045,7 @@ witch2House: {
 /* ---------------------------------------------------------------- */
 nightSpot: {
   name:"За городом. Ночь", music:'tense', w:240, h:320,
+  zone:'forest', weather:{ rain:.55, fog:.55, wind:.35, leaves:.3 }, light:{ tint:'#080a16', dark:.60 },
   bgPaint(ctx) {
     ctx.fillStyle = '#08050f'; ctx.fillRect(0,0,240,320);
     ctx.fillStyle = '#000';
@@ -3099,6 +3106,7 @@ nightSpot: {
 /* ---------------------------------------------------------------- */
 witch3House: {
   name:"Дом за городом", music:'tense', w:240, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.14, wind:0 }, light:{ tint:'#0e1220', dark:.46 },
   bgPaint(ctx) {
     const t = 0;
     ctx.fillStyle = '#141824'; ctx.fillRect(0,0,240,300);
@@ -3186,6 +3194,7 @@ witch3House: {
 /* ---------------------------------------------------------------- */
 backAlley: {
   name:"Переулок", music:'tense', w:240, h:300,
+  zone:'town', weather:{ rain:.5, fog:.35, wind:.15, leaves:.2 }, light:{ tint:'#0c0a14', dark:.56 },
   bgPaint(ctx) {
     ctx.fillStyle = '#0e0c14'; ctx.fillRect(0,0,240,300);
     ctx.fillStyle = '#1a1620'; ctx.fillRect(0,0,60,300); ctx.fillRect(180,0,60,300);
@@ -3221,6 +3230,7 @@ backAlley: {
 /* ---------------------------------------------------------------- */
 hellFinal: {
   name:"Ад", music:'hell', w:240, h:320,
+  zone:'hell', weather:{ indoor:true, rain:0, fog:.34, wind:.1 }, light:{ tint:'#1e0208', dark:.42 },
   bgPaint(ctx) {
     const g = ctx.createRadialGradient(120,160,10,120,160,250);
     g.addColorStop(0,'#6a0810'); g.addColorStop(1,'#080005');
@@ -3249,6 +3259,7 @@ hellFinal: {
 /* ---------------------------------------------------------------- */
 hellSue: {
   name:"Ад", music:'hell', w:240, h:320,
+  zone:'hell', weather:{ indoor:true, rain:0, fog:.30, wind:.1 }, light:{ tint:'#1a0206', dark:.40 },
   bgPaint(ctx) {
     const g = ctx.createRadialGradient(120,180,10,120,180,240);
     g.addColorStop(0,'#2a0810'); g.addColorStop(1,'#050004');
@@ -3271,6 +3282,7 @@ hellSue: {
 /* ---------------------------------------------------------------- */
 parkWalk: {
   name:"Дорога домой", music:'warm', w:240, h:320,
+  zone:'forest', weather:{ rain:.12, fog:.10, wind:.25, leaves:.6 }, light:{ tint:'#1c2230', dark:.16 },
   bgPaint(ctx) {
     ctx.fillStyle = '#2a3448'; ctx.fillRect(0,0,240,150);
     ctx.fillStyle = '#e8c090'; ctx.beginPath(); ctx.arc(50,44,16,0,Math.PI*2); ctx.fill();
@@ -3299,6 +3311,7 @@ parkWalk: {
 /* ---------------------------------------------------------------- */
 kitchen: {
   name:"Кухня", music:'home', w:240, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 }, light:{ tint:'#1c1820', dark:.22 },
   bgPaint(ctx) {
     ctx.fillStyle = '#3c3238'; ctx.fillRect(0,0,240,300);
     ctx.fillStyle = '#241c22'; ctx.fillRect(0,0,240,44);
@@ -3379,6 +3392,7 @@ kitchen: {
 /* ---------------------------------------------------------------- */
 bathroom: {
   name:"Ванная", music:'home', w:240, h:280,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 }, light:{ tint:'#141a22', dark:.24 },
   bgPaint(ctx) {
     ctx.fillStyle = '#33383e'; ctx.fillRect(0,0,240,280);
     ctx.fillStyle = '#2a3036'; ctx.fillRect(0,0,240,44);
@@ -3436,6 +3450,7 @@ bathroom: {
 /* ---------------------------------------------------------------- */
 balcony: {
   name:"Балкон", music:'sad', w:240, h:230,
+  zone:'street', weather:{ rain:.45, fog:.20, wind:.45, leaves:.35 }, light:{ tint:'#141a28', dark:.34 },
   bgPaint(ctx) {
     const night = F('thirdHouseOpen') || F('sueDead');
     ctx.fillStyle = night ? '#100c1c' : '#243050'; ctx.fillRect(0,0,240,120);
@@ -3498,6 +3513,7 @@ balcony: {
 /* ---------------------------------------------------------------- */
 stairwell: {
   name:"Подъезд", music:'home', w:240, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 }, light:{ tint:'#12101a', dark:.34 },
   bgPaint(ctx) {
     ctx.fillStyle = '#2a2830'; ctx.fillRect(0,0,240,300);
     ctx.fillStyle = '#1e1c24'; ctx.fillRect(0,0,240,50);
