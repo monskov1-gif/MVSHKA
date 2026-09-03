@@ -466,6 +466,34 @@ const Audio = {
 /* --- Ambient music: 3 detuned oscillators through a lowpass, chord per theme --- */
 const Music = {
   nodes:null, gain:null, filter:null, lfo:null, current:null,
+  /* Real loops can replace the synth pad without touching anything else:
+     put the files next to index.html and call
+        Music.useFiles();            // uses the default names below
+        Music.useFiles({hell:'my/track.ogg'});
+     Left empty by default so the single-file build makes no network requests. */
+  DEFAULT_FILES: { home:'assets/audio/home.mp3', street:'assets/audio/town.mp3',
+                   warm:'assets/audio/cafe.mp3', tense:'assets/audio/witch.mp3',
+                   hell:'assets/audio/hell.mp3', sad:'assets/audio/sad.mp3' },
+  FILES: {},
+  useFiles(map) { this.FILES = Object.assign({}, this.DEFAULT_FILES, map || {}); this.els = {}; this.current = null; },
+  els:{}, elCur:null,
+  tryFile(theme) {
+    const src = this.FILES[theme];
+    if (!src) return false;
+    let el = this.els[theme];
+    if (el === undefined) {
+      el = document.createElement('audio');
+      el.src = src; el.loop = true; el.preload = 'auto'; el.volume = 0;
+      el.addEventListener('error', () => { this.els[theme] = null; }, { once:true });
+      this.els[theme] = el;
+    }
+    if (!el || !el.readyState) return false;
+    if (this.elCur && this.elCur !== el) this.elCur.pause();
+    this.elCur = el;
+    el.volume = Math.min(1, Audio.musicVolume);
+    el.play().catch(()=>{});
+    return true;
+  },
   THEMES: {
     home:   [110, 164.81, 196.00],
     street: [98,  146.83, 174.61],
@@ -481,6 +509,8 @@ const Music = {
     this.current = theme;
     const chord = this.THEMES[theme];
     if (!chord) { this.stop(); return; }
+    if (this.tryFile(theme)) { if (this.gain && Audio.ctx) { try { this.gain.gain.setTargetAtTime(0, Audio.ctx.currentTime, .6); } catch(e){} } return; }
+    if (this.elCur) { this.elCur.pause(); this.elCur = null; }
     if (!this.nodes) this._build();
     const t = Audio.ctx.currentTime;
     this.nodes.forEach((o,i)=>{ try { o.frequency.setTargetAtTime(chord[i], t, 0.8); } catch(e){} });
@@ -509,6 +539,7 @@ const Music = {
   },
   setVolume(v) {
     Audio.musicVolume = v;
+    if (typeof Ambience !== 'undefined') Ambience.refresh();
     if (this.gain && Audio.ctx && this.current && this.THEMES[this.current]) {
       try { this.gain.gain.setTargetAtTime(0.055 * v, Audio.ctx.currentTime, 0.3); } catch(e){}
     }
@@ -521,6 +552,62 @@ const Music = {
     if (!this.gain || !Audio.ctx) return;
     const base = (this.current && this.THEMES[this.current]) ? 0.055 * Audio.musicVolume : 0;
     try { this.gain.gain.setTargetAtTime(on ? 0 : base, Audio.ctx.currentTime, on ? 0.05 : 1.0); } catch(e){}
+  }
+};
+
+/* =====================================================================
+   AMBIENCE — filtered noise whose level follows the weather, plus a
+   per-zone room tone. Synthesised, so the game still ships as one file.
+===================================================================== */
+const Ambience = {
+  src:null, filter:null, gain:null, hiss:null, hissGain:null, cur:null, started:false,
+  ZONES: {
+    street:{cut:900,base:.16,hiss:.05}, town:{cut:800,base:.14,hiss:.04},
+    indoor:{cut:340,base:.05,hiss:.02}, cafe:{cut:520,base:.07,hiss:.05},
+    forest:{cut:1200,base:.20,hiss:.07}, hell:{cut:150,base:.22,hiss:.03},
+    none:{cut:200,base:0,hiss:0},
+  },
+  start() {
+    if (this.started || !Audio.ctx) return;
+    const c = Audio.ctx, n = c.sampleRate * 2;
+    const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    let last = 0;
+    for (let i=0;i<n;i++) { const w = Math.random()*2-1; last = (last + .02*w)/1.02; d[i] = last*3.2; }
+    this.src = c.createBufferSource(); this.src.buffer = buf; this.src.loop = true;
+    this.filter = c.createBiquadFilter(); this.filter.type='lowpass'; this.filter.frequency.value=600;
+    this.gain = c.createGain(); this.gain.gain.value = 0;
+    this.src.connect(this.filter); this.filter.connect(this.gain); this.gain.connect(c.destination);
+    this.src.start();
+    const hb = c.createBuffer(1, n, c.sampleRate), hd = hb.getChannelData(0);
+    for (let i=0;i<n;i++) hd[i] = (Math.random()*2-1)*.5;
+    this.hiss = c.createBufferSource(); this.hiss.buffer = hb; this.hiss.loop = true;
+    const hf = c.createBiquadFilter(); hf.type='bandpass'; hf.frequency.value=3400; hf.Q.value=.7;
+    this.hissGain = c.createGain(); this.hissGain.gain.value = 0;
+    this.hiss.connect(hf); hf.connect(this.hissGain); this.hissGain.connect(c.destination);
+    this.hiss.start();
+    this.started = true;
+  },
+  set(zone) {
+    this.start();
+    if (!Audio.ctx || !this.gain) return;
+    const z = this.ZONES[zone] || this.ZONES.indoor;
+    this.cur = zone;
+    const t = Audio.ctx.currentTime;
+    const rain = (typeof Weather !== 'undefined') ? Weather.cur.rain : 0;
+    const vol = Audio.musicVolume;
+    try {
+      this.filter.frequency.setTargetAtTime(z.cut + rain*700, t, 1.2);
+      this.gain.gain.setTargetAtTime((z.base + rain*.12) * vol, t, 1.4);
+      this.hissGain.gain.setTargetAtTime((z.hiss + rain*.09) * vol, t, 1.4);
+    } catch(e) {}
+  },
+  refresh() { if (this.cur) this.set(this.cur); },
+  stop() {
+    if (this.gain && Audio.ctx) { try {
+      this.gain.gain.setTargetAtTime(0, Audio.ctx.currentTime, .5);
+      this.hissGain.gain.setTargetAtTime(0, Audio.ctx.currentTime, .5);
+    } catch(e){} }
+    this.cur = null;
   }
 };
 
@@ -836,7 +923,15 @@ function addStats(delta) {
 }
 function S(k) { return gameState ? gameState.stats[k] : 0; }
 function F(k) { return !!(gameState && gameState.flags[k]); }
-function setFlag(k, v=true) { if (gameState) gameState.flags[k] = v; }
+function setFlag(k, v=true) {
+  if (!gameState) return;
+  const before = gameState.flags[k];
+  gameState.flags[k] = v;
+  if (before !== v && typeof World !== 'undefined') {
+    World.invalidate();                       // the world repaints as the story turns
+    if (typeof Weather !== 'undefined' && Rooms[gameState.currentRoom]) Weather.apply(Rooms[gameState.currentRoom]);
+  }
+}
 function C(k) { return (gameState && gameState.counters[k]) || 0; }
 function addC(k, v=1) { if (gameState) gameState.counters[k] = (gameState.counters[k]||0) + v; }
 function hasItem(n) { return !!(gameState && gameState.inventory.includes(n)); }
@@ -844,6 +939,969 @@ function amuletCount() {
   if (!gameState) return 0;
   return gameState.inventory.filter(i => i.startsWith('Амулет')).length;
 }
+
+/* =====================================================================
+   PALETTE — late autumn in a small town: warm foliage against cold wet air
+===================================================================== */
+const PAL = {
+  skyDay:'#8e97a6', skyDusk:'#4e5570', skyNight:'#20232f',
+  asphalt:'#3a3740', asphaltWet:'#2e2c35', kerb:'#6e6a6e', walk:'#5f5a5c',
+  grass:'#4c5a3a', grassDry:'#5e6338', dirt:'#5a4a38', mud:'#4a3c2e',
+  leafRed:'#a8412c', leafOrange:'#c2702c', leafGold:'#c9992f', leafBrown:'#7a4d２8'.replace('２','2'),
+  bark:'#4a3a30', barkDark:'#33261f',
+  woodWall:'#8a7660', woodWall2:'#6f5c4a', woodWall3:'#a8927a',
+  brick:'#6d4438', roof:'#4a3f44', roofDark:'#3a3138',
+  windowLit:'#f2c46a', windowDark:'#2d3240', glass:'#57616f',
+  lampGlow:'#ffcf7a', lampPost:'#2b2830',
+  wallIn:'#5b4a4a', wallIn2:'#4a3c3e', floorWood:'#7a5a3e', floorWood2:'#6a4c34',
+  floorTile:'#7d7a76', rugRed:'#7d3a38', rugWarm:'#8a6a3a',
+  metal:'#8d949c', metalDark:'#5a6068', white:'#e8e4dc', cream:'#d9cfbc',
+  ink:'#1b1720', shadow:'rgba(0,0,0,.32)',
+  hellRed:'#5a0c14', hellDeep:'#12040a', hellGlow:'#ff5a3c', hellViolet:'#3a1050',
+};
+function withA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = v => Math.max(0, Math.min(255, Math.round(v * f)));
+  return `rgb(${c((n>>16)&255)},${c((n>>8)&255)},${c(n&255)})`;
+}
+
+/* =====================================================================
+   ART — a library of reusable props drawn once into offscreen canvases.
+   Every prop declares its own footprint, so room collision is derived
+   from what you can actually see instead of hand-written wall rectangles.
+
+   def(key, {w,h,ax,ay,foot,solid,tall,light}, draw)
+     w,h   size of the sprite
+     ax,ay anchor inside the sprite — the point that sits on the floor
+     foot  collision box relative to the anchor (null = walkable)
+===================================================================== */
+const Art = {
+  defs:{}, cache:{},
+  def(key, meta, draw) { this.defs[key] = Object.assign({ax:0, ay:0, foot:null}, meta, {draw}); },
+  meta(key) { return this.defs[key]; },
+  get(key) {
+    if (this.cache[key]) return this.cache[key];
+    const d = this.defs[key];
+    if (!d) return null;
+    const c = document.createElement('canvas');
+    c.width = d.w; c.height = d.h;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    try { d.draw(g, d); } catch(e) { console.error('art', key, e); }
+    this.cache[key] = c;
+    return c;
+  },
+  /* footprint of a placed object, in room coordinates */
+  footOf(o) {
+    const d = this.defs[o.t];
+    if (!d || !d.foot) return null;
+    return { x:o.x + d.foot.x, y:o.y + d.foot.y, w:d.foot.w, h:d.foot.h };
+  },
+  drawAt(ctx, o, camX, camY) {
+    const img = this.get(o.t); if (!img) return;
+    const d = this.defs[o.t];
+    ctx.drawImage(img, Math.round(o.x - d.ax - camX), Math.round(o.y - d.ay - camY));
+  }
+};
+
+/* --- little drawing helpers shared by the props --- */
+function shadowEllipse(g, cx, cy, rx, ry, a) {
+  g.fillStyle = `rgba(0,0,0,${a === undefined ? .28 : a})`;
+  g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); g.fill();
+}
+/* a 3/4-view box: visible top face plus a front face, the way furniture
+   reads in a top-down RPG */
+function box34(g, x, y, w, depth, height, topCol, frontCol, sideCol) {
+  g.fillStyle = frontCol; g.fillRect(x, y + depth, w, height);
+  g.fillStyle = sideCol || shade(frontCol, .8);
+  g.fillRect(x, y + depth + height - 2, w, 2);
+  g.fillStyle = topCol; g.fillRect(x, y, w, depth);
+  g.fillStyle = shade(topCol, 1.12); g.fillRect(x, y, w, 1);
+  g.fillStyle = shade(frontCol, .72); g.fillRect(x, y + depth, w, 1);
+}
+function legs(g, x, y, w, h, col) {
+  g.fillStyle = col;
+  g.fillRect(x, y, 2, h); g.fillRect(x + w - 2, y, 2, h);
+}
+function woodGrain(g, x, y, w, h, col) {
+  g.fillStyle = col;
+  for (let i = 2; i < h; i += 3) g.fillRect(x + 1, y + i, w - 2, 1);
+}
+
+/* =====================================================================
+   ART LIBRARY — interiors
+===================================================================== */
+(function defineFurniture() {
+  const D = (k, m, f) => Art.def(k, m, f);
+
+  /* ---- beds ---- */
+  D('bed_single', {w:30,h:46,ax:15,ay:44,foot:{x:-15,y:-44,w:30,h:46}}, g => {
+    shadowEllipse(g, 15, 44, 13, 3);
+    box34(g, 2, 0, 26, 5, 4, '#5a4436', '#43332a');            // headboard
+    g.fillStyle = '#cfc4b4'; g.fillRect(3, 6, 24, 34);          // mattress
+    g.fillStyle = '#e8e2d6'; g.fillRect(5, 8, 20, 10);          // pillow
+    g.fillStyle = '#8a4a52'; g.fillRect(3, 20, 24, 20);         // blanket
+    g.fillStyle = '#9c5a60'; g.fillRect(3, 20, 24, 2);
+    g.fillStyle = '#733d45'; for (let i=0;i<3;i++) g.fillRect(6+i*8, 22, 1, 17);
+    g.fillStyle = '#43332a'; g.fillRect(2, 40, 26, 3);
+    legs(g, 3, 43, 24, 3, '#2f241d');
+  });
+  D('bed_double', {w:44,h:48,ax:22,ay:46,foot:{x:-22,y:-46,w:44,h:48}}, g => {
+    shadowEllipse(g, 22, 46, 19, 3);
+    box34(g, 2, 0, 40, 5, 4, '#4a3a4a', '#372a37');
+    g.fillStyle = '#c8bcae'; g.fillRect(3, 6, 38, 36);
+    g.fillStyle = '#e6ded0'; g.fillRect(5, 8, 15, 9); g.fillRect(24, 8, 15, 9);
+    g.fillStyle = '#5c4258'; g.fillRect(3, 20, 38, 22);
+    g.fillStyle = '#6d5068'; g.fillRect(3, 20, 38, 2);
+    g.fillStyle = '#372a37'; g.fillRect(2, 42, 40, 3);
+    legs(g, 3, 45, 38, 3, '#241c24');
+  });
+
+  /* ---- seating ---- */
+  D('sofa_old', {w:50,h:30,ax:25,ay:28,foot:{x:-25,y:-20,w:50,h:22}}, g => {
+    shadowEllipse(g, 25, 28, 22, 3);
+    g.fillStyle = '#6b4a3c'; g.fillRect(2, 0, 46, 11);           // backrest
+    g.fillStyle = '#7d5947'; g.fillRect(3, 1, 44, 3);
+    g.fillStyle = '#5c3e33'; g.fillRect(0, 4, 6, 18); g.fillRect(44, 4, 6, 18);  // arms
+    g.fillStyle = '#6b4a3c'; g.fillRect(1, 5, 4, 3); g.fillRect(45, 5, 4, 3);
+    g.fillStyle = '#8a6450'; g.fillRect(7, 10, 17, 11); g.fillRect(26, 10, 17, 11); // cushions
+    g.fillStyle = '#79553f'; g.fillRect(7, 10, 17, 1); g.fillRect(26, 10, 17, 1);
+    g.fillStyle = '#4a3128'; g.fillRect(2, 21, 46, 3);
+    legs(g, 4, 24, 42, 4, '#2e211b');
+  });
+  D('sofa_modern', {w:52,h:28,ax:26,ay:26,foot:{x:-26,y:-18,w:52,h:20}}, g => {
+    shadowEllipse(g, 26, 26, 23, 3);
+    g.fillStyle = '#4d5560'; g.fillRect(2, 0, 48, 9);
+    g.fillStyle = '#5d6672'; g.fillRect(3, 1, 46, 2);
+    g.fillStyle = '#454c56'; g.fillRect(0, 3, 5, 17); g.fillRect(47, 3, 5, 17);
+    g.fillStyle = '#68717d'; g.fillRect(6, 9, 19, 10); g.fillRect(27, 9, 19, 10);
+    g.fillStyle = '#3a4048'; g.fillRect(2, 19, 48, 3);
+    legs(g, 5, 22, 42, 4, '#2a2e34');
+  });
+  D('armchair', {w:26,h:26,ax:13,ay:24,foot:{x:-13,y:-17,w:26,h:19}}, g => {
+    shadowEllipse(g, 13, 24, 11, 3);
+    g.fillStyle = '#6a4550'; g.fillRect(2, 0, 22, 10);
+    g.fillStyle = '#7d5460'; g.fillRect(3, 1, 20, 2);
+    g.fillStyle = '#5a3944'; g.fillRect(0, 3, 5, 15); g.fillRect(21, 3, 5, 15);
+    g.fillStyle = '#8a6070'; g.fillRect(6, 10, 14, 8);
+    g.fillStyle = '#43272f'; g.fillRect(2, 18, 22, 3);
+    legs(g, 4, 21, 18, 3, '#2b1a1f');
+  });
+  D('chair_wood', {w:14,h:22,ax:7,ay:20,foot:{x:-7,y:-10,w:14,h:12}}, g => {
+    shadowEllipse(g, 7, 20, 6, 2);
+    g.fillStyle = '#6b4f36'; g.fillRect(2, 0, 10, 8);
+    g.fillStyle = '#7d5e42'; g.fillRect(3, 1, 8, 2);
+    g.fillStyle = '#8a6944'; g.fillRect(1, 8, 12, 6);
+    g.fillStyle = '#5a412c'; g.fillRect(1, 13, 12, 2);
+    legs(g, 2, 15, 10, 5, '#3b2a1c');
+  });
+
+  /* ---- tables & desks ---- */
+  D('table_wood', {w:40,h:28,ax:20,ay:26,foot:{x:-20,y:-16,w:40,h:18}}, g => {
+    shadowEllipse(g, 20, 26, 17, 3);
+    box34(g, 0, 2, 40, 14, 4, '#8a6944', '#5f4530');
+    woodGrain(g, 1, 3, 38, 12, '#7d5e3c');
+    legs(g, 3, 20, 34, 6, '#3b2a1c');
+  });
+  D('table_round', {w:32,h:30,ax:16,ay:28,foot:{x:-15,y:-16,w:30,h:18}}, g => {
+    shadowEllipse(g, 16, 28, 14, 3);
+    g.fillStyle = '#5f4530'; g.beginPath(); g.ellipse(16, 15, 15, 9, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#8a6944'; g.beginPath(); g.ellipse(16, 13, 15, 9, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#9a784f'; g.beginPath(); g.ellipse(16, 12, 12, 6, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#3b2a1c'; g.fillRect(14, 20, 4, 7); g.fillRect(10, 26, 12, 2);
+  });
+  D('desk', {w:40,h:26,ax:20,ay:24,foot:{x:-20,y:-16,w:40,h:18}}, g => {
+    shadowEllipse(g, 20, 24, 17, 3);
+    box34(g, 0, 2, 40, 12, 4, '#7b5a3c', '#553d29');
+    g.fillStyle = '#4a3524'; g.fillRect(24, 16, 14, 6);          // drawer block
+    g.fillStyle = '#6b4f36'; g.fillRect(25, 17, 12, 2); g.fillRect(25, 20, 12, 2);
+    g.fillStyle = '#c9a05a'; g.fillRect(30, 18, 3, 1); g.fillRect(30, 21, 3, 1);
+    legs(g, 2, 18, 8, 6, '#3b2a1c');
+  });
+
+  /* ---- storage ---- */
+  D('wardrobe', {w:36,h:48,ax:18,ay:46,foot:{x:-18,y:-14,w:36,h:16}}, g => {
+    shadowEllipse(g, 18, 46, 15, 3);
+    g.fillStyle = '#4a3324'; g.fillRect(0, 0, 36, 44);
+    g.fillStyle = '#6b4c34'; g.fillRect(2, 2, 32, 40);
+    g.fillStyle = '#5a3f2b'; g.fillRect(17, 2, 2, 40);           // door split
+    woodGrain(g, 3, 4, 14, 36, '#79573a'); woodGrain(g, 20, 4, 14, 36, '#79573a');
+    g.fillStyle = '#c9a05a'; g.fillRect(14, 22, 2, 5); g.fillRect(20, 22, 2, 5);
+    g.fillStyle = '#3a2718'; g.fillRect(0, 42, 36, 3);
+  });
+  D('bookshelf', {w:36,h:44,ax:18,ay:42,foot:{x:-18,y:-12,w:36,h:14}}, g => {
+    shadowEllipse(g, 18, 42, 15, 3);
+    g.fillStyle = '#40301f'; g.fillRect(0, 0, 36, 40);
+    g.fillStyle = '#5c452e'; g.fillRect(2, 2, 32, 36);
+    const books = ['#8a3a30','#3a5a7a','#4a7a4a','#a08030','#6a4a7a','#a05a3a','#7a7a4a'];
+    for (let r = 0; r < 4; r++) {
+      const y = 4 + r * 9;
+      g.fillStyle = '#40301f'; g.fillRect(2, y + 7, 32, 2);
+      let x = 4;
+      while (x < 32) {
+        const w = 2 + ((x + r * 3) % 3);
+        g.fillStyle = books[(x + r) % books.length];
+        g.fillRect(x, y + 1 - ((x % 2)), w, 6 + (x % 2));
+        x += w + 1;
+      }
+    }
+    g.fillStyle = '#33261a'; g.fillRect(0, 38, 36, 3);
+  });
+  D('cabinet', {w:30,h:30,ax:15,ay:28,foot:{x:-15,y:-12,w:30,h:14}}, g => {
+    shadowEllipse(g, 15, 28, 13, 3);
+    g.fillStyle = '#463020'; g.fillRect(0, 0, 30, 26);
+    g.fillStyle = '#66492f'; g.fillRect(2, 2, 26, 22);
+    g.fillStyle = '#553d29'; g.fillRect(14, 2, 2, 22);
+    g.fillStyle = '#c9a05a'; g.fillRect(11, 12, 2, 4); g.fillRect(17, 12, 2, 4);
+    g.fillStyle = '#33241a'; g.fillRect(0, 24, 30, 3);
+  });
+  D('chest', {w:24,h:20,ax:12,ay:18,foot:{x:-12,y:-11,w:24,h:13}}, g => {
+    shadowEllipse(g, 12, 18, 10, 2);
+    box34(g, 1, 1, 22, 6, 8, '#6b4a2e', '#4d3420');
+    g.fillStyle = '#8a7038'; g.fillRect(1, 7, 22, 2); g.fillRect(10, 1, 4, 14);
+    g.fillStyle = '#3a2a18'; g.fillRect(10, 9, 4, 3);
+  });
+
+  /* ---- kitchen & bath ---- */
+  D('counter', {w:46,h:26,ax:23,ay:24,foot:{x:-23,y:-14,w:46,h:16}}, g => {
+    shadowEllipse(g, 23, 24, 20, 3);
+    box34(g, 0, 0, 46, 8, 14, '#a89880', '#6a5442');
+    g.fillStyle = '#5a4636'; g.fillRect(15, 8, 1, 14); g.fillRect(31, 8, 1, 14);
+    g.fillStyle = '#c9a05a'; g.fillRect(12, 13, 3, 1); g.fillRect(33, 13, 3, 1);
+    g.fillStyle = '#b8a88e'; g.fillRect(0, 0, 46, 2);
+  });
+  D('stove', {w:26,h:26,ax:13,ay:24,foot:{x:-13,y:-14,w:26,h:16}}, g => {
+    shadowEllipse(g, 13, 24, 11, 3);
+    box34(g, 0, 0, 26, 8, 14, '#4a4a52', '#3a3a42');
+    g.fillStyle = '#22222a';
+    [[7,3],[18,3],[7,6],[18,6]].forEach(([x,y]) => { g.beginPath(); g.ellipse(x, y, 3.4, 2.2, 0, 0, Math.PI*2); g.fill(); });
+    g.fillStyle = '#5c5c66'; g.fillRect(3, 12, 20, 8);           // oven door
+    g.fillStyle = '#2a2a32'; g.fillRect(5, 14, 16, 4);
+    g.fillStyle = '#9aa0a8'; g.fillRect(4, 11, 18, 1);
+  });
+  D('sink', {w:26,h:22,ax:13,ay:20,foot:{x:-13,y:-12,w:26,h:14}}, g => {
+    shadowEllipse(g, 13, 20, 11, 2);
+    box34(g, 0, 0, 26, 8, 10, '#b6b2aa', '#7d7a72');
+    g.fillStyle = '#8d949c'; g.fillRect(5, 2, 16, 5);
+    g.fillStyle = '#6a7078'; g.fillRect(6, 3, 14, 3);
+    g.fillStyle = '#a8aeb6'; g.fillRect(12, 0, 2, 3); g.fillRect(12, 0, 5, 1);
+  });
+  D('fridge', {w:26,h:46,ax:13,ay:44,foot:{x:-13,y:-14,w:26,h:16}}, g => {
+    shadowEllipse(g, 13, 44, 11, 3);
+    g.fillStyle = '#9a9488'; g.fillRect(0, 0, 26, 42);
+    g.fillStyle = '#c4beb2'; g.fillRect(1, 1, 24, 40);
+    g.fillStyle = '#a8a296'; g.fillRect(1, 15, 24, 2);
+    g.fillStyle = '#7d786e'; g.fillRect(21, 6, 2, 7); g.fillRect(21, 20, 2, 7);
+    g.fillStyle = '#d8c060'; g.fillRect(5, 4, 4, 4);
+    g.fillStyle = '#b05050'; g.fillRect(11, 4, 4, 4);
+    g.fillStyle = '#6a655c'; g.fillRect(0, 41, 26, 2);
+  });
+  D('bathtub', {w:30,h:48,ax:15,ay:46,foot:{x:-15,y:-46,w:30,h:48}}, g => {
+    shadowEllipse(g, 15, 46, 13, 3);
+    g.fillStyle = '#b8b4ac'; g.fillRect(0, 0, 30, 44);
+    g.fillStyle = '#e4e0d8'; g.fillRect(2, 2, 26, 40);
+    g.fillStyle = '#cfd6d8'; g.fillRect(4, 5, 22, 34);
+    g.fillStyle = '#8d949c'; g.fillRect(13, 0, 4, 4);
+    g.fillStyle = '#a8aeb6'; g.fillRect(12, 3, 6, 2);
+    g.fillStyle = '#9a968e'; g.fillRect(0, 42, 30, 3);
+  });
+  D('toilet', {w:16,h:24,ax:8,ay:22,foot:{x:-8,y:-14,w:16,h:16}}, g => {
+    shadowEllipse(g, 8, 22, 7, 2);
+    g.fillStyle = '#cfcbc3'; g.fillRect(2, 0, 12, 8);
+    g.fillStyle = '#e4e0d8'; g.fillRect(3, 1, 10, 6);
+    g.fillStyle = '#e4e0d8'; g.beginPath(); g.ellipse(8, 14, 6, 7, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#b0aca4'; g.beginPath(); g.ellipse(8, 14, 4, 5, 0, 0, Math.PI*2); g.fill();
+  });
+
+  /* ---- warmth & clutter ---- */
+  D('fireplace', {w:38,h:34,ax:19,ay:32,foot:{x:-19,y:-12,w:38,h:14}}, g => {
+    g.fillStyle = '#5a4a44'; g.fillRect(0, 0, 38, 30);
+    g.fillStyle = '#6d5a52'; for (let r=0;r<5;r++) for (let c=0;c<5;c++) g.fillRect(2+c*7+((r%2)?3:0), 2+r*6, 6, 5);
+    g.fillStyle = '#1a1218'; g.fillRect(9, 12, 20, 16);
+    g.fillStyle = '#c0442a'; g.fillRect(12, 20, 14, 8);
+    g.fillStyle = '#e8802a'; g.fillRect(14, 22, 10, 5);
+    g.fillStyle = '#f8c85a'; g.fillRect(17, 24, 4, 3);
+    g.fillStyle = '#4a3a34'; g.fillRect(0, 28, 38, 3);
+  });
+  D('rug_red', {w:52,h:36,ax:26,ay:18,foot:null}, g => {
+    g.fillStyle = '#7d3a38'; g.fillRect(0, 0, 52, 36);
+    g.fillStyle = '#9a4a44'; g.fillRect(3, 3, 46, 30);
+    g.fillStyle = '#6a2e2c'; g.fillRect(7, 7, 38, 22);
+    g.fillStyle = '#b8735a'; g.fillRect(11, 11, 30, 14);
+    g.fillStyle = '#7d3a38'; g.fillRect(16, 15, 20, 6);
+  });
+  D('rug_warm', {w:48,h:32,ax:24,ay:16,foot:null}, g => {
+    g.fillStyle = '#8a6a3a'; g.fillRect(0, 0, 48, 32);
+    g.fillStyle = '#a08248'; g.fillRect(2, 2, 44, 28);
+    g.fillStyle = '#6f5330'; for (let i=0;i<5;i++) g.fillRect(4, 5+i*5, 40, 1);
+  });
+  D('lamp_floor', {w:16,h:40,ax:8,ay:38,foot:{x:-5,y:-6,w:10,h:8}, light:{dy:-30,r:44,c:'#ffcf7a',i:.75}}, g => {
+    shadowEllipse(g, 8, 38, 6, 2);
+    g.fillStyle = '#3a3038'; g.fillRect(7, 10, 2, 26);
+    g.fillStyle = '#2b2830'; g.fillRect(4, 35, 8, 3);
+    g.fillStyle = '#d8b070'; g.fillRect(2, 2, 12, 9);
+    g.fillStyle = '#f2d59a'; g.fillRect(3, 3, 10, 6);
+    g.fillStyle = '#fff0c8'; g.fillRect(5, 10, 6, 2);
+  });
+  D('candle', {w:8,h:14,ax:4,ay:13,foot:null, light:{dy:-10,r:22,c:'#ffbe60',i:.6,flicker:1}}, g => {
+    g.fillStyle = '#d8cbb0'; g.fillRect(2, 5, 4, 8);
+    g.fillStyle = '#efe6d0'; g.fillRect(2, 5, 2, 8);
+    g.fillStyle = '#8a7a58'; g.fillRect(1, 12, 6, 2);
+    g.fillStyle = '#ffb040'; g.beginPath(); g.ellipse(4, 3, 1.6, 3, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#fff0b0'; g.beginPath(); g.ellipse(4, 3.5, .8, 1.6, 0, 0, Math.PI*2); g.fill();
+  });
+  D('plant_pot', {w:20,h:28,ax:10,ay:26,foot:{x:-7,y:-8,w:14,h:10}}, g => {
+    shadowEllipse(g, 10, 26, 8, 2);
+    g.fillStyle = '#3f6b3a';
+    [[10,6,7],[5,11,5],[15,11,5],[10,13,6]].forEach(([x,y,r]) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI*2); g.fill(); });
+    g.fillStyle = '#548a48';
+    [[8,5,4],[13,10,3]].forEach(([x,y,r]) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI*2); g.fill(); });
+    box34(g, 4, 17, 12, 4, 7, '#8a5a3a', '#6a4028');
+  });
+  D('painting', {w:22,h:18,ax:11,ay:9,foot:null}, g => {
+    g.fillStyle = '#4a3524'; g.fillRect(0, 0, 22, 18);
+    g.fillStyle = '#c9a05a'; g.fillRect(1, 1, 20, 16);
+    g.fillStyle = '#6a7a8a'; g.fillRect(3, 3, 16, 12);
+    g.fillStyle = '#4a5a4a'; g.fillRect(3, 9, 16, 6);
+    g.fillStyle = '#8a8a6a'; g.fillRect(6, 6, 4, 4);
+  });
+  D('tv', {w:30,h:22,ax:15,ay:20,foot:{x:-15,y:-9,w:30,h:11}}, g => {
+    shadowEllipse(g, 15, 20, 12, 2);
+    g.fillStyle = '#22242a'; g.fillRect(0, 0, 30, 15);
+    g.fillStyle = '#3a4450'; g.fillRect(2, 2, 26, 11);
+    g.fillStyle = '#55636f'; g.fillRect(3, 3, 12, 5);
+    g.fillStyle = '#1a1c22'; g.fillRect(13, 15, 4, 3); g.fillRect(9, 17, 12, 2);
+  });
+  D('clock', {w:14,h:14,ax:7,ay:7,foot:null}, g => {
+    g.fillStyle = '#4a3524'; g.beginPath(); g.arc(7, 7, 7, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#e0d8c8'; g.beginPath(); g.arc(7, 7, 5, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#2a2018'; g.fillRect(6.5, 3, 1, 4.5); g.fillRect(7, 7, 3, 1);
+  });
+  D('mirror_tall', {w:22,h:46,ax:11,ay:44,foot:{x:-11,y:-8,w:22,h:10}}, g => {
+    shadowEllipse(g, 11, 44, 9, 2);
+    g.fillStyle = '#4a3524'; g.fillRect(0, 0, 22, 42);
+    g.fillStyle = '#8d99a6'; g.fillRect(3, 3, 16, 36);
+    g.fillStyle = '#a3aeb8'; g.fillRect(3, 3, 16, 12);
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(5, 6, 4, 30);
+    g.fillStyle = '#c9a05a'; g.fillRect(9, 0, 4, 3);
+  });
+  D('door_wood', {w:28,h:38,ax:14,ay:36,foot:null}, g => {
+    g.fillStyle = '#3f352e'; g.fillRect(0, 0, 28, 36);
+    g.fillStyle = '#6b533c'; g.fillRect(2, 2, 24, 34);
+    g.fillStyle = '#5a4530'; g.fillRect(5, 5, 18, 12); g.fillRect(5, 20, 18, 12);
+    g.fillStyle = '#c9a05a'; g.fillRect(22, 19, 3, 3);
+  });
+  D('window_in', {w:34,h:28,ax:17,ay:14,foot:null}, g => {
+    g.fillStyle = '#3f352e'; g.fillRect(0, 0, 34, 28);
+    g.fillStyle = '#2b3444'; g.fillRect(3, 3, 28, 22);
+    g.fillStyle = '#3d4a5e'; g.fillRect(3, 3, 28, 8);
+    g.fillStyle = '#3f352e'; g.fillRect(16, 3, 2, 22); g.fillRect(3, 12, 28, 2);
+    g.fillStyle = '#8a7660'; g.fillRect(0, 25, 34, 3);
+  });
+  D('photo_frame', {w:16,h:18,ax:8,ay:9,foot:null}, g => {
+    g.fillStyle = '#3a2c22'; g.fillRect(0, 0, 16, 18);
+    g.fillStyle = '#6a5a50'; g.fillRect(2, 2, 12, 14);
+    g.fillStyle = '#8a7a72'; g.fillRect(5, 5, 6, 7);
+  });
+  D('coffee_machine', {w:26,h:24,ax:13,ay:22,foot:{x:-13,y:-10,w:26,h:12}}, g => {
+    g.fillStyle = '#4a4a52'; g.fillRect(1, 0, 24, 20);
+    g.fillStyle = '#63636d'; g.fillRect(2, 1, 22, 8);
+    g.fillStyle = '#a8302a'; g.fillRect(5, 3, 3, 3);
+    g.fillStyle = '#2a2a32'; g.fillRect(6, 11, 14, 7);
+    g.fillStyle = '#8d949c'; g.fillRect(9, 9, 8, 2);
+    g.fillStyle = '#3a3a42'; g.fillRect(1, 18, 24, 3);
+  });
+  D('till', {w:22,h:22,ax:11,ay:20,foot:{x:-11,y:-9,w:22,h:11}}, g => {
+    g.fillStyle = '#5a5048'; g.fillRect(1, 4, 20, 14);
+    g.fillStyle = '#6f645a'; g.fillRect(2, 5, 18, 5);
+    g.fillStyle = '#2f3a44'; g.fillRect(4, 0, 14, 6);
+    g.fillStyle = '#7ba0b8'; g.fillRect(5, 1, 12, 4);
+    g.fillStyle = '#3a3430'; for (let i=0;i<3;i++) g.fillRect(4+i*6, 12, 4, 3);
+  });
+  D('cauldron', {w:28,h:26,ax:14,ay:24,foot:{x:-13,y:-10,w:26,h:12}}, g => {
+    shadowEllipse(g, 14, 24, 11, 2);
+    g.fillStyle = '#26262c'; g.beginPath(); g.ellipse(14, 14, 13, 10, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#33333a'; g.beginPath(); g.ellipse(14, 12, 13, 9, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#4a7a34'; g.beginPath(); g.ellipse(14, 11, 9, 5, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#68a244'; g.beginPath(); g.ellipse(12, 10, 4, 2, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#1e1e24'; g.fillRect(2, 18, 24, 3);
+  });
+  D('herb_shelf', {w:34,h:34,ax:17,ay:32,foot:{x:-17,y:-8,w:34,h:10}}, g => {
+    g.fillStyle = '#40301f'; g.fillRect(0, 0, 34, 30);
+    g.fillStyle = '#5c452e'; g.fillRect(2, 2, 30, 26);
+    g.fillStyle = '#40301f'; g.fillRect(2, 13, 30, 2);
+    const jars = ['#7a8a44','#a06030','#6a8a6a','#8a7a40'];
+    for (let i=0;i<4;i++) { g.fillStyle = jars[i]; g.fillRect(4+i*7, 5, 5, 7); g.fillRect(4+i*7, 17, 5, 8); }
+    g.fillStyle = '#d8c8a0'; for (let i=0;i<4;i++) { g.fillRect(4+i*7, 5, 5, 1); g.fillRect(4+i*7, 17, 5, 1); }
+  });
+  D('altar', {w:40,h:28,ax:20,ay:26,foot:{x:-20,y:-16,w:40,h:18}}, g => {
+    shadowEllipse(g, 20, 26, 17, 3);
+    box34(g, 0, 0, 40, 10, 14, '#3a2a38', '#281c28');
+    g.fillStyle = '#5a4058'; g.fillRect(0, 0, 40, 2);
+    g.fillStyle = '#7a4a8a'; g.fillRect(4, 3, 32, 1); g.fillRect(4, 7, 32, 1);
+    g.fillStyle = '#2a1c2a'; g.fillRect(6, 12, 28, 10);
+  });
+})();
+
+/* =====================================================================
+   ART LIBRARY — exteriors: trees, street furniture, buildings
+===================================================================== */
+(function defineExterior() {
+  const D = (k, m, f) => Art.def(k, m, f);
+
+  /* --- maple canopies. Drawn as clustered blobs so the silhouette reads
+         as a tree rather than a green circle. --- */
+  function canopy(g, cx, cy, r, base, light, dark) {
+    const blobs = [[0,0,1],[-.62,.12,.72],[.62,.10,.72],[-.34,-.44,.66],[.36,-.42,.66],[0,.46,.7]];
+    g.fillStyle = dark;
+    blobs.forEach(([dx,dy,f]) => { g.beginPath(); g.arc(cx+dx*r, cy+dy*r+2, r*f, 0, Math.PI*2); g.fill(); });
+    g.fillStyle = base;
+    blobs.forEach(([dx,dy,f]) => { g.beginPath(); g.arc(cx+dx*r, cy+dy*r, r*f, 0, Math.PI*2); g.fill(); });
+    g.fillStyle = light;
+    [[-.3,-.5,.42],[.28,-.3,.34],[-.05,-.68,.28]].forEach(([dx,dy,f]) => {
+      g.beginPath(); g.arc(cx+dx*r, cy+dy*r, r*f, 0, Math.PI*2); g.fill();
+    });
+  }
+  function trunk(g, cx, top, bottom, w, col, dark) {
+    g.fillStyle = col; g.fillRect(cx - w/2, top, w, bottom - top);
+    g.fillStyle = dark; g.fillRect(cx - w/2, top, 2, bottom - top);
+    g.fillStyle = col;
+    g.fillRect(cx - w/2 - 3, bottom - 4, 3, 4); g.fillRect(cx + w/2, bottom - 4, 3, 4);
+  }
+  const TREES = {
+    tree_red:    ['#a8412c','#c25a3a','#77291d'],
+    tree_orange: ['#c2702c','#d98d43','#8d4a1c'],
+    tree_gold:   ['#c9992f','#dcb14a','#8f6a1c'],
+    tree_rust:   ['#8a4326','#a85a35','#5f2c19'],
+  };
+  Object.keys(TREES).forEach(key => {
+    const [base, light, dark] = TREES[key];
+    D(key, {w:64,h:76,ax:32,ay:74,foot:{x:-7,y:-8,w:14,h:10}, fade:true}, g => {
+      shadowEllipse(g, 32, 73, 13, 4, .22);
+      trunk(g, 32, 40, 74, 9, PAL.bark, PAL.barkDark);
+      canopy(g, 32, 26, 24, base, light, dark);
+    });
+  });
+  D('tree_bare', {w:56,h:74,ax:28,ay:72,foot:{x:-6,y:-8,w:12,h:10}, fade:true}, g => {
+    shadowEllipse(g, 28, 71, 11, 3, .2);
+    trunk(g, 28, 26, 72, 8, PAL.bark, PAL.barkDark);
+    g.strokeStyle = PAL.bark; g.lineWidth = 2.4;
+    [[-1,-1],[1,-1],[-1.5,-.4],[1.5,-.4]].forEach(([dx,dy]) => {
+      g.beginPath(); g.moveTo(28, 34); g.lineTo(28 + dx*14, 34 + dy*16); g.stroke();
+    });
+    g.lineWidth = 1.4;
+    [[-1.8,-1.3],[1.8,-1.3],[-.6,-1.9],[.7,-1.9]].forEach(([dx,dy]) => {
+      g.beginPath(); g.moveTo(28, 32); g.lineTo(28 + dx*13, 32 + dy*13); g.stroke();
+    });
+    g.lineWidth = 1;
+  });
+  D('pine', {w:40,h:72,ax:20,ay:70,foot:{x:-7,y:-8,w:14,h:10}, fade:true}, g => {
+    shadowEllipse(g, 20, 69, 10, 3, .2);
+    trunk(g, 20, 52, 70, 6, '#3e3126', '#2a2018');
+    for (let i = 0; i < 4; i++) {
+      const y = 12 + i * 12, w = 8 + i * 6;
+      g.fillStyle = '#2f4a33'; g.beginPath();
+      g.moveTo(20, y - 12); g.lineTo(20 - w, y + 8); g.lineTo(20 + w, y + 8); g.closePath(); g.fill();
+      g.fillStyle = '#3d5d3f'; g.beginPath();
+      g.moveTo(20, y - 10); g.lineTo(20 - w + 3, y + 6); g.lineTo(20 + w - 6, y + 6); g.closePath(); g.fill();
+    }
+  });
+  D('bush', {w:24,h:18,ax:12,ay:16,foot:{x:-10,y:-6,w:20,h:8}}, g => {
+    shadowEllipse(g, 12, 16, 9, 2, .2);
+    g.fillStyle = '#3d4f30';
+    [[6,10,6],[12,8,7],[18,10,6]].forEach(([x,y,r]) => { g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill(); });
+    g.fillStyle = '#4e6338';
+    [[9,7,4],[15,8,4]].forEach(([x,y,r]) => { g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill(); });
+    g.fillStyle = '#8a5a30'; g.fillRect(7, 6, 2, 2); g.fillRect(16, 9, 2, 2);
+  });
+
+  /* --- street furniture --- */
+  D('lamp_street', {w:18,h:56,ax:9,ay:54,foot:{x:-4,y:-5,w:8,h:6}, light:{dy:-44,r:66,c:'#ffcf7a',i:.95}}, g => {
+    shadowEllipse(g, 9, 53, 6, 2, .25);
+    g.fillStyle = PAL.lampPost; g.fillRect(7, 12, 4, 40);
+    g.fillStyle = '#3d3a44'; g.fillRect(4, 50, 10, 4);
+    g.fillStyle = '#2b2830'; g.fillRect(3, 4, 12, 3);
+    g.fillStyle = '#4a4550'; g.fillRect(4, 6, 10, 8);
+    g.fillStyle = '#ffe6a8'; g.fillRect(5, 7, 8, 6);
+    g.fillStyle = '#fff6d8'; g.fillRect(6, 8, 6, 3);
+    g.fillStyle = '#2b2830'; g.fillRect(6, 2, 6, 2);
+  });
+  D('pole_power', {w:16,h:72,ax:8,ay:70,foot:{x:-4,y:-5,w:8,h:6}, fade:true}, g => {
+    shadowEllipse(g, 8, 69, 5, 2, .22);
+    g.fillStyle = '#5a4a3a'; g.fillRect(6, 4, 5, 66);
+    g.fillStyle = '#463828'; g.fillRect(6, 4, 2, 66);
+    g.fillStyle = '#5a4a3a'; g.fillRect(0, 12, 16, 3); g.fillRect(2, 22, 12, 2);
+    g.fillStyle = '#8d949c'; g.fillRect(1, 9, 2, 3); g.fillRect(13, 9, 2, 3); g.fillRect(7, 9, 2, 3);
+    g.fillStyle = '#3a3038'; g.fillRect(5, 26, 6, 8);
+  });
+  D('mailbox', {w:14,h:26,ax:7,ay:24,foot:{x:-4,y:-5,w:8,h:6}}, g => {
+    shadowEllipse(g, 7, 24, 5, 2, .22);
+    g.fillStyle = '#4a4038'; g.fillRect(6, 10, 3, 14);
+    g.fillStyle = '#6a5a4a'; g.fillRect(1, 3, 12, 8);
+    g.fillStyle = '#7d6a56'; g.fillRect(1, 3, 12, 2);
+    g.fillStyle = '#3a3028'; g.fillRect(11, 5, 2, 5);
+    g.fillStyle = '#a83a30'; g.fillRect(0, 4, 2, 4);
+  });
+  D('bin', {w:18,h:24,ax:9,ay:22,foot:{x:-8,y:-7,w:16,h:9}}, g => {
+    shadowEllipse(g, 9, 22, 8, 2, .24);
+    box34(g, 1, 2, 16, 4, 16, '#3f4a3a', '#2f3a2c');
+    g.fillStyle = '#4d5a46'; g.fillRect(2, 8, 14, 1); g.fillRect(2, 14, 14, 1);
+    g.fillStyle = '#5a6a52'; g.fillRect(1, 1, 16, 2);
+  });
+  D('bench', {w:36,h:20,ax:18,ay:18,foot:{x:-18,y:-9,w:36,h:11}}, g => {
+    shadowEllipse(g, 18, 18, 15, 2, .24);
+    g.fillStyle = '#6b4f36'; g.fillRect(2, 0, 32, 6);
+    g.fillStyle = '#7d5e42'; g.fillRect(2, 1, 32, 2);
+    g.fillStyle = '#8a6944'; g.fillRect(0, 7, 36, 5);
+    g.fillStyle = '#5a412c'; g.fillRect(0, 11, 36, 2);
+    g.fillStyle = '#3a3038'; g.fillRect(3, 13, 3, 5); g.fillRect(30, 13, 3, 5);
+  });
+  D('hydrant', {w:12,h:18,ax:6,ay:16,foot:{x:-4,y:-4,w:8,h:5}}, g => {
+    shadowEllipse(g, 6, 16, 4, 2, .22);
+    g.fillStyle = '#a03a2c'; g.fillRect(3, 4, 6, 12);
+    g.fillStyle = '#c04a38'; g.fillRect(3, 4, 2, 12);
+    g.fillStyle = '#a03a2c'; g.fillRect(0, 7, 12, 3);
+    g.fillStyle = '#8a2e22'; g.fillRect(4, 1, 4, 3);
+  });
+  D('sign_street', {w:16,h:36,ax:8,ay:34,foot:{x:-3,y:-4,w:6,h:5}}, g => {
+    shadowEllipse(g, 8, 34, 4, 2, .2);
+    g.fillStyle = '#4a4550'; g.fillRect(7, 8, 2, 26);
+    g.fillStyle = '#3a5a44'; g.fillRect(0, 4, 16, 6);
+    g.fillStyle = '#e0e6dc'; g.fillRect(1, 6, 14, 1);
+    g.fillStyle = '#4a6a52'; g.fillRect(1, 5, 14, 1);
+  });
+  D('sign_stop', {w:14,h:34,ax:7,ay:32,foot:{x:-3,y:-4,w:6,h:5}}, g => {
+    shadowEllipse(g, 7, 32, 4, 2, .2);
+    g.fillStyle = '#4a4550'; g.fillRect(6, 12, 2, 20);
+    g.fillStyle = '#9a3428'; g.beginPath(); g.arc(7, 7, 6, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#b8493a'; g.beginPath(); g.arc(7, 6, 5, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#e8e0d8'; g.fillRect(4, 5, 6, 2);
+  });
+  D('car', {w:34,h:62,ax:17,ay:60,foot:{x:-17,y:-58,w:34,h:60}}, g => {
+    shadowEllipse(g, 17, 59, 15, 4, .26);
+    g.fillStyle = '#3c4a5a'; g.fillRect(2, 4, 30, 54);
+    g.fillStyle = '#4d5f72'; g.fillRect(3, 5, 28, 52);
+    g.fillStyle = '#2f3a46'; g.fillRect(3, 5, 28, 3); g.fillRect(3, 54, 28, 3);
+    g.fillStyle = '#6d7f92'; g.fillRect(5, 12, 24, 12);          // roof
+    g.fillStyle = '#20303c'; g.fillRect(5, 8, 24, 4); g.fillRect(5, 24, 24, 4);
+    g.fillStyle = '#1a1c22'; g.fillRect(0, 12, 3, 8); g.fillRect(31, 12, 3, 8);
+    g.fillRect(0, 40, 3, 8); g.fillRect(31, 40, 3, 8);
+    g.fillStyle = '#d8d0a8'; g.fillRect(6, 3, 5, 3); g.fillRect(23, 3, 5, 3);
+    g.fillStyle = '#a03a2c'; g.fillRect(6, 57, 5, 3); g.fillRect(23, 57, 5, 3);
+  });
+  D('car_side', {w:64,h:34,ax:32,ay:32,foot:{x:-32,y:-26,w:64,h:28}}, g => {
+    shadowEllipse(g, 32, 31, 28, 3, .26);
+    g.fillStyle = '#3c4a5a'; g.fillRect(2, 8, 60, 22);
+    g.fillStyle = '#4d5f72'; g.fillRect(3, 9, 58, 20);
+    g.fillStyle = '#2f3a46'; g.fillRect(3, 26, 58, 3);
+    g.fillStyle = '#6d7f92'; g.fillRect(14, 2, 36, 10);          // cabin
+    g.fillStyle = '#20303c'; g.fillRect(16, 4, 14, 7); g.fillRect(33, 4, 14, 7);
+    g.fillStyle = '#55697c'; g.fillRect(16, 4, 14, 2);
+    g.fillStyle = '#1a1c22';
+    g.beginPath(); g.arc(16, 30, 5, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.arc(48, 30, 5, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#3a3d44';
+    g.beginPath(); g.arc(16, 30, 2, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.arc(48, 30, 2, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#d8d0a8'; g.fillRect(60, 12, 3, 5);
+    g.fillStyle = '#a03a2c'; g.fillRect(1, 12, 3, 5);
+    g.fillStyle = '#8d949c'; g.fillRect(4, 20, 56, 1);
+  });
+  D('puddle', {w:44,h:20,ax:22,ay:10,foot:null}, g => {
+    g.fillStyle = 'rgba(30,34,44,.55)';
+    g.beginPath(); g.ellipse(22, 10, 21, 9, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = 'rgba(120,140,170,.16)';
+    g.beginPath(); g.ellipse(20, 8, 15, 5, 0, 0, Math.PI*2); g.fill();
+  });
+  D('leaves_pile', {w:30,h:16,ax:15,ay:8,foot:null}, g => {
+    const cols = ['#a8412c','#c2702c','#c9992f','#8a4326'];
+    for (let i = 0; i < 16; i++) {
+      g.fillStyle = cols[i % 4];
+      g.fillRect((i * 7) % 26 + 1, ((i * 5) % 12) + 1, 3, 2);
+    }
+  });
+
+  /* --- fences --- */
+  D('fence_wood', {w:32,h:22,ax:16,ay:20,foot:{x:-16,y:-5,w:32,h:6}}, g => {
+    g.fillStyle = '#8a7660';
+    for (let i = 0; i < 4; i++) { g.fillRect(i*8+1, 2, 5, 18); }
+    g.fillStyle = '#a08a70'; for (let i = 0; i < 4; i++) g.fillRect(i*8+1, 2, 2, 18);
+    g.fillStyle = '#6f5c4a'; g.fillRect(0, 7, 32, 2); g.fillRect(0, 15, 32, 2);
+  });
+  D('fence_iron', {w:32,h:24,ax:16,ay:22,foot:{x:-16,y:-5,w:32,h:6}}, g => {
+    g.fillStyle = '#23212a';
+    for (let i = 0; i < 8; i++) { g.fillRect(i*4+1, 4, 2, 18); g.fillRect(i*4+1, 2, 2, 2); }
+    g.fillRect(0, 8, 32, 2); g.fillRect(0, 18, 32, 2);
+    g.fillStyle = '#3a3644'; g.fillRect(0, 8, 32, 1);
+  });
+  D('gate_iron', {w:26,h:26,ax:13,ay:24,foot:null}, g => {
+    g.fillStyle = '#23212a';
+    g.fillRect(0, 2, 3, 22); g.fillRect(23, 2, 3, 22);
+    for (let i = 0; i < 4; i++) g.fillRect(4+i*5, 6, 2, 18);
+    g.fillRect(3, 10, 20, 2);
+    g.fillStyle = '#c9a05a'; g.fillRect(12, 14, 2, 3);
+  });
+
+  /* --- buildings: drawn as facades seen slightly from above --- */
+  function facade(g, x, y, w, h, wall, wall2, roofCol, opts={}) {
+    g.fillStyle = roofCol; g.fillRect(x - 3, y, w + 6, 10);
+    g.fillStyle = shade(roofCol, 1.18); g.fillRect(x - 3, y, w + 6, 2);
+    g.fillStyle = wall; g.fillRect(x, y + 10, w, h - 10);
+    g.fillStyle = wall2;
+    for (let i = y + 12; i < y + h; i += 4) g.fillRect(x, i, w, 1);
+    g.fillStyle = shade(wall, .8); g.fillRect(x, y + 10, 2, h - 10);
+  }
+  function windows(g, x, y, cols, rows, lit, dx=14, dy=16) {
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const wx = x + c * dx, wy = y + r * dy;
+      g.fillStyle = '#3a3038'; g.fillRect(wx - 1, wy - 1, 12, 12);
+      g.fillStyle = lit ? PAL.windowLit : PAL.windowDark; g.fillRect(wx, wy, 10, 10);
+      if (lit) { g.fillStyle = '#fff0c0'; g.fillRect(wx, wy, 10, 3); }
+      g.fillStyle = '#3a3038'; g.fillRect(wx + 4, wy, 2, 10); g.fillRect(wx, wy + 4, 10, 2);
+    }
+  }
+  /* house_a — clapboard two-storey with a porch (the classic suburban home) */
+  D('house_a', {w:96,h:104,ax:48,ay:102,foot:{x:-48,y:-100,w:96,h:100}, lit:true}, g => {
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(4, 96, 92, 6);
+    // gable roof
+    g.fillStyle = PAL.roofDark;
+    g.beginPath(); g.moveTo(48, 0); g.lineTo(96, 26); g.lineTo(0, 26); g.closePath(); g.fill();
+    g.fillStyle = PAL.roof;
+    g.beginPath(); g.moveTo(48, 3); g.lineTo(92, 26); g.lineTo(4, 26); g.closePath(); g.fill();
+    facade(g, 4, 22, 88, 76, PAL.woodWall, PAL.woodWall2, PAL.roofDark);
+    windows(g, 14, 40, 2, 1, true, 52);
+    windows(g, 14, 66, 1, 1, false);
+    windows(g, 70, 66, 1, 1, true);
+    // porch
+    g.fillStyle = '#6f5c4a'; g.fillRect(30, 74, 36, 24);
+    g.fillStyle = '#4a3f38'; g.fillRect(40, 78, 16, 20);
+    g.fillStyle = '#6b533c'; g.fillRect(42, 80, 12, 18);
+    g.fillStyle = '#c9a05a'; g.fillRect(51, 88, 2, 2);
+    g.fillStyle = '#8a7660'; g.fillRect(28, 72, 40, 3);
+    g.fillStyle = '#7d6a54'; g.fillRect(30, 75, 3, 22); g.fillRect(63, 75, 3, 22);
+    g.fillStyle = '#5a4a3a'; g.fillRect(36, 96, 24, 4);
+  });
+  /* house_b — narrower victorian with a turret window */
+  D('house_b', {w:88,h:110,ax:44,ay:108,foot:{x:-44,y:-104,w:88,h:104}, lit:true}, g => {
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(4, 102, 84, 6);
+    g.fillStyle = '#3a3138';
+    g.beginPath(); g.moveTo(44, 0); g.lineTo(88, 30); g.lineTo(0, 30); g.closePath(); g.fill();
+    g.fillStyle = '#4a4048';
+    g.beginPath(); g.moveTo(44, 4); g.lineTo(84, 30); g.lineTo(4, 30); g.closePath(); g.fill();
+    facade(g, 6, 26, 76, 78, '#a8927a', '#8a7660', '#3a3138');
+    windows(g, 16, 42, 2, 1, false, 44);
+    windows(g, 16, 66, 1, 1, true);
+    g.fillStyle = '#4a3f38'; g.fillRect(38, 72, 16, 30);
+    g.fillStyle = '#6b533c'; g.fillRect(40, 74, 12, 28);
+    g.fillStyle = '#c9a05a'; g.fillRect(49, 88, 2, 2);
+    g.fillStyle = '#8a7660'; g.fillRect(34, 70, 24, 3);
+    g.fillStyle = '#7d6a54'; g.fillRect(35, 73, 3, 28); g.fillRect(54, 73, 3, 28);
+  });
+  /* house_c — small single storey, slightly run down */
+  D('house_c', {w:80,h:74,ax:40,ay:72,foot:{x:-40,y:-68,w:80,h:68}, lit:true}, g => {
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(4, 66, 72, 6);
+    g.fillStyle = '#43393f';
+    g.beginPath(); g.moveTo(40, 0); g.lineTo(80, 20); g.lineTo(0, 20); g.closePath(); g.fill();
+    g.fillStyle = '#524650';
+    g.beginPath(); g.moveTo(40, 3); g.lineTo(76, 20); g.lineTo(4, 20); g.closePath(); g.fill();
+    facade(g, 4, 16, 72, 52, '#7d6a58', '#67564a', '#43393f');
+    windows(g, 12, 32, 1, 1, true);
+    windows(g, 54, 32, 1, 1, false);
+    g.fillStyle = '#3f352e'; g.fillRect(32, 42, 16, 24);
+    g.fillStyle = '#5c4834'; g.fillRect(34, 44, 12, 22);
+    g.fillStyle = '#c9a05a'; g.fillRect(43, 56, 2, 2);
+  });
+  /* shopfront — the sort of thing that lines a small main street */
+  D('shop', {w:104,h:82,ax:52,ay:80,foot:{x:-52,y:-76,w:104,h:76}, lit:true}, g => {
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(4, 74, 96, 6);
+    g.fillStyle = '#4a4048'; g.fillRect(0, 0, 104, 12);
+    g.fillStyle = '#5a4e56'; g.fillRect(0, 0, 104, 3);
+    facade(g, 2, 8, 100, 68, '#8a8076', '#736a62', '#4a4048');
+    g.fillStyle = '#2f2a30'; g.fillRect(8, 20, 88, 12);          // sign board
+    g.fillStyle = '#d8c8a0'; g.fillRect(14, 24, 40, 3); g.fillRect(58, 24, 26, 3);
+    g.fillStyle = '#3a3038'; g.fillRect(8, 38, 88, 34);
+    g.fillStyle = PAL.windowLit; g.fillRect(10, 40, 38, 30); g.fillRect(56, 40, 38, 30);
+    g.fillStyle = '#fff0c0'; g.fillRect(10, 40, 38, 4); g.fillRect(56, 40, 38, 4);
+    g.fillStyle = 'rgba(60,40,30,.35)'; g.fillRect(14, 50, 12, 18); g.fillRect(62, 48, 14, 20);
+    g.fillStyle = '#4a3f38'; g.fillRect(46, 44, 12, 28);
+    g.fillStyle = '#c9a05a'; g.fillRect(55, 58, 2, 2);
+    g.fillStyle = '#a03a2c'; g.fillRect(6, 34, 92, 5);           // awning
+    g.fillStyle = '#c04a38'; for (let i = 0; i < 12; i++) g.fillRect(6 + i*8, 34, 4, 5);
+  });
+  D('chapel', {w:88,h:112,ax:44,ay:110,foot:{x:-44,y:-104,w:88,h:104}, lit:true}, g => {
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(6, 104, 76, 6);
+    g.fillStyle = '#3a3640'; g.fillRect(38, 0, 12, 26);
+    g.fillStyle = '#4a4550'; g.fillRect(39, 2, 10, 24);
+    g.fillStyle = '#d8d0c0'; g.fillRect(42, 6, 4, 8);
+    g.fillStyle = '#3a3640';
+    g.beginPath(); g.moveTo(44, 18); g.lineTo(82, 44); g.lineTo(6, 44); g.closePath(); g.fill();
+    facade(g, 8, 40, 72, 66, '#c8c0b0', '#a8a094', '#3a3640');
+    g.fillStyle = '#3a3038'; g.fillRect(20, 56, 14, 22); g.fillRect(54, 56, 14, 22);
+    g.fillStyle = '#6a5a8a'; g.fillRect(21, 57, 12, 20); g.fillRect(55, 57, 12, 20);
+    g.fillStyle = '#8a6a9a'; g.fillRect(21, 57, 12, 6); g.fillRect(55, 57, 12, 6);
+    g.fillStyle = '#4a3f38'; g.fillRect(36, 74, 16, 30);
+    g.fillStyle = '#5c4834'; g.fillRect(38, 76, 12, 28);
+    g.fillStyle = '#c9a05a'; g.fillRect(47, 90, 2, 2);
+  });
+  D('house_boarded', {w:84,h:80,ax:42,ay:78,foot:{x:-42,y:-74,w:84,h:74}}, g => {
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(4, 72, 76, 6);
+    g.fillStyle = '#332c30';
+    g.beginPath(); g.moveTo(42, 0); g.lineTo(84, 22); g.lineTo(0, 22); g.closePath(); g.fill();
+    g.fillStyle = '#3f373c';
+    g.beginPath(); g.moveTo(42, 3); g.lineTo(80, 22); g.lineTo(4, 22); g.closePath(); g.fill();
+    facade(g, 4, 18, 76, 56, '#5f564e', '#4a423c', '#332c30');
+    g.fillStyle = '#241f22'; g.fillRect(14, 34, 16, 14); g.fillRect(54, 34, 16, 14);
+    g.fillStyle = '#6b5a44';
+    g.fillRect(12, 38, 20, 3); g.fillRect(12, 44, 20, 3);
+    g.fillRect(52, 36, 20, 3); g.fillRect(52, 43, 20, 3);
+    g.fillStyle = '#2a2428'; g.fillRect(34, 50, 16, 24);
+    g.fillStyle = '#6b5a44'; g.fillRect(32, 56, 20, 3); g.fillRect(32, 64, 20, 3);
+  });
+  D('garage', {w:64,h:56,ax:32,ay:54,foot:{x:-32,y:-50,w:64,h:50}}, g => {
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(4, 48, 56, 6);
+    g.fillStyle = '#43393f'; g.fillRect(0, 0, 64, 12);
+    g.fillStyle = '#524650'; g.fillRect(0, 0, 64, 3);
+    facade(g, 2, 8, 60, 44, '#7d6a58', '#67564a', '#43393f');
+    g.fillStyle = '#4a4550'; g.fillRect(10, 22, 44, 28);
+    g.fillStyle = '#5f6470';
+    for (let i = 0; i < 6; i++) g.fillRect(11, 23 + i*4.6, 42, 3);
+  });
+})();
+
+/* =====================================================================
+   WORLD — the layer that turns rooms from "paint rectangles every frame"
+   into a scene: a cached background, a sorted prop layer, weather and light.
+===================================================================== */
+const World = {
+  bgCache:{},          // roomKey -> {key, canvas}
+  /* Static background is painted once and blitted afterwards. Rooms declare
+     bgKey() when their look depends on story flags, so it repaints only then. */
+  background(roomKey) {
+    const room = Rooms[roomKey];
+    const key = room.bgKey ? room.bgKey() : 'static';
+    const hit = this.bgCache[roomKey];
+    if (hit && hit.key === key) return hit.canvas;
+    const c = document.createElement('canvas');
+    c.width = room.w; c.height = room.h;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    room.bgPaint(g);
+    if (room.wet) this.bakeReflections(g, room);
+    this.bgCache[roomKey] = { key, canvas:c };
+    return c;
+  },
+  invalidate(roomKey) { if (roomKey) delete this.bgCache[roomKey]; else this.bgCache = {}; },
+
+  /* Wet asphalt: smear a soft vertical streak under every light source and
+     under lit windows. Not physically correct — it just has to read as rain. */
+  bakeReflections(g, room) {
+    const lights = this.lightsOf(room);
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    lights.forEach(L => {
+      if (L.y > (room.wetFrom || 0) + 260) return;
+      const top = L.y + 6, len = 60 + L.r * 0.7;
+      const grad = g.createLinearGradient(0, top, 0, top + len);
+      grad.addColorStop(0, withA(L.c, 0.28 * (L.i || 1)));
+      grad.addColorStop(0.35, withA(L.c, 0.10 * (L.i || 1)));
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grad;
+      g.fillRect(L.x - 5, top, 10, len);
+      g.fillStyle = withA(L.c, 0.05);
+      g.fillRect(L.x - 12, top, 24, len * 0.55);
+    });
+    g.restore();
+  },
+
+  /* Light sources = the room's own list plus any prop that declares one. */
+  lightsOf(room) {
+    const out = (room.lights || []).map(L => Object.assign({ r:50, c:'#ffcf7a', i:.8 }, L));
+    (room.objects || []).forEach(o => {
+      if (o.when && !o.when()) return;
+      const d = Art.meta(o.t);
+      if (d && d.light) out.push({ x:o.x, y:o.y + (d.light.dy||0), r:d.light.r, c:d.light.c, i:d.light.i, flicker:d.light.flicker });
+    });
+    return out;
+  },
+
+  objectsOf(room) { return (room.objects || []).filter(o => !o.when || o.when()); },
+
+  /* Props block movement through their own declared footprint, so level
+     collision follows the art instead of a parallel list of rectangles. */
+  blockedByProps(room, box) {
+    for (const o of this.objectsOf(room)) {
+      const f = Art.footOf(o);
+      if (f && rectHit(box, f)) return true;
+    }
+    return false;
+  },
+};
+
+/* =====================================================================
+   WEATHER — rain, fog, wind-blown leaves. Per-room base values, nudged
+   by how far the story has gone.
+===================================================================== */
+const Weather = {
+  rainDrops:[], leaves:[], fogPhase:0,
+  cur:{ rain:0, fog:0, wind:.2, leaves:0, indoor:false },
+
+  /* Story pressure: the town gets colder and wetter as Naya goes further. */
+  storyMod() {
+    if (!gameState) return { rain:0, fog:0 };
+    let r = 0, f = 0;
+    if (F('firstWitchDead'))  { r += .10; f += .10; }
+    if (F('secondAmulet'))    { r += .08; f += .18; }
+    if (F('sueDead'))         { r += .30; f += .15; }
+    if (F('sueRevived'))      { r -= .10; f += .05; }
+    if (F('chosenEarthPath')) { r -= .45; f -= .40; }
+    if (F('sueRefused'))      { f += .16; }
+    return { rain:r, fog:f };
+  },
+  apply(room) {
+    const base = room.weather || {};
+    const m = this.storyMod();
+    this.cur = {
+      rain:   clamp((base.rain||0)   + (base.indoor ? 0 : m.rain), 0, 1),
+      fog:    clamp((base.fog||0)    + m.fog, 0, 1),
+      wind:   base.wind === undefined ? .25 : base.wind,
+      leaves: base.leaves || 0,
+      indoor: !!base.indoor,
+    };
+  },
+  update(dt, room) {
+    if (!FX.on()) { this.rainDrops.length = 0; this.leaves.length = 0; return; }
+    const f = dt / 16.6;
+    const W = CONFIG.VIEW_W, H = CONFIG.VIEW_H;
+    const want = Math.round(this.cur.rain * (this.cur.indoor ? 0 : 70));
+    while (this.rainDrops.length < want)
+      this.rainDrops.push({ x:Math.random()*(W+40)-20, y:Math.random()*H, l:5+Math.random()*7, s:3.4+Math.random()*2.4 });
+    if (this.rainDrops.length > want) this.rainDrops.length = want;
+    const drift = this.cur.wind * 1.6;
+    for (const d of this.rainDrops) {
+      d.y += d.s * f; d.x += drift * f;
+      if (d.y > H) { d.y = -8; d.x = Math.random()*(W+40)-20; }
+    }
+    const wantL = Math.round(this.cur.leaves * 16);
+    while (this.leaves.length < wantL)
+      this.leaves.push({ x:Math.random()*W, y:Math.random()*H, vy:.18+Math.random()*.3,
+                         ph:Math.random()*6.28, c:['#a8412c','#c2702c','#c9992f','#8a4326'][(Math.random()*4)|0], r:Math.random()*6 });
+    if (this.leaves.length > wantL) this.leaves.length = wantL;
+    for (const L of this.leaves) {
+      L.ph += 0.04 * f; L.y += L.vy * f; L.x += (Math.sin(L.ph) * .5 + this.cur.wind) * f; L.r += .04 * f;
+      if (L.y > H + 6) { L.y = -6; L.x = Math.random()*W; }
+      if (L.x > W + 6) L.x = -6;
+    }
+    this.fogPhase += dt * 0.006;
+  },
+  drawFog(ctx) {
+    const a = this.cur.fog;
+    if (a < 0.02 || !FX.on()) return;
+    const W = CONFIG.VIEW_W, H = CONFIG.VIEW_H;
+    ctx.save();
+    for (let i = 0; i < 3; i++) {
+      const speed = 8 + i * 5, band = H * (0.28 + i * 0.12);
+      const y = ((this.fogPhase * speed + i * 90) % (H + band)) - band * 0.5;
+      const grad = ctx.createLinearGradient(0, y, 0, y + band);
+      grad.addColorStop(0, 'rgba(178,186,196,0)');
+      grad.addColorStop(0.5, `rgba(178,186,196,${(0.16 * a).toFixed(3)})`);
+      grad.addColorStop(1, 'rgba(178,186,196,0)');
+      ctx.fillStyle = grad; ctx.fillRect(0, y, W, band);
+    }
+    ctx.fillStyle = `rgba(186,192,200,${(0.10 * a).toFixed(3)})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  },
+  drawRain(ctx) {
+    if (!this.rainDrops.length) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(186,204,224,.42)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const d of this.rainDrops) {
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - this.cur.wind * 3, d.y + d.l);
+    }
+    ctx.stroke();
+    ctx.restore();
+  },
+  drawLeaves(ctx) {
+    for (const L of this.leaves) {
+      ctx.save();
+      ctx.translate(L.x, L.y); ctx.rotate(L.r);
+      ctx.fillStyle = L.c; ctx.fillRect(-2, -1, 4, 2); ctx.fillRect(-1, -2, 2, 4);
+      ctx.restore();
+    }
+  },
+};
+
+/* =====================================================================
+   LIGHTING — a darkness sheet with holes punched out by light sources.
+   Cheap, and it does most of the atmospheric work.
+===================================================================== */
+const Lighting = {
+  buf:null, bctx:null,
+  ensure() {
+    if (this.buf) return;
+    this.buf = document.createElement('canvas');
+    this.buf.width = CONFIG.VIEW_W; this.buf.height = CONFIG.VIEW_H;
+    this.bctx = this.buf.getContext('2d');
+  },
+  /* Ambient darkness colour + strength for the current room and story beat. */
+  ambientFor(room) {
+    const p = room.light || {};
+    let tint = p.tint || '#101828';
+    let a = p.dark === undefined ? .28 : p.dark;
+    if (gameState) {
+      if (F('sueDead') && !F('sueRevived')) a += .12;
+      if (F('chosenWitchPath')) { tint = '#2a0410'; a += .10; }
+      if (F('chosenEarthPath')) a = Math.max(0, a - .18);
+      a += FX.corruption * .10;
+    }
+    return { tint, a: clamp(a, 0, .82) };
+  },
+  draw(ctx, room, camX, camY) {
+    if (!FX.on()) return;
+    const amb = this.ambientFor(room);
+    if (amb.a < 0.02) return;
+    this.ensure();
+    const g = this.bctx, W = CONFIG.VIEW_W, H = CONFIG.VIEW_H;
+    g.globalCompositeOperation = 'source-over';
+    g.fillStyle = withA(amb.tint, amb.a);
+    g.clearRect(0, 0, W, H); g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = 'destination-out';
+    const t = Date.now();
+    for (const L of World.lightsOf(room)) {
+      const x = L.x - camX, y = L.y - camY;
+      if (x < -L.r || x > W + L.r || y < -L.r || y > H + L.r) continue;
+      const fl = L.flicker ? (0.86 + 0.14 * Math.sin(t / 90 + x)) : 1;
+      const r = L.r * fl;
+      const grad = g.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, `rgba(0,0,0,${Math.min(1, (L.i||.8) * fl)})`);
+      grad.addColorStop(0.55, `rgba(0,0,0,${(L.i||.8) * fl * 0.42})`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grad;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI*2); g.fill();
+    }
+    g.globalCompositeOperation = 'source-over';
+    ctx.drawImage(this.buf, 0, 0);
+    // warm bloom on top of the lamps themselves
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const L of World.lightsOf(room)) {
+      const x = L.x - camX, y = L.y - camY;
+      if (x < -L.r || x > W + L.r || y < -L.r || y > H + L.r) continue;
+      const fl = L.flicker ? (0.86 + 0.14 * Math.sin(t / 90 + x)) : 1;
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, L.r * 0.6 * fl);
+      grad.addColorStop(0, withA(L.c, 0.16 * (L.i || .8)));
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(x, y, L.r * 0.6 * fl, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+};
 
 /* =====================================================================
    UI HELPERS
@@ -903,7 +1961,9 @@ const FX = {
     if (F('sueRevived'))     c -= .10;
     c += Math.max(0, (S('witchAmbition') - 35) / 130);
     c -= Math.max(0, (S('humanity') - 60) / 220);
+    const prev = Math.round(this.corruption * 4);
     this.corruption = clamp(c, 0, 1);
+    if (Math.round(this.corruption * 4) !== prev && typeof World !== 'undefined') World.invalidate();
     const v = document.getElementById('vignette');
     v.style.opacity = this.on() ? (this.corruption * 0.85).toFixed(3) : 0;
   },
@@ -1074,6 +2134,32 @@ async function flashTitle(text, dur=1500) {
 }
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+/* Interior shell: back wall, skirting, floorboards — so every room starts
+   from something that reads as a room instead of a coloured rectangle. */
+function paintInterior(ctx, w, h, o) {
+  o = o || {};
+  const wallH = o.wallH || 56;
+  ctx.fillStyle = o.wall || PAL.wallIn; ctx.fillRect(0, 0, w, wallH);
+  ctx.fillStyle = o.wall2 || PAL.wallIn2;
+  if (o.stripes !== false) for (let x = 0; x < w; x += 12) ctx.fillRect(x, 0, 2, wallH);
+  ctx.fillStyle = shade(o.wall || PAL.wallIn, .7); ctx.fillRect(0, wallH - 5, w, 3);
+  ctx.fillStyle = shade(o.wall || PAL.wallIn, 1.15); ctx.fillRect(0, wallH - 2, w, 2);
+  const f1 = o.floor || PAL.floorWood, f2 = o.floor2 || PAL.floorWood2;
+  ctx.fillStyle = f1; ctx.fillRect(0, wallH, w, h - wallH);
+  ctx.fillStyle = f2;
+  if (o.tiles) {
+    for (let y = wallH; y < h; y += 16) for (let x = 0; x < w; x += 16)
+      if (((x / 16 + y / 16) | 0) % 2) ctx.fillRect(x, y, 16, 16);
+  } else {
+    for (let y = wallH + 6; y < h; y += 13) ctx.fillRect(0, y, w, 1);
+    for (let y = wallH; y < h; y += 13) {
+      const off = ((y / 13) | 0) % 2 ? 24 : 0;
+      for (let x = off; x < w; x += 56) ctx.fillRect(x, y, 1, 13);
+    }
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(0, wallH, w, 6);
+}
+
 /* Small shared painters */
 function paintDoor(ctx, x, y, w=30, h=15) {
   ctx.fillStyle = '#2a1810'; ctx.fillRect(x, y, w, h);
@@ -1105,48 +2191,37 @@ const Rooms = {
 /* ---------------------------------------------------------------- */
 nayaRoom: {
   name:"Комната Наи", music:'home', w:240, h:300,
+  weather:{ indoor:true, rain:0, fog:.04, wind:0 },
+  light:{ tint:'#1a1420', dark:.26 },
+  lights:[{x:150,y:44,r:52,c:'#8fb0d8',i:.30}],
   bgPaint(ctx) {
-    const dark = FX.corruption > 0.5;
-    ctx.fillStyle = dark ? '#2e1e26' : '#3a2830'; ctx.fillRect(0,0,240,300);
-    ctx.fillStyle = '#1a1018'; ctx.fillRect(0,0,240,40);
-    ctx.fillStyle = '#25181e'; for (let x=0;x<240;x+=16) ctx.fillRect(x,0,2,40);
-    ctx.strokeStyle = '#2a1a22'; ctx.lineWidth = 1;
-    for (let y=40;y<300;y+=20) { ctx.beginPath(); ctx.moveTo(0,y+.5); ctx.lineTo(240,y+.5); ctx.stroke(); }
-    // bed
-    ctx.fillStyle = '#6a2040'; ctx.fillRect(10,50,60,40);
-    ctx.fillStyle = '#e8c8d0'; ctx.fillRect(14,54,52,10);
-    ctx.fillStyle = '#4a1030'; ctx.fillRect(10,80,60,10);
-    // mirror
-    ctx.fillStyle = F('mirrorSecret') ? '#6a7080' : '#8090a0'; ctx.fillRect(180,45,40,50);
-    if (F('mirrorSecret')) { ctx.fillStyle='rgba(192,48,77,.3)'; ctx.fillRect(180,45,40,50); }
-    ctx.fillStyle = '#4a1a30'; ctx.fillRect(178,43,44,4); ctx.fillRect(178,93,44,4);
-    // table + crystal
-    ctx.fillStyle = '#4a2818'; ctx.fillRect(90,60,60,30);
-    if (!F('crystalTaken') && !F('gaveCrystalAway')) {
-      ctx.fillStyle = hasItem('Кристалл') ? '#5a3020' : '#8a30c0';
-      if (!hasItem('Кристалл')) {
-        ctx.beginPath(); ctx.moveTo(115,55); ctx.lineTo(125,55); ctx.lineTo(130,68);
-        ctx.lineTo(120,78); ctx.lineTo(110,68); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#c060ff'; ctx.fillRect(118,60,4,8);
-      }
-    }
-    // wardrobe
-    ctx.fillStyle = '#3a1a10'; ctx.fillRect(20,110,50,80);
-    ctx.fillStyle = '#5a2818'; ctx.fillRect(22,112,46,76);
-    ctx.fillStyle = '#c0a060'; ctx.fillRect(42,148,4,4);
-    // photo on the wall
-    ctx.fillStyle = '#2a1a20'; ctx.fillRect(158,110,22,26);
-    ctx.fillStyle = F('photoSeen') ? '#6a4a50' : '#4a3a40'; ctx.fillRect(160,112,18,22);
-    ctx.fillStyle = '#8a6a70'; ctx.fillRect(165,118,8,9);
+    const dark = FX.corruption > .5;
+    paintInterior(ctx, 240, 300, {
+      wall: dark ? '#4a3a42' : '#5b4a4a', wall2:'#4a3c3e',
+      floor: dark ? '#6a4c38' : PAL.floorWood, floor2: PAL.floorWood2, wallH:58 });
+    ctx.fillStyle = 'rgba(255,255,255,.04)'; ctx.fillRect(120, 58, 70, 120);   // window light on the floor
     paintDoor(ctx, 105, 285);
   },
-  ambient() { if (Math.random() < 0.04) FX.spawn(120 + (Math.random()-.5)*200, 300, 1, {color:'#4a3a44', rise:-0.14, life:130, spread:6}); },
+  objects: [
+    { t:'window_in',  x:150, y:36 },
+    { t:'photo_frame',x:196, y:32 },
+    { t:'painting',   x:56,  y:30 },
+    { t:'bed_single', x:44,  y:132 },
+    { t:'bookshelf',  x:92,  y:98 },
+    { t:'desk',       x:152, y:120 },
+    { t:'chair_wood', x:152, y:146 },
+    { t:'wardrobe',   x:208, y:130 },
+    { t:'mirror_tall',x:16,  y:196 },
+    { t:'rug_red',    x:128, y:214 },
+    { t:'lamp_floor', x:214, y:222 },
+    { t:'plant_pot',  x:36,  y:252 },
+  ],
+  ambient() { if (Math.random() < 0.03) FX.spawn(150 + (Math.random()-.5)*60, 60, 1, {color:'#5a4a54', rise:.12, life:120, spread:8}); },
   walls: [
-    {x:0,y:0,w:240,h:40},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
-    {x:10,y:50,w:60,h:40},{x:180,y:60,w:40,h:35},{x:90,y:60,w:60,h:30},{x:20,y:110,w:50,h:80},
+    {x:0,y:0,w:240,h:58},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
   ],
   interactables: [
-    { x:10,y:50,w:60,h:40, name:'bed', prompt:'Кровать', action(){
+    { x:24,y:112,w:44,h:34, name:'bed', prompt:'Кровать', action(){
         if (F('silenceDone') === false && F('sueRevived') && !F('reflectionDone')) {
           addC('silenceLooks'); checkSilence();
           return Dialogue.start([{who:'naya',expr:'empty',text:'Сью сидит на моей кровати. Как раньше. Только теперь между нами — метр пустоты.'}]);
@@ -1154,7 +2229,7 @@ nayaRoom: {
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Она сидела здесь. Ела мои чипсы. Смеялась над моими шторами.'}]);
         Dialogue.start([{who:'naya',expr:'sad',text:'Иногда кажется, что я сплю только потому, что не знаю, что ещё делать.'}]);
       }},
-    { x:180,y:45,w:40,h:50, name:'mirror', prompt:'Зеркало', action(){
+    { x:2,y:164,w:34,h:38, name:'mirror', prompt:'Зеркало', action(){
         addC('mirrorLooks');
         const n = C('mirrorLooks');
         if (n === 1) return Dialogue.start([{who:'naya',expr:'angry',text:'Я даже не знаю, на кого злюсь больше — на себя или на неё.'}]);
@@ -1173,7 +2248,7 @@ nayaRoom: {
         }
         return Dialogue.start([{who:'naya',expr:'empty',text:'Больше я туда не смотрю.'}]);
       }},
-    { x:158,y:105,w:24,h:32, name:'photo', prompt:'Фотография', action(){
+    { x:182,y:26,w:30,h:34, name:'photo', prompt:'Фотография', action(){
         if (!F('photoSeen')) {
           setFlag('photoSeen'); Memories.unlock('mother');
           return Dialogue.start([
@@ -1186,7 +2261,7 @@ nayaRoom: {
         if (S('witchAmbition') > 60) return Dialogue.start([{who:'naya',expr:'empty',text:'Она смотрит на меня так, будто узнаёт.'}]);
         return Dialogue.start([{who:'naya',expr:'sad',text:'Она здесь моложе, чем я сейчас.'}]);
       }},
-    { x:90,y:60,w:60,h:30, name:'table', prompt:'Стол', action(){
+    { x:130,y:100,w:46,h:32, name:'table', prompt:'Стол', action(){
         if (F('crystalTaken')) return Dialogue.start([{who:'naya',expr:'empty',text:'Здесь лежал кристалл. Осталось пятно от тепла. Или мне так кажется.'}]);
         if (F('gaveCrystalAway')) return Dialogue.start([{who:'naya',expr:'normal',text:'Пусто. И, кажется, впервые это не страшно.'}]);
         if (!hasItem('Кристалл')) {
@@ -1198,8 +2273,16 @@ nayaRoom: {
         }
         return Dialogue.start([{who:'naya',expr:'normal',text:'Мой рабочий стол. Пусто.'}]);
       }},
-    { x:44,y:148,w:34,h:44, name:'wardrobe', prompt:'Шкаф', action(){
+    { x:188,y:112,w:42,h:32, name:'wardrobe', prompt:'Шкаф', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Мои вещи. Всё чёрное и красное. Что тут скажешь.'}]);
+      }},
+    { x:70,y:74,w:46,h:32, name:'books', prompt:'Полка', action(){
+        if (F('foundGenevieve')) return Dialogue.start([{who:'naya',expr:'normal',text:'Учебники, которые мне не пригодились, и одна книга про травы, которую дала Женевьева.'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Школьные учебники. Я их так и не сдала. Никто не спросил.'}]);
+      }},
+    { x:132,y:22,w:38,h:32, name:'window', prompt:'Окно', action(){
+        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Дождь. Он идёт уже третьи сутки и, кажется, не собирается заканчиваться.'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Отсюда видно фонарь у подъезда. В детстве я думала, что он горит специально для меня.'}]);
       }},
     { x:100,y:258,w:40,h:32, name:'door', prompt:'Выйти', action: async () => {
         if (!F('prologueComplete')) { Scene.play('prologue'); return; }
@@ -1210,25 +2293,25 @@ nayaRoom: {
       }},
   ],
   npcs: [
-    { x:82,y:150, sprite:'sue', name:'Сью',
+    { x:96,y:200, sprite:'sue', name:'Сью',
       when:()=> F('cafeSceneComplete') && !F('homeTalkDone'),
       dialogue:()=> Scene.play('homeTalkWithSue') },
-    { x:82,y:150, sprite:'sue', name:'Сью',
+    { x:96,y:200, sprite:'sue', name:'Сью',
       when:()=> F('returnedFromHell1') && !F('toldSueWitch'),
       dialogue:()=> Scene.play('sueAfterHell') },
-    { x:82,y:150, sprite:'sue', name:'Сью',
+    { x:96,y:200, sprite:'sue', name:'Сью',
       when:()=> F('communeIntro') && !F('persuasionDone'),
       dialogue:()=> Scene.play('persuadeSue') },
-    { x:82,y:150, sprite:'sue', name:'Сью',
+    { x:96,y:200, sprite:'sue', name:'Сью',
       when:()=> F('sueAgreed') && !F('thirdAmulet') && !F('sueDead'),
       dialogue:()=> Scene.play('sueHint') },
-    { x:96,y:160, sprite:'sueGhost', name:'Сью',
+    { x:82,y:170, sprite:'sueGhost', name:'Сью',
       when:()=> F('sueDead') && !F('reviveChoiceMade'),
       dialogue:()=> Scene.play('reviveChoice') },
-    { x:96,y:160, sprite:'sue', name:'Сью',
+    { x:82,y:170, sprite:'sue', name:'Сью',
       when:()=> F('sueRevived') && !F('reflectionDone'),
       dialogue:()=> Scene.play('postRevival') },
-    { x:96,y:160, sprite:'sue', name:'Сью',
+    { x:96,y:200, sprite:'sue', name:'Сью',
       when:()=> F('chosenEarthPath') && !F('ending'),
       dialogue:()=> Scene.play('earthEnding') },
   ],
@@ -1301,170 +2384,258 @@ corridor1: {
 
 /* ---------------------------------------------------------------- */
 street: {
-  name:"Улица", music:'street', w:240, h:320,
+  name:"Мейпл-стрит", music:'street', w:420, h:320, wet:true, wetFrom:120,
+  weather:{ rain:.34, fog:.14, wind:.3, leaves:.55 },
+  light:{ tint:'#131b2c', dark:.40 },
+  lights:[
+    {x:170,y:78,r:34,c:'#ffcf7a',i:.5},   // cafe windows
+    {x:214,y:78,r:34,c:'#ffcf7a',i:.5},
+    {x:74,y:82,r:26,c:'#f2c46a',i:.35},   // a lit window in Naya's block
+    {x:300,y:60,r:26,c:'#f2c46a',i:.3},
+  ],
   bgPaint(ctx) {
-    const night = F('thirdHouseOpen') || F('lonerChase');
-    ctx.fillStyle = night ? '#0e0a18' : '#1a1428'; ctx.fillRect(0,0,240,140);
-    ctx.fillStyle = '#e0e0ff';
-    for (let i=0;i<20;i++) ctx.fillRect((i*47)%240, (i*23)%130, 1, 1);
-    ctx.fillStyle = '#f0e8c0'; ctx.beginPath(); ctx.arc(190,40,14,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#252025'; ctx.fillRect(0,140,240,180);
-    ctx.fillStyle = '#151015'; ctx.fillRect(0,180,240,60);
-    ctx.strokeStyle = '#c0a020'; ctx.setLineDash([8,8]);
-    ctx.beginPath(); ctx.moveTo(0,210.5); ctx.lineTo(240,210.5); ctx.stroke(); ctx.setLineDash([]);
-
-    // LEFT building: Madlen's house (or the door that will not open, on the loner path)
-    const leftW1 = F('sueAgreed') && !F('firstAmulet');
-    const lonerLeft = F('sueRefused') && !F('lonerCaught');
-    const leftActive = (F('foundGenevieve') && leftW1) || lonerLeft;
-    if (leftActive) { ctx.fillStyle = 'rgba(192,48,77,0.28)'; ctx.fillRect(5,75,70,70); }
-    ctx.fillStyle = leftActive ? '#4a2038' : '#2a2028'; ctx.fillRect(10,80,60,60);
-    ctx.fillStyle = leftActive ? '#ff8040' : '#f0d060';
-    ctx.fillRect(20,95,10,10); ctx.fillRect(40,95,10,10); ctx.fillRect(20,115,10,10);
-    ctx.fillStyle = '#1a0810'; ctx.fillRect(35,120,15,20);
-    ctx.font = '7px Courier New';
-    if (leftActive) { ctx.fillStyle = '#e0a0b0'; ctx.fillText('МАДЛЕН', 18, 78); }
-
-    // RIGHT building: Genevieve — reachable at any point once Naya has found her
-    const rightGen = F('returnedFromHell1');
-    if (rightGen) { ctx.fillStyle = 'rgba(96,192,96,0.30)'; ctx.fillRect(165,65,70,80); }
-    ctx.fillStyle = rightGen ? '#204028' : '#302838'; ctx.fillRect(170,70,60,70);
-    ctx.fillStyle = rightGen ? '#ffd060' : '#f0d060';
-    ctx.fillRect(180,85,10,10); ctx.fillRect(200,85,10,10);
-    ctx.fillStyle = '#1a0810'; ctx.fillRect(192,120,15,20);
-    if (rightGen) { ctx.fillStyle='#a0e0a0'; ctx.font='7px Courier New'; ctx.fillText('ЖЕНЕВЬЕВА', 168, 68); }
-
-    ctx.fillStyle = '#c0304d'; ctx.fillRect(90,90,60,20);
-    ctx.fillStyle = '#fff'; ctx.font = '10px Courier New'; ctx.fillText('CAFE', 105, 104);
-    ctx.fillStyle = '#2a1810'; ctx.fillRect(105,110,30,30);
-    ctx.fillStyle = '#8a6040'; ctx.fillRect(107,112,26,28);
-
-    ctx.fillStyle = '#3a1a2a'; ctx.fillRect(212,255,22,50);
-    ctx.fillStyle = '#8a6040'; ctx.fillRect(216,275,14,30);
-    ctx.fillStyle = '#e0a0b0'; ctx.font='7px Courier New'; ctx.fillText('ДОМОЙ', 208, 252);
-
-    // the road on down to the old quarter, where Rose lives
-    const oldOpen = F('foundGenevieve');
-    ctx.fillStyle = '#161320'; ctx.fillRect(8,268,32,48);
-    ctx.fillStyle = oldOpen ? '#5a4a68' : '#2e2836';
-    ctx.fillRect(12,272,24,44);
-    ctx.fillStyle = oldOpen ? '#c0a8e0' : '#6a5a64'; ctx.font='7px Courier New';
-    ctx.fillText('КВАРТАЛ', 6, 265);
-    if (F('firstAmulet') && !F('secondAmulet')) {
-      ctx.fillStyle = 'rgba(192,48,77,' + (0.16 + 0.10*Math.sin(Date.now()/500)) + ')';
-      ctx.fillRect(4,264,42,52);
+    const W = 420;
+    // --- backdrop: cold sky over a distant treeline
+    const sky = ctx.createLinearGradient(0,0,0,120);
+    sky.addColorStop(0, PAL.skyDusk); sky.addColorStop(1, '#5c5f70');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,120);
+    ctx.fillStyle = '#3a3d4a';
+    for (let x=0;x<W;x+=14) {
+      const h = 26 + ((x*7)%22);
+      ctx.beginPath(); ctx.moveTo(x, 120); ctx.lineTo(x+7, 120-h); ctx.lineTo(x+14, 120); ctx.closePath(); ctx.fill();
     }
-
-    // alley entrance (loner branch)
+    // --- far pavement
+    ctx.fillStyle = PAL.walk; ctx.fillRect(0,118,W,32);
+    ctx.fillStyle = '#6b6668';
+    for (let x=0;x<W;x+=22) ctx.fillRect(x,118,1,32);
+    ctx.fillStyle = '#544f51'; ctx.fillRect(0,118,W,2);
+    ctx.fillStyle = PAL.kerb; ctx.fillRect(0,148,W,4);
+    // --- road
+    ctx.fillStyle = PAL.asphaltWet; ctx.fillRect(0,152,W,94);
+    ctx.fillStyle = '#35333d';
+    for (let i=0;i<70;i++) ctx.fillRect((i*67)%W, 154+((i*29)%90), 3, 1);
+    ctx.fillStyle = '#26242c'; ctx.fillRect(0,152,W,3);
+    ctx.fillStyle = '#b9a24a';                      // worn centre line
+    for (let x=6;x<W;x+=26) { ctx.fillRect(x,197,14,2); ctx.fillRect(x,202,14,2); }
+    ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(0,152,W,40);
+    // --- near pavement and verge
+    ctx.fillStyle = PAL.kerb; ctx.fillRect(0,246,W,4);
+    ctx.fillStyle = PAL.walk; ctx.fillRect(0,250,W,44);
+    ctx.fillStyle = '#6b6668';
+    for (let x=8;x<W;x+=24) ctx.fillRect(x,250,1,44);
+    ctx.fillStyle = PAL.grassDry; ctx.fillRect(0,294,W,26);
+    ctx.fillStyle = '#4e5533';
+    for (let i=0;i<60;i++) ctx.fillRect((i*53)%W, 296+((i*17)%22), 2, 1);
+    // --- drains
+    ctx.fillStyle = '#22212a';
+    [70,190,330].forEach(x => { ctx.fillRect(x,242,16,5); ctx.fillStyle='#3a3844';
+      for(let i=0;i<4;i++) ctx.fillRect(x+2+i*4,243,2,3); ctx.fillStyle='#22212a'; });
+    // --- fallen leaves, thicker along the kerbs
+    const cols = [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
+    for (let i=0;i<230;i++) {
+      const x = (i*97)%W;
+      let y;
+      const band = i % 3;
+      if (band === 0) y = 250 + ((i*31)%66);
+      else if (band === 1) y = 120 + ((i*23)%30);
+      else y = 154 + ((i*41)%90);
+      ctx.fillStyle = cols[i%4];
+      ctx.globalAlpha = band === 2 ? .55 : 1;
+      ctx.fillRect(x, y, 3, 2);
+      if (i%5===0) ctx.fillRect(x+1, y-1, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+    // --- signage baked into the ground layer
+    ctx.font = '7px Courier New';
+    ctx.fillStyle = '#c0a8e0'; ctx.fillText('КВАРТАЛ', 8, 268);
+    ctx.fillStyle = '#e0a0b0'; ctx.fillText('ДОМОЙ', 46, 130);
+    ctx.fillStyle = '#fff'; ctx.font = '9px Courier New'; ctx.fillText('CAFE', 156, 40);
+    if (F('foundGenevieve')) { ctx.fillStyle='#a0e0a0'; ctx.font='7px Courier New'; ctx.fillText('ЖЕНЕВЬЕВА', 350, 44); }
+    if (F('sueAgreed') && !F('firstAmulet') || F('sueRefused')) {
+      ctx.fillStyle='#e0a0b0'; ctx.font='7px Courier New'; ctx.fillText('МАДЛЕН', 262, 30);
+    }
     if (F('lonerDoorFail') && !F('lonerCaught')) {
-      ctx.fillStyle = '#0a0810'; ctx.fillRect(8,192,26,54);
-      ctx.fillStyle = '#4a2038'; ctx.font='7px Courier New'; ctx.fillText('ПЕРЕУЛОК', 6, 189);
+      ctx.fillStyle='#4a2038'; ctx.font='7px Courier New'; ctx.fillText('ПЕРЕУЛОК', 228, 146);
+    }
+  },
+  overPaint(ctx) {
+    if (F('firstAmulet') && !F('secondAmulet')) {
+      ctx.fillStyle = 'rgba(192,48,77,' + (0.14 + 0.09*Math.sin(Date.now()/500)).toFixed(3) + ')';
+      ctx.fillRect(2,252,42,60);
     }
     if (Game.chase && Game.chase.active) {
       const left = Math.max(0, Math.ceil(Game.chase.t/1000));
-      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(70, 148, 100, 16);
-      ctx.strokeStyle = '#c0304d'; ctx.strokeRect(70.5, 148.5, 99, 15);
+      const cx = Game.cam.x;
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(cx+70, 158, 100, 16);
+      ctx.strokeStyle = '#c0304d'; ctx.strokeRect(cx+70.5, 158.5, 99, 15);
       ctx.fillStyle = '#ff6070'; ctx.font = '9px Courier New'; ctx.textAlign='center';
-      ctx.fillText('БЕГИ ДОМОЙ  ' + left, 120, 159); ctx.textAlign='left';
+      ctx.fillText('БЕГИ ДОМОЙ  ' + left, cx+120, 169); ctx.textAlign='left';
     }
   },
-  ambient() {
-    if (F('lonerChase') && Math.random()<0.3) FX.spawn(Math.random()*240, 140, 1, {color:'#ff2040', rise:0.3, life:40});
-  },
-  walls: [{x:0,y:0,w:240,h:140},{x:0,y:315,w:240,h:5},{x:0,y:0,w:8,h:320},{x:232,y:0,w:8,h:320}],
+  objects: [
+    { t:'house_b', x:74,  y:120 },                                   // Naya's block
+    { t:'shop',    x:186, y:120 },                                   // the cafe
+    { t:'house_a', x:298, y:120 },                                   // Madlen
+    { t:'house_c', x:388, y:120, when:()=> F('returnedFromHell1') }, // Genevieve
+    { t:'house_boarded', x:388, y:120, when:()=> !F('returnedFromHell1') },
+    // far pavement dressing
+    { t:'lamp_street', x:32,  y:146 }, { t:'lamp_street', x:150, y:146 },
+    { t:'lamp_street', x:262, y:146 }, { t:'lamp_street', x:372, y:146 },
+    { t:'mailbox', x:110, y:144 }, { t:'hydrant', x:238, y:144 },
+    { t:'sign_street', x:14, y:146 },
+    { t:'bin', x:342, y:144 },
+    // near pavement: trees along the verge
+    { t:'tree_red',    x:40,  y:300 }, { t:'tree_gold', x:126, y:302 },
+    { t:'tree_orange', x:212, y:300 }, { t:'tree_rust', x:298, y:302 },
+    { t:'tree_bare',   x:384, y:300 },
+    { t:'bench', x:170, y:284 }, { t:'bin', x:250, y:282 },
+    { t:'pole_power', x:88, y:296 }, { t:'pole_power', x:330, y:296 },
+    { t:'leaves_pile', x:196, y:262 }, { t:'leaves_pile', x:64, y:270 },
+    { t:'puddle', x:130, y:224 }, { t:'puddle', x:286, y:186 }, { t:'puddle', x:360, y:230 },
+    { t:'car_side', x:120, y:242, when:()=> !F('sueDead') },
+    { t:'car_side', x:344, y:190 },
+  ],
+  walls: [
+    {x:0,y:0,w:420,h:120},{x:0,y:315,w:420,h:5},{x:0,y:0,w:8,h:320},{x:412,y:0,w:8,h:320},
+  ],
   interactables: [
-    { x:100,y:140,w:40,h:32, name:'toCafe', prompt:'Кафе', action: async ()=> {
+    { x:168,y:118,w:40,h:30, name:'toCafe', prompt:'Кафе', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
         await changeRoom('cafe', 120, 268);
       }},
-    { x:198,y:248,w:38,h:68, name:'toHome', prompt:'Домой', action: async ()=> {
+    { x:58,y:118,w:36,h:30, name:'toHome', prompt:'Домой', action: async ()=> {
         if (Game.chase && Game.chase.active) { Chase.reachedHome(); return; }
         await changeRoom('stairwell', 120, 250);
       }},
-    { x:6,y:270,w:34,h:46, name:'toOldTown', prompt:'Старый квартал', action: async ()=> {
-        if (Game.chase && Game.chase.active) { UI.toast('Туда нельзя. Только домой.'); return; }
-        if (!F('foundGenevieve')) { UI.toast('Мне туда незачем.'); return; }
-        await changeRoom('oldTown', 30, 280);
-      }},
-    { x:10,y:140,w:60,h:40, name:'toLeftHouse', prompt:'Дом Мадлен', action: async ()=> {
+    { x:282,y:118,w:36,h:30, name:'toLeftHouse', prompt:'Дом Мадлен', action: async ()=> {
         if (F('sueRefused')) { Scene.play('lonerDoor'); return; }
         if (!F('foundGenevieve')) { UI.toast('Дверь заперта.'); return; }
         if (!F('sueAgreed')) { UI.toast('Одной туда нельзя. Нужен человек рядом.'); return; }
         if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'sad',text:'Здесь больше делать нечего.'}]);
         await changeRoom('witch1House', 120, 258);
       }},
-    { x:170,y:140,w:60,h:40, name:'toRightHouse', prompt:'Дом Женевьевы', action: async ()=> {
-        if (!F('returnedFromHell1')) { UI.toast('Дверь заперта.'); return; }
+    { x:370,y:118,w:36,h:30, name:'toRightHouse', prompt:'Дом Женевьевы', action: async ()=> {
+        if (!F('returnedFromHell1')) { UI.toast('Заколочено. Тут давно никто не живёт.'); return; }
         await changeRoom('genevieveHouse', 120, 258);
       }},
-    { x:6,y:196,w:28,h:44, name:'toAlley', prompt:'Переулок',
+    { x:6,y:252,w:34,h:60, name:'toOldTown', prompt:'Старый квартал', action: async ()=> {
+        if (Game.chase && Game.chase.active) { UI.toast('Туда нельзя. Только домой.'); return; }
+        if (!F('foundGenevieve')) { UI.toast('Мне туда незачем.'); return; }
+        await changeRoom('oldTown', 30, 280);
+      }},
+    { x:222,y:120,w:26,h:28, name:'toAlley', prompt:'Переулок',
       when:()=> F('lonerDoorFail') && !F('lonerCaught'),
       action: async ()=> await changeRoom('backAlley', 120, 280) },
+    { x:156,y:270,w:34,h:26, name:'benchLook', prompt:'Скамейка', action(){
+        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Мокрая. Мы сидели тут в сентябре и ели мороженое, потому что она сказала, что "ещё лето".'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Мокрая. Как и всё в этом городе последние две недели.'}]);
+      }},
+    { x:100,y:130,w:26,h:26, name:'mail', prompt:'Ящик', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Чужой почтовый ящик. Пусто. Даже реклама сюда доходить перестала.'}]);
+      }},
+    { x:96,y:224,w:48,h:26, name:'carLook', prompt:'Машина',
+      when:()=> !F('sueDead'),
+      action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Стоит тут третью неделю. Я даже не знаю, что это за модель.'}]);
+      }},
+    { x:26,y:130,w:26,h:26, name:'lampLook', prompt:'Фонарь', action(){
+        if (FX.corruption > .5) return Dialogue.start([{who:'naya',expr:'empty',text:'Тёплый свет. Почему-то от него становится только холоднее.'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Гудит. Зимой он гудит громче — я почему-то это помню с детства.'}]);
+      }},
+    { x:198,y:250,w:30,h:24, name:'leaves', prompt:'Листья', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'На земле их больше, чем на дереве. Каждый год одно и то же, и каждый год это почему-то грустно.'}]);
+      }},
   ],
   npcs: [
-    { x:70,y:265, sprite:'customer', name:'Прохожий',
+    { x:236,y:268, sprite:'customer', name:'Прохожий',
       when:()=> !F('lonerChase') && !F('sueDead'),
       dialogue:()=> {
-        if (F('communePanic')) return Dialogue.start([{who:'customer',expr:'normal',name:'Прохожий',text:'В том доме теперь пусто. Странная была старушка. Тихая.'}]);
+        if (F('communeWarded')) return Dialogue.start([{who:'customer',expr:'normal',name:'Прохожий',text:'Мне кажется, в этом городе что-то происходит. Жена смеётся, а я вот не смеюсь.'}]);
+        if (F('communePanic')) return Dialogue.start([{who:'customer',expr:'normal',name:'Прохожий',text:'Слыхали? Женщину нашли мёртвой. Вчера тут полиция стояла.'}]);
         return Dialogue.start([{who:'customer',expr:'normal',name:'Прохожий',text:'Холодает. Ты бы куртку надела.'}]);
+      }},
+    { x:330,y:270, sprite:'neighbor', name:'Женщина с собакой',
+      when:()=> !F('lonerChase') && !F('sueDead') && F('metSue'),
+      dialogue:()=> {
+        if (F('firstWitchDead')) return Dialogue.start([{who:'neighbor',expr:'normal',name:'Женщина',text:'Собака вторую ночь скулит и не хочет идти мимо того дома. Животные ведь чувствуют, да?'}]);
+        return Dialogue.start([{who:'neighbor',expr:'normal',name:'Женщина',text:'Хороший вечер. Дождь, конечно, но какой уж есть.'}]);
       }},
   ],
 },
 
 /* ---------------------------------------------------------------- */
 cafe: {
-  name:"Кафе", music:'warm', w:240, h:300,
+  name:"Кафе «У Мардж»", music:'warm', w:240, h:300,
+  weather:{ indoor:true, rain:0, fog:.03, wind:0 },
+  light:{ tint:'#2a1c14', dark:.16 },
+  lights:[
+    {x:60,y:22,r:52,c:'#ffcf7a',i:.7},{x:120,y:22,r:52,c:'#ffcf7a',i:.7},{x:180,y:22,r:52,c:'#ffcf7a',i:.7},
+    {x:214,y:140,r:44,c:'#7ba0c8',i:.28},
+  ],
   bgPaint(ctx) {
-    ctx.fillStyle = '#3a2820'; ctx.fillRect(0,0,240,300);
-    ctx.fillStyle = '#2a1a10'; ctx.fillRect(0,0,240,40);
-    ctx.fillStyle = '#5a3820'; ctx.fillRect(20,60,200,30);
-    ctx.fillStyle = '#8a5828'; ctx.fillRect(20,58,200,4);
-    ctx.fillStyle = '#606060'; ctx.fillRect(40,40,30,20);
-    ctx.fillStyle = '#c02020'; ctx.fillRect(48,46,4,4);
-    ctx.fillStyle = '#c0a040'; ctx.fillRect(150,42,22,18);
-    const drawTable = (x,y)=>{ ctx.fillStyle='#8a6040'; ctx.fillRect(x,y,40,30); ctx.fillStyle='#603820'; ctx.fillRect(x,y+28,40,2); };
-    drawTable(30,150); drawTable(150,150); drawTable(30,220); drawTable(150,220);
-    ctx.fillStyle = '#f0d060'; [60,120,180].forEach(x => { ctx.beginPath(); ctx.arc(x,20,5,0,Math.PI*2); ctx.fill(); });
-    ctx.fillStyle = '#4060a0'; ctx.fillRect(196,110,32,60);
-    ctx.strokeStyle = '#2a1810'; ctx.strokeRect(196.5,110.5,31,59);
+    paintInterior(ctx, 240, 300, { wall:'#5e4636', wall2:'#4c382b', floor:'#7a6248', floor2:'#6a5238', wallH:52, tiles:true });
+    ctx.fillStyle = '#4a3628'; ctx.fillRect(0, 52, 240, 4);
+    ctx.fillStyle = '#3a2a20';                       // chalkboard menu
+    ctx.fillRect(150, 10, 62, 30);
+    ctx.fillStyle = '#d8c8a0';
+    for (let i=0;i<5;i++) ctx.fillRect(155, 15+i*5, 30 + ((i*7)%20), 1);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(148, 8, 66, 2);
+    ctx.fillStyle = 'rgba(255,207,122,.05)'; ctx.fillRect(0, 52, 240, 90);
     paintDoor(ctx, 105, 285);
   },
+  objects: [
+    { t:'counter', x:64,  y:96 }, { t:'counter', x:112, y:96 },
+    { t:'coffee_machine', x:48, y:82 },
+    { t:'till', x:150, y:84 },
+    { t:'window_in', x:214, y:120 },
+    { t:'table_round', x:56, y:176 }, { t:'chair_wood', x:34, y:180 }, { t:'chair_wood', x:78, y:180 },
+    { t:'table_round', x:172, y:176 }, { t:'chair_wood', x:150, y:180 }, { t:'chair_wood', x:194, y:180 },
+    { t:'table_round', x:56, y:250 }, { t:'chair_wood', x:34, y:254 },
+    { t:'sofa_old', x:176, y:252 },
+    { t:'plant_pot', x:214, y:206 },
+    { t:'painting', x:38, y:28 },
+  ],
   walls: [
-    {x:0,y:0,w:240,h:95},{x:0,y:295,w:240,h:5},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},
-    {x:30,y:150,w:40,h:30},{x:150,y:150,w:40,h:30},{x:30,y:220,w:40,h:30},{x:150,y:220,w:40,h:30},
+    {x:0,y:0,w:240,h:56},{x:0,y:295,w:240,h:5},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},
   ],
   interactables: [
-    { x:100,y:262,w:40,h:32, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 120, 210) },
-    { x:40,y:60,w:30,h:35, name:'coffee', prompt:'Кофемашина', action(){
+    { x:100,y:262,w:40,h:32, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 176, 160) },
+    { x:32,y:62,w:34,h:34, name:'coffee', prompt:'Кофемашина', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Кофемашина. Мой ежедневный кошмар. Шипит, как будто спорит со мной.'}]);
       }},
-    { x:148,y:42,w:26,h:50, name:'till', prompt:'Касса', action(){
+    { x:134,y:64,w:34,h:34, name:'till', prompt:'Касса', action(){
         if (S('humanity') < 40) return Dialogue.start([{who:'naya',expr:'empty',text:'Считать чужие деньги восемь часов подряд. Как я вообще это делала.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Смена, зарплата, снова смена. Я знаю тут каждую царапину.'}]);
       }},
-    { x:194,y:108,w:36,h:64, name:'window', prompt:'Окно', action(){
+    { x:198,y:106,w:34,h:36, name:'window', prompt:'Окно', action(){
         if (F('firstWitchDead')) return Dialogue.start([{who:'naya',expr:'sad',text:'За окном — улица, где я убила человека. Люди ходят мимо, как будто ничего.'}]);
-        Dialogue.start([{who:'naya',expr:'normal',text:'За окном — та же улица, что и всегда. Вот и весь мой мир.'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Дождь по стеклу. Внутри тепло и пахнет молоком — снаружи ноябрь.'}]);
       }},
-    { x:150,y:218,w:40,h:34, name:'table2', prompt:'Столик', action(){
+    { x:152,y:156,w:44,h:34, name:'table2', prompt:'Столик', action(){
         if (F('cafeSceneComplete')) return Dialogue.start([{who:'naya',expr:'sad',text:'Здесь сидела Сью со своей подругой. Смеялись.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Липкий столик. Кто-то опять не убрал за собой.'}]);
       }},
+    { x:154,y:230,w:46,h:34, name:'sofaLook', prompt:'Диван', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Продавленный диван у окна. Лучшее место в кафе.'},
+          {who:'naya',expr:'smile',text:'Сью занимает его, даже когда не собирается ничего заказывать.'},
+        ]);
+      }},
   ],
   npcs: [
-    { x:100,y:200, sprite:'sue', name:'Сью',
+    { x:96,y:206, sprite:'sue', name:'Сью',
       when:()=> F('metSue') && !F('cafeSceneComplete'),
       dialogue:()=> Scene.play('cafeScene') },
-    { x:118,y:200, sprite:'friend', name:'Подруга',
+    { x:120,y:206, sprite:'friend', name:'Подруга',
       when:()=> F('metSue') && !F('cafeSceneComplete'),
       dialogue:()=> Dialogue.start([{who:'sue',expr:'smile',name:'Подруга',text:'Привет! Сью столько про тебя рассказывала.'}]) },
-    { x:206,y:200, sprite:'chris', name:'Крис',
+    { x:206,y:264, sprite:'chris', name:'Крис',
       when:()=> F('metSue') && !F('cafeSceneComplete'),
       dialogue:()=> Dialogue.start([{who:'chris',expr:'normal',text:'Ная. Нам надо поговорить. Сядь со мной на минуту.'}]) },
-    { x:206,y:200, sprite:'chris', name:'Крис',
+    { x:206,y:264, sprite:'chris', name:'Крис',
       when:()=> F('cafeSceneComplete') && !F('sueDead') && !F('firstAmulet'),
       dialogue:()=> Scene.play('chrisAfter') },
-    { x:60,y:270, sprite:'customer', name:'Посетитель',
+    { x:30,y:222, sprite:'customer', name:'Посетитель',
       when:()=> !F('sueDead'),
       dialogue:()=> {
         const lines = F('secondAmulet')
@@ -1571,46 +2742,63 @@ lilithHall: {
 /* ---------------------------------------------------------------- */
 genevieveHouse: {
   name:"Дом Женевьевы", music:'warm', w:240, h:300,
+  weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#241a14', dark:.18 },
+  lights:[{x:200,y:104,r:40,c:'#8ad04a',i:.35},{x:44,y:60,r:44,c:'#7ba0c8',i:.24}],
   bgPaint(ctx) {
-    ctx.fillStyle = '#284028'; ctx.fillRect(0,0,240,300);
-    ctx.fillStyle = '#182818'; ctx.fillRect(0,0,240,45);
-    ctx.fillStyle = '#40803a';
-    for (let i=0;i<6;i++) { ctx.beginPath(); ctx.arc(20+i*35,52,6,0,Math.PI*2); ctx.fill(); }
-    ctx.fillStyle = '#5a4020'; ctx.fillRect(50,120,140,100);
-    ctx.fillStyle = '#8a6030'; ctx.fillRect(54,124,132,4);
-    ctx.fillStyle = '#402818'; ctx.fillRect(10,60,30,60);
-    ctx.fillStyle = '#40803a'; ctx.fillRect(14,66,22,4);
-    ctx.fillStyle = '#a06030'; ctx.fillRect(14,76,8,10); ctx.fillRect(24,76,8,10);
-    ctx.fillStyle = '#202020'; ctx.beginPath(); ctx.arc(200,90,15,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = F('communePanic') ? '#404040' : '#60a020';
-    ctx.beginPath(); ctx.arc(200,85,10,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#2a1810'; ctx.fillRect(60,60,40,50);
-    ctx.fillStyle = '#c0a060'; ctx.font = '6px Courier New'; ctx.fillText('КОММУНА', 62, 118);
+    paintInterior(ctx, 240, 300, { wall:'#4e5442', wall2:'#414736', floor:'#7d6446', floor2:'#6c5439', wallH:56 });
+    ctx.fillStyle = '#3a4030'; ctx.fillRect(58, 62, 46, 54);      // doorway to the commune
+    ctx.fillStyle = '#2a3020'; ctx.fillRect(62, 66, 38, 50);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('КОММУНА', 60, 124);
+    ctx.fillStyle = 'rgba(140,200,90,.05)'; ctx.fillRect(150, 56, 88, 100);
     paintDoor(ctx, 105, 285);
   },
-  ambient() { if (!F('communePanic') && Math.random()<0.05) FX.spawn(200,82,1,{color:'#80c040',rise:-0.35,life:60}); },
+  objects: [
+    { t:'window_in', x:44, y:36 },
+    { t:'herb_shelf', x:24, y:118 },
+    { t:'bookshelf', x:214, y:104 },
+    { t:'cauldron', x:198, y:150 },
+    { t:'table_wood', x:126, y:170 },
+    { t:'chair_wood', x:100, y:176 }, { t:'chair_wood', x:152, y:176 },
+    { t:'rug_warm', x:120, y:230 },
+    { t:'armchair', x:44, y:212 },
+    { t:'plant_pot', x:22, y:250 }, { t:'plant_pot', x:214, y:238 },
+    { t:'plant_pot', x:196, y:262 },
+    { t:'candle', x:104, y:154 },
+    { t:'painting', x:150, y:28 },
+  ],
+  ambient() { if (!F('communePanic') && Math.random()<0.05) FX.spawn(198,144,1,{color:'#80c040',rise:-0.35,life:60}); },
   walls: [
-    {x:0,y:0,w:240,h:45},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
-    {x:10,y:60,w:30,h:60},{x:185,y:75,w:30,h:30},{x:60,y:60,w:40,h:50},
+    {x:0,y:0,w:240,h:56},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
+    {x:58,y:56,w:46,h:60},
   ],
   interactables: [
-    { x:100,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 120, 210) },
-    { x:60,y:110,w:40,h:30, name:'toCommune', prompt:'В коммуну',
+    { x:100,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 370, 160) },
+    { x:60,y:96,w:42,h:34, name:'toCommune', prompt:'В коммуну',
       when:()=> F('foundGenevieve'),
       action: async ()=> {
         if (F('sueRefused') && !F('lonerBreakIn')) { UI.toast('Женевьева не пустит тебя туда одну. Пока — нет.'); return; }
         await changeRoom('communeHall', 120, 268);
       }},
-    { x:8,y:56,w:36,h:66, name:'herbs', prompt:'Травы', action(){
+    { x:6,y:96,w:40,h:34, name:'herbs', prompt:'Травы', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Полынь, зверобой, ещё что-то остро пахнущее. Всё подписано аккуратным почерком.'}]);
       }},
-    { x:183,y:72,w:36,h:38, name:'cauldron', prompt:'Котёл', action(){
+    { x:180,y:130,w:38,h:32, name:'cauldron', prompt:'Котёл', action(){
         if (F('communePanic')) return Dialogue.start([{who:'naya',expr:'sad',text:'Котёл остыл. Женевьева больше ничего не варит.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Пахнет супом. Обычным овощным супом. Я почему-то ждала другого.'}]);
       }},
+    { x:196,y:82,w:40,h:32, name:'genBooks', prompt:'Книги', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Травники, справочники, две книги по акушерству и детектив в мягкой обложке.'},
+          {who:'naya',expr:'sad',text:'Ничего страшного. Вообще ничего страшного.'},
+        ]);
+      }},
+    { x:26,y:190,w:38,h:32, name:'chairLook', prompt:'Кресло', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Продавленное кресло с пледом. В нём кто-то сидит каждый вечер сорок лет подряд.'}]);
+      }},
   ],
   npcs: [
-    { x:132,y:160, sprite:'genevieve', name:'Женевьева',
+    { x:126,y:210, sprite:'genevieve', name:'Женевьева',
       dialogue:()=> {
         if (!F('foundGenevieve')) return Scene.play('meetGenevieve');
         if (F('sueRefused') && !F('lonerGenevieve')) return Scene.play('lonerGenevieve');
@@ -1645,8 +2833,10 @@ communeHall: {
     for (let i=0;i<5;i++) { ctx.fillRect(40+i*40,60,4,12); }
     ctx.fillStyle = '#f0a020';
     for (let i=0;i<5;i++) { ctx.beginPath(); ctx.arc(42+i*40,57,3,0,Math.PI*2); ctx.fill(); }
-    if (F('communeWarded')) paintRunes(ctx, [[60,120,9],[180,120,9],[60,220,9],[180,220,9]], '#40a0ff', Date.now());
     paintDoor(ctx, 105, 285);
+  },
+  overPaint(ctx) {
+    if (F('communeWarded')) paintRunes(ctx, [[60,120,9],[180,120,9],[60,220,9],[180,220,9]], '#40a0ff', Date.now());
   },
   ambient() { if (F('communePanic') && Math.random()<0.06) FX.spawn(120,170,1,{color:'#8a4040',spread:80,rise:-0.2,life:70}); },
   walls: [{x:0,y:0,w:240,h:45},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5}],
@@ -1698,49 +2888,58 @@ communeHall: {
 
 /* ---------------------------------------------------------------- */
 witch1House: {
-  name:"Дом первой ведьмы", music:'tense', w:240, h:300,
+  name:"Дом Мадлен", music:'tense', w:240, h:300,
+  weather:{ indoor:true, rain:0, fog:.07, wind:0 },
+  light:{ tint:'#1c1826', dark:.34 },
+  lights:[{x:30,y:74,r:30,c:'#ffbe60',i:.55,flicker:1},{x:210,y:74,r:30,c:'#ffbe60',i:.55,flicker:1}],
   bgPaint(ctx) {
-    ctx.fillStyle = '#302838'; ctx.fillRect(0,0,240,300);
-    ctx.fillStyle = '#1a1428'; ctx.fillRect(0,0,240,40);
-    ctx.fillStyle = '#e0d0a0'; ctx.fillRect(20,60,6,14); ctx.fillRect(210,60,6,14);
-    ctx.fillStyle = '#f0a020';
-    ctx.beginPath(); ctx.arc(23,58,3,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(213,58,3,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#3a2010'; ctx.fillRect(40,60,60,50);
-    ['#c04030','#4030c0','#30c060','#c0a030'].forEach((c,i)=>{ ctx.fillStyle=c; ctx.fillRect(44+i*12,64,10,20); });
-    ctx.fillStyle = '#1a0820'; ctx.fillRect(150,80,60,40);
-    if (!F('firstAmulet')) {
-      ctx.fillStyle = '#c060ff'; ctx.beginPath(); ctx.arc(180,100,6,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#e8b0ff'; ctx.beginPath(); ctx.arc(180,100,3,0,Math.PI*2); ctx.fill();
-    }
-    ctx.strokeStyle = '#8a2040'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(120,205,40,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle = '#4a3020'; ctx.fillRect(196,180,30,40);
+    paintInterior(ctx, 240, 300, { wall:'#463a4a', wall2:'#3a3040', floor:'#5f4a38', floor2:'#503d2d', wallH:56 });
+    ctx.strokeStyle = '#7a3a52'; ctx.lineWidth = 1;             // faded circle worn into the boards
+    ctx.beginPath(); ctx.arc(120, 208, 42, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(120, 208, 34, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.1)';
+    for (let i=0;i<40;i++) ctx.fillRect((i*61)%240, 60+((i*37)%230), 2, 1);
     paintDoor(ctx, 105, 285);
   },
-  ambient() { if (!F('firstAmulet') && Math.random()<0.14) FX.spawn(180,100,1,{color:'#c060ff',spread:8,rise:-0.4,life:50}); },
+  objects: [
+    { t:'candle', x:30, y:84 }, { t:'candle', x:210, y:84 },
+    { t:'painting', x:74, y:26 }, { t:'painting', x:166, y:26 },
+    { t:'bookshelf', x:56, y:104 },
+    { t:'altar', x:176, y:112, when:()=> !F('firstAmulet') },
+    { t:'altar', x:176, y:112, when:()=> F('firstAmulet') },
+    { t:'candle', x:152, y:100, when:()=> !F('firstAmulet') },
+    { t:'candle', x:200, y:100, when:()=> !F('firstAmulet') },
+    { t:'cabinet', x:214, y:198 },
+    { t:'table_round', x:120, y:258 },
+    { t:'chair_wood', x:96, y:262 }, { t:'chair_wood', x:144, y:262 },
+    { t:'rug_red', x:120, y:210 },
+    { t:'wardrobe', x:26, y:186 },
+  ],
+  ambient() { if (!F('firstAmulet') && Math.random()<0.14) FX.spawn(176,100,1,{color:'#c060ff',spread:10,rise:-0.4,life:50}); },
   walls: [
-    {x:0,y:0,w:240,h:45},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
-    {x:40,y:60,w:60,h:50},{x:150,y:80,w:60,h:40},{x:196,y:180,w:30,h:40},
+    {x:0,y:0,w:240,h:56},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
   ],
   interactables: [
-    { x:100,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 120, 210) },
-    { x:40,y:60,w:60,h:50, name:'books', prompt:'Книги', action(){
+    { x:100,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 282, 160) },
+    { x:38,y:80,w:40,h:34, name:'books', prompt:'Книги', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Старые книги. Пахнут пылью и травами.'},
           {who:'naya',expr:'talk',text:'"О пороге и приглашении". Значит, Женевьева не выдумывала.'},
         ]);
       }},
-    { x:194,y:176,w:34,h:48, name:'kettles', prompt:'Полка', action(){
+    { x:196,y:178,w:38,h:32, name:'kettles', prompt:'Буфет', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Три одинаковых чайника. Интересно, зачем ведьме три одинаковых чайника.'}]);
       }},
-    { x:150,y:80,w:60,h:44, name:'altar', prompt:'Алтарь', action(){
+    { x:156,y:92,w:44,h:32, name:'altar', prompt:'Алтарь', action(){
         if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'Пусто. Осталась только тень на камне.'}]);
         Scene.play('firstAmuletScene');
       }},
+    { x:100,y:236,w:44,h:32, name:'teaTable', prompt:'Стол', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Чашки на троих и печенье в блюдце. Она достала хорошую посуду.'}]);
+      }},
   ],
   npcs: [
-    { x:172,y:190, sprite:'witch1', name:'Мадлен',
+    { x:172,y:186, sprite:'witch1', name:'Мадлен',
       when:()=> !F('firstAmulet'),
       dialogue:()=> Dialogue.start([
         {who:'witch1',expr:'normal',name:'Мадлен',text:'Так вы от Женевьевы? Заходите, дети. Что у вас за беда?'},
@@ -1748,7 +2947,7 @@ witch1House: {
         {who:'witch1',expr:'worried',name:'Мадлен',text:'Бедная девочка. Хорошо. Алтарь справа — положи туда то, что принесла.'},
         {who:'naya',expr:'normal',text:'(Подойди к алтарю и начни "очищение".)'},
       ]) },
-    { x:80,y:210, sprite:'sue', name:'Сью',
+    { x:70,y:196, sprite:'sue', name:'Сью',
       when:()=> !F('firstAmulet'),
       dialogue:()=> Dialogue.start([
         {who:'sue',expr:'worried',text:'Ная... ты уверена, что нам сюда? Она такая... обычная. Как бабушка.'},
@@ -1760,43 +2959,50 @@ witch1House: {
 
 /* ---------------------------------------------------------------- */
 witch2House: {
-  name:"Дом второй ведьмы", music:'tense', w:240, h:300,
+  name:"Дом Розы", music:'tense', w:240, h:300,
+  weather:{ indoor:true, rain:0, fog:.03, wind:0 },
+  light:{ tint:'#241c1a', dark:.2 },
+  lights:[{x:30,y:96,r:40,c:'#ff8a3c',i:.6,flicker:1},{x:120,y:34,r:44,c:'#7ba0c8',i:.26}],
   bgPaint(ctx) {
-    ctx.fillStyle = '#3a2820'; ctx.fillRect(0,0,240,300);
-    ctx.fillStyle = '#1a1010'; ctx.fillRect(0,0,240,40);
-    ctx.fillStyle = '#4060a0'; ctx.fillRect(90,10,60,25);
-    ctx.strokeStyle = '#2a1810'; ctx.strokeRect(90.5,10.5,59,24);
-    ctx.beginPath(); ctx.moveTo(120.5,10); ctx.lineTo(120.5,35); ctx.stroke();
-    ctx.fillStyle = '#804a20'; ctx.fillRect(60,140,120,100);
-    ctx.fillStyle = '#3a2020'; ctx.fillRect(10,60,40,50);
-    ctx.fillStyle = '#f04020'; ctx.fillRect(16,80,28,25);
-    ctx.fillStyle = '#f0a020'; ctx.fillRect(20,85,20,15);
-    ctx.fillStyle = '#2a1810'; ctx.fillRect(180,60,50,60);
-    ctx.fillStyle = '#5a3820'; ctx.fillRect(182,62,46,56);
-    ctx.fillStyle = '#c0a060'; ctx.fillRect(220,88,3,3);
-    if (C('witch2Distract') >= 3 && !F('secondAmulet')) {
-      ctx.strokeStyle = '#ffd060'; ctx.lineWidth = 1; ctx.strokeRect(179.5,59.5,51,61);
-    }
-    ctx.fillStyle = '#8a6040'; ctx.fillRect(90,170,60,40);
+    paintInterior(ctx, 240, 300, { wall:'#6b5a4e', wall2:'#5a4a40', floor:'#8a7458', floor2:'#78624a', wallH:52 });
+    ctx.fillStyle = 'rgba(255,140,60,.06)'; ctx.fillRect(0, 52, 90, 120);
     paintDoor(ctx, 105, 285);
   },
-  ambient() { if (Math.random()<0.2) FX.spawn(30,80,1,{color:'#f0a020',spread:16,rise:-0.5,life:40}); },
+  objects: [
+    { t:'window_in', x:120, y:34 },
+    { t:'fireplace', x:32, y:108 },
+    { t:'cabinet', x:206, y:96 },
+    { t:'counter', x:150, y:96 },
+    { t:'tv', x:60, y:180 },
+    { t:'rug_warm', x:120, y:222 },
+    { t:'table_round', x:120, y:208 },
+    { t:'sofa_modern', x:120, y:256 },
+    { t:'plant_pot', x:214, y:170 },
+    { t:'photo_frame', x:64, y:30 }, { t:'photo_frame', x:84, y:30 }, { t:'photo_frame', x:104, y:30 },
+    { t:'clock', x:180, y:26 },
+  ],
+  ambient() { if (Math.random()<0.2) FX.spawn(32,100,1,{color:'#f0a020',spread:16,rise:-0.5,life:40}); },
   walls: [
-    {x:0,y:0,w:240,h:45},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
-    {x:10,y:60,w:40,h:50},{x:180,y:60,w:50,h:60},{x:90,y:170,w:60,h:40},
+    {x:0,y:0,w:240,h:52},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
   ],
   interactables: [
     { x:100,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> {
         if (!F('secondAmulet')) { UI.toast('Уйти сейчас — значит вернуться сюда снова.'); return; }
-        await changeRoom('oldTown', 52, 200);
+        await changeRoom('oldTown', 80, 200);
       }},
-    { x:8,y:56,w:46,h:58, name:'fire', prompt:'Камин', action(){
+    { x:14,y:84,w:40,h:34, name:'fire', prompt:'Камин', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'В камине тепло. По-настоящему тепло. У меня дома батареи еле дышат.'}]);
       }},
-    { x:88,y:166,w:64,h:48, name:'tea', prompt:'Стол', action(){
+    { x:98,y:176,w:44,h:32, name:'tea', prompt:'Столик', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Чай на троих. Она заварила его до того, как мы постучали.'}]);
       }},
-    { x:180,y:60,w:50,h:65, name:'cabinet', prompt:'Шкаф', action(){
+    { x:44,y:158,w:36,h:32, name:'tvLook', prompt:'Телевизор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Включён без звука. Идёт прогноз погоды.'},
+          {who:'naya',expr:'sad',text:'Обещают дождь до конца недели. Это единственное честное предсказание в этом доме.'},
+        ]);
+      }},
+    { x:186,y:76,w:40,h:34, name:'cabinet', prompt:'Шкаф', action(){
         if (F('secondAmulet')) return Dialogue.start([{who:'naya',expr:'normal',text:'Шкаф пуст.'}]);
         const d = C('witch2Distract');
         if (d < 3) return Dialogue.start([
@@ -1805,9 +3011,16 @@ witch2House: {
         ]);
         Scene.play('secondAmuletScene');
       }},
+    { x:46,y:24,w:80,h:30, name:'photos', prompt:'Фотографии', action(){
+        if (F('secondAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'На одной из них — молодая Роза с сёстрами. Восемь женщин. Теперь их шесть.'}]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Внуки, свадьба, кто-то на пляже. Обычная стена обычной бабушки.'},
+          {who:'naya',expr:'sad',text:'(Я почему-то ожидала пентаграмм.)'},
+        ]);
+      }},
   ],
   npcs: [
-    { x:60,y:236, sprite:'sue', name:'Сью',
+    { x:60,y:250, sprite:'sue', name:'Сью',
       when:()=> !F('secondAmulet'),
       dialogue:()=> {
         const d = C('witch2Distract');
@@ -1817,7 +3030,7 @@ witch2House: {
         ]);
         return Dialogue.start([{who:'sue',expr:'worried',text:'Она отвернулась. Иди к шкафу — быстро.'}]);
       }},
-    { x:150,y:226, sprite:'witch2', name:'Роза',
+    { x:166,y:242, sprite:'witch2', name:'Роза',
       when:()=> !F('secondAmulet'),
       dialogue:()=> Scene.play('distractWitch2') },
   ],
@@ -1839,8 +3052,10 @@ nightSpot: {
     ctx.fillStyle = '#2a2038'; ctx.fillRect(80,144,80,8);
     ctx.fillStyle = F('thirdAmulet') ? '#403040' : '#40a0ff';
     ctx.fillRect(88,162,14,14); ctx.fillRect(138,162,14,14);
-    if (!F('thirdAmulet')) paintRunes(ctx, [[120,232,8],[95,250,6],[145,250,6]], '#40a0ff', Date.now());
     ctx.fillStyle = '#5a6070'; ctx.font = '6px Courier New'; ctx.fillText('дом за городом', 84, 142);
+  },
+  overPaint(ctx) {
+    if (!F('thirdAmulet')) paintRunes(ctx, [[120,232,8],[95,250,6],[145,250,6]], '#40a0ff', Date.now());
   },
   ambient() { if (Math.random()<0.12) FX.spawn(Math.random()*240, 320, 1, {color:'#20304a', rise:-0.25, life:120}); },
   walls: [
@@ -1885,15 +3100,14 @@ nightSpot: {
 witch3House: {
   name:"Дом за городом", music:'tense', w:240, h:300,
   bgPaint(ctx) {
-    const t = Date.now();
+    const t = 0;
     ctx.fillStyle = '#141824'; ctx.fillRect(0,0,240,300);
     ctx.fillStyle = '#0c0e16'; ctx.fillRect(0,0,240,45);
     ctx.fillStyle = '#1c2230'; ctx.fillRect(20,50,200,190);
     ctx.strokeStyle = '#0e1018';
     for (let y=50;y<240;y+=14) { ctx.beginPath(); ctx.moveTo(20,y+.5); ctx.lineTo(220,y+.5); ctx.stroke(); }
     const done = C('runesDisarmed') || 0;
-    const runeSpots = [[52,92,11],[188,92,11],[120,196,11]];
-    runeSpots.forEach((r,i)=>{ if (i >= done) paintRunes(ctx, [r], '#40a0ff', t + i*400); else {
+    [[52,92,11],[188,92,11],[120,196,11]].forEach((r,i)=>{ if (i < done) {
       ctx.strokeStyle='#2a3038'; ctx.beginPath(); ctx.arc(r[0],r[1],r[2],0,Math.PI*2); ctx.stroke();
     }});
     ctx.fillStyle = '#241a12'; ctx.fillRect(30,60,50,60);
@@ -1902,12 +3116,21 @@ witch3House: {
     ctx.fillStyle = '#101828'; ctx.fillRect(96,130,48,44);
     ctx.strokeStyle = '#2a3a56'; ctx.strokeRect(96.5,130.5,47,43);
     if (done >= 3 && !F('thirdAmulet')) {
-      ctx.fillStyle = 'rgba(160,32,192,' + (0.3+0.2*Math.sin(t/300)) + ')'; ctx.fillRect(92,126,56,52);
       ctx.fillStyle = '#c060ff'; ctx.beginPath(); ctx.arc(120,152,6,0,Math.PI*2); ctx.fill();
       ctx.fillStyle = '#e8b0ff'; ctx.beginPath(); ctx.arc(120,152,3,0,Math.PI*2); ctx.fill();
     }
     ctx.fillStyle = '#2a2438'; ctx.fillRect(40,200,36,30); ctx.fillRect(168,200,36,30);
     paintDoor(ctx, 105, 285);
+  },
+  overPaint(ctx) {
+    const t = Date.now(), done = C('runesDisarmed') || 0;
+    [[52,92,11],[188,92,11],[120,196,11]].forEach((r,i) => {
+      if (i >= done) paintRunes(ctx, [r], '#40a0ff', t + i*400);
+    });
+    if (done >= 3 && !F('thirdAmulet')) {
+      ctx.fillStyle = 'rgba(160,32,192,' + (0.3+0.2*Math.sin(t/300)).toFixed(3) + ')';
+      ctx.fillRect(92,126,56,52);
+    }
   },
   ambient() {
     if (Math.random() < 0.05) FX.spawn(Math.random()*240, Math.random()*260, 1, {color:'#2a3a56', rise:0, life:40});
@@ -2290,11 +3513,7 @@ stairwell: {
       ctx.fillStyle = '#2a2620'; ctx.fillRect(166+cIdx*20, 82+r*24, 13, 2);
     }
     // flickering bulb
-    const lit = Math.sin(Date.now()/220) > -0.75;
     ctx.fillStyle = '#6a6a70'; ctx.fillRect(117,0,6,14);
-    ctx.fillStyle = lit ? '#fff2b0' : '#5a5644';
-    ctx.beginPath(); ctx.arc(120,18,6,0,Math.PI*2); ctx.fill();
-    if (lit) { ctx.fillStyle = 'rgba(255,242,176,.06)'; ctx.beginPath(); ctx.arc(120,18,52,0,Math.PI*2); ctx.fill(); }
     // apartment door (up) and street door (down)
     ctx.fillStyle = '#43301e'; ctx.fillRect(96,50,48,26);
     ctx.fillStyle = '#5e4428'; ctx.fillRect(99,53,42,23);
@@ -2303,6 +3522,12 @@ stairwell: {
     ctx.fillStyle = '#2a2418'; ctx.fillRect(92,272,56,26);
     ctx.fillStyle = '#4a4030'; ctx.fillRect(95,275,50,23);
     ctx.fillStyle = '#e0a0b0'; ctx.font = '7px Courier New'; ctx.fillText('НА УЛИЦУ', 90, 268);
+  },
+  overPaint(ctx) {
+    const lit = Math.sin(Date.now()/220) > -0.75;
+    ctx.fillStyle = lit ? '#fff2b0' : '#5a5644';
+    ctx.beginPath(); ctx.arc(120,18,6,0,Math.PI*2); ctx.fill();
+    if (lit) { ctx.fillStyle = 'rgba(255,242,176,.07)'; ctx.beginPath(); ctx.arc(120,18,52,0,Math.PI*2); ctx.fill(); }
   },
   walls: [
     {x:0,y:0,w:240,h:58},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
@@ -2353,101 +3578,115 @@ stairwell: {
 
 /* ---------------------------------------------------------------- */
 oldTown: {
-  name:"Старый квартал", music:'street', w:240, h:320,
+  name:"Старый квартал", music:'street', w:360, h:320, wet:true,
+  weather:{ rain:.4, fog:.3, wind:.25, leaves:.4 },
+  light:{ tint:'#10121e', dark:.5 },
+  lights:[
+    {x:96,y:66,r:30,c:'#ffb060',i:.55, when:true},
+    {x:300,y:236,r:30,c:'#8a70c0',i:.3},
+  ],
   bgPaint(ctx) {
-    const night = F('thirdHouseOpen') && !F('thirdAmulet');
-    ctx.fillStyle = night ? '#0d0a16' : '#1b1626'; ctx.fillRect(0,0,240,150);
+    const W = 360;
+    const sky = ctx.createLinearGradient(0,0,0,150);
+    sky.addColorStop(0,'#191426'); sky.addColorStop(1,'#2e2a3e');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,150);
     ctx.fillStyle = '#dcdcf0';
-    for (let i=0;i<18;i++) ctx.fillRect((i*61)%240, (i*31)%140, 1, 1);
-    ctx.fillStyle = '#2a2432'; ctx.fillRect(0,150,240,170);
-    // cobbles
-    ctx.strokeStyle = '#221d29';
-    for (let y=156;y<320;y+=12) for (let x=(y%24?0:6);x<240;x+=18) ctx.strokeRect(x+.5,y+.5,17,11);
-
-    // Rose's house — its own building, left
-    const roseActive = F('firstAmulet') && !F('secondAmulet');
-    if (roseActive) { ctx.fillStyle='rgba(192,48,77,.26)'; ctx.fillRect(8,58,88,94); }
-    ctx.fillStyle = roseActive ? '#4a2a34' : '#2c2630'; ctx.fillRect(14,64,76,86);
-    ctx.fillStyle = '#1e1822'; ctx.fillRect(14,58,76,8);
-    ctx.fillStyle = roseActive ? '#ffb060' : '#c8b070';
-    ctx.fillRect(24,80,16,16); ctx.fillRect(62,80,16,16);
-    ctx.fillStyle = '#1a0f14'; ctx.fillRect(44,120,20,30);
-    ctx.fillStyle = '#7a5a3a'; ctx.fillRect(46,122,16,28);
-    if (roseActive) { ctx.fillStyle='#e0a0b0'; ctx.font='7px Courier New'; ctx.fillText('РОЗА', 36, 56); }
-    // her little garden
-    ctx.fillStyle = '#2e4630'; ctx.fillRect(14,152,76,12);
+    for (let i=0;i<22;i++) ctx.fillRect((i*61)%W, (i*31)%140, 1, 1);
+    // cobbled square
+    ctx.fillStyle = '#2f2a38'; ctx.fillRect(0,150,W,170);
+    ctx.strokeStyle = '#262130';
+    for (let y=154;y<320;y+=11) for (let x=(y%22?0:6);x<W;x+=17) ctx.strokeRect(x+.5,y+.5,16,10);
+    ctx.fillStyle = 'rgba(255,255,255,.03)'; ctx.fillRect(0,150,W,40);
+    // damp patches
+    ctx.fillStyle = 'rgba(20,24,34,.4)';
+    [[70,206,40,14],[210,250,52,16],[300,180,34,12]].forEach(([x,y,w,h]) => {
+      ctx.beginPath(); ctx.ellipse(x,y,w/2,h/2,0,0,Math.PI*2); ctx.fill();
+    });
+    // Rose's little front garden
+    ctx.fillStyle = '#33452e'; ctx.fillRect(38,150,84,14);
     ctx.fillStyle = F('secondAmulet') ? '#4a4438' : '#5e8a44';
-    for (let i=0;i<7;i++) { ctx.beginPath(); ctx.arc(20+i*11,152,3,0,Math.PI*2); ctx.fill(); }
-
-    // shuttered houses opposite
-    ctx.fillStyle = '#241f2c'; ctx.fillRect(150,74,80,76);
-    ctx.fillStyle = '#191520'; ctx.fillRect(158,92,20,22); ctx.fillRect(202,92,20,22);
-    ctx.fillStyle = '#3a3040'; ctx.fillRect(178,120,24,30);
-
-    // fountain
-    ctx.fillStyle = '#3a3442'; ctx.beginPath(); ctx.arc(150,232,26,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#1e2a34'; ctx.beginPath(); ctx.arc(150,232,20,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#4a4454'; ctx.fillRect(146,214,8,20);
-
-    // way back, and the road out of town
-    ctx.fillStyle = '#e0a0b0'; ctx.font = '7px Courier New';
-    ctx.fillText('НАЗАД', 12, 312);
-    if (F('thirdHouseOpen') && !F('thirdAmulet')) {
-      const t = Date.now();
-      ctx.fillStyle = 'rgba(160,32,192,' + (0.20 + 0.12*Math.sin(t/420)) + ')';
-      ctx.fillRect(196,250,40,66);
-      ctx.fillStyle = '#e060f0'; ctx.fillText('ЗА ГОРОД', 186, 246);
-    } else {
-      ctx.fillStyle = '#6a5a64'; ctx.fillText('за город', 190, 246);
+    for (let i=0;i<9;i++) { ctx.beginPath(); ctx.arc(44+i*9,151,3,0,Math.PI*2); ctx.fill(); }
+    // leaves
+    const cols = [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
+    for (let i=0;i<170;i++) {
+      ctx.fillStyle = cols[i%4];
+      ctx.fillRect((i*89)%W, 152+((i*37)%164), 3, 2);
     }
-    ctx.fillStyle = '#161220'; ctx.fillRect(206,256,26,60);
+    ctx.font = '7px Courier New';
+    ctx.fillStyle = '#e0a0b0'; ctx.fillText('НАЗАД', 12, 306);
+    if (F('firstAmulet') && !F('secondAmulet')) { ctx.fillStyle='#e0a0b0'; ctx.fillText('РОЗА', 66, 62); }
   },
-  ambient() {
-    if (F('thirdHouseOpen') && !F('thirdAmulet') && Math.random() < 0.14)
-      FX.spawn(218, 286, 1, {color:'#c060ff', spread:22, rise:-0.3, life:60});
-    if (Math.random() < 0.03) FX.spawn(150, 226, 1, {color:'#3a5a70', rise:-0.4, life:50, spread:14});
+  overPaint(ctx) {
+    if (F('thirdHouseOpen') && !F('thirdAmulet')) {
+      ctx.fillStyle = 'rgba(160,32,192,' + (0.18 + 0.12*Math.sin(Date.now()/420)).toFixed(3) + ')';
+      ctx.fillRect(298,196,54,120);
+      ctx.fillStyle = '#e060f0'; ctx.font = '7px Courier New'; ctx.fillText('ЗА ГОРОД', 300, 192);
+    } else {
+      ctx.fillStyle = '#6a5a64'; ctx.font = '7px Courier New'; ctx.fillText('за город', 302, 192);
+    }
   },
+  objects: [
+    { t:'house_c', x:80,  y:150 },                       // Rose's house
+    { t:'house_boarded', x:196, y:146 },
+    { t:'chapel', x:300, y:150 },
+    { t:'fence_wood', x:38, y:166 }, { t:'fence_wood', x:70, y:166 },
+    { t:'fence_wood', x:102, y:166 },
+    { t:'lamp_street', x:22, y:196 }, { t:'lamp_street', x:166, y:190 },
+    { t:'tree_bare', x:140, y:236 }, { t:'tree_rust', x:246, y:242 },
+    { t:'tree_bare', x:44, y:262 },
+    { t:'bench', x:196, y:222 }, { t:'bin', x:166, y:218 },
+    { t:'pole_power', x:270, y:196 },
+    { t:'puddle', x:112, y:250 }, { t:'puddle', x:236, y:288 },
+    { t:'leaves_pile', x:80, y:236 }, { t:'leaves_pile', x:284, y:266 },
+    { t:'plant_pot', x:126, y:170 },
+  ],
   walls: [
-    {x:0,y:0,w:240,h:150},{x:0,y:0,w:8,h:320},{x:232,y:0,w:8,h:320},{x:0,y:315,w:240,h:5},
-    {x:126,y:208,w:48,h:48},
+    {x:0,y:0,w:360,h:150},{x:0,y:0,w:8,h:320},{x:352,y:0,w:8,h:320},{x:0,y:315,w:360,h:5},
   ],
   interactables: [
-    { x:6,y:262,w:44,h:52, name:'toStreet', prompt:'Назад', action: async ()=> await changeRoom('street', 40, 250) },
-    { x:14,y:150,w:76,h:36, name:'toRose', prompt:'Дом Розы', action: async ()=> {
+    { x:6,y:262,w:38,h:52, name:'toStreet', prompt:'Назад', action: async ()=> await changeRoom('street', 40, 270) },
+    { x:44,y:150,w:72,h:32, name:'toRose', prompt:'Дом Розы', action: async ()=> {
         if (!F('firstAmulet')) { UI.toast('Сначала — Мадлен. Иначе нас тут не ждут.'); return; }
         if (F('secondAmulet')) return Dialogue.start([{who:'naya',expr:'sad',text:'Здесь больше делать нечего.'}]);
         await changeRoom('witch2House', 120, 258);
       }},
-    { x:198,y:252,w:40,h:62, name:'toNightRoad', prompt:'За город', action: async ()=> {
+    { x:296,y:196,w:52,h:60, name:'toNightRoad', prompt:'За город', action: async ()=> {
         if (!F('thirdHouseOpen')) { UI.toast('За городом ночью делать нечего. Пока нечего.'); return; }
         if (F('thirdAmulet')) return Dialogue.start([{who:'naya',expr:'sad',text:'Больше туда не пойду. Никогда.'}]);
         await changeRoom('nightSpot', 120, 268);
       }},
-    { x:124,y:206,w:52,h:52, name:'fountain', prompt:'Фонтан', action(){
-        if (F('secondAmulet')) return Dialogue.start([
-          {who:'naya',expr:'sad',text:'Мы сидели тут после Розы. Молча. Минут сорок.'},
-          {who:'sue',expr:'sad',text:'(Она тогда впервые не взяла меня за руку.)'},
+    { x:264,y:150,w:64,h:34, name:'chapelDoor', prompt:'Часовня', action(){
+        if (F('communePanic')) return Dialogue.start([
+          {who:'naya',expr:'sad',text:'Закрыто. На двери — бумажка: "Прощание с Мадлен, в субботу".'},
+          {who:'naya',expr:'empty',text:'Написано от руки. Кто-то старался, чтобы было аккуратно.'},
         ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Закрыто. Служба по воскресеньям. Мать сюда не пускали.'}]);
+      }},
+    { x:170,y:148,w:60,h:34, name:'boarded', prompt:'Заколоченный дом', action(){
         Dialogue.start([
-          {who:'naya',expr:'normal',text:'Старый фонтан. Воду в нём отключили ещё до моего рождения.'},
-          {who:'naya',expr:'normal',text:'На дне монетки. Люди всё равно бросают.'},
+          {who:'naya',expr:'normal',text:'Здесь никто не живёт лет десять. Окна забиты крест-накрест.'},
+          {who:'naya',expr:'sad',text:'Дети говорят, что тут жила ведьма. Дети всегда так говорят про пустые дома.'},
         ]);
       }},
-    { x:148,y:150,w:84,h:36, name:'shutters', prompt:'Дома напротив', action(){
-        if (F('communeWarded')) return Dialogue.start([
-          {who:'naya',expr:'angry',text:'Ставни закрыты даже днём. Весь квартал закрылся за две недели.'},
-          {who:'naya',expr:'empty',text:'Из-за меня.'},
+    { x:182,y:206,w:32,h:26, name:'bench2', prompt:'Скамейка', action(){
+        if (F('secondAmulet')) return Dialogue.start([
+          {who:'naya',expr:'sad',text:'Мы сидели тут после Розы. Молча. Минут сорок.'},
+          {who:'naya',expr:'empty',text:'Она тогда впервые не взяла меня за руку.'},
         ]);
-        Dialogue.start([{who:'naya',expr:'normal',text:'Старые дома. Тут живут те, кто помнит квартал ещё зелёным.'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Мокрая. Вся эта площадь мокрая с сентября.'}]);
+      }},
+    { x:114,y:158,w:36,h:26, name:'garden', prompt:'Палисадник', action(){
+        if (F('secondAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'Цветы завяли за неделю. Никто их не поливал.'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Кто-то каждый день подвязывает эти кусты. В октябре. Зачем-то.'}]);
       }},
   ],
   npcs: [
-    { x:96,y:250, sprite:'acolyte', name:'Ученица',
+    { x:214,y:268, sprite:'acolyte', name:'Ученица',
       when:()=> F('communeIntro') && !F('sueDead'),
       dialogue:()=> {
         if (F('communeWarded')) return Dialogue.start([{who:'acolyte',expr:'worried',text:'Меня попросили не ходить тут одной. Я и не хожу. Почти.'}]);
         if (F('communePanic')) return Dialogue.start([{who:'acolyte',expr:'worried',text:'Роза не открывает уже второй день. Может, ты зайдёшь? Тебя она любит.'}]);
-        return Dialogue.start([{who:'acolyte',expr:'normal',text:'Роза живёт вон там. Заходи к ней, она обрадуется — к ней вообще редко заходят.'}]);
+        return Dialogue.start([{who:'acolyte',expr:'normal',text:'Роза живёт вон там. Заходи, она обрадуется — к ней вообще редко заходят.'}]);
       }},
   ],
 },
@@ -2503,6 +3742,7 @@ function isBlocked(x, y) {
   const room = Rooms[gameState.currentRoom];
   const box = playerBox(x, y);
   for (const w of room.walls) if (rectHit(box, w)) return true;
+  if (World.blockedByProps(room, box)) return true;
   for (const n of roomNPCs(room)) {
     if (rectHit(box, { x:n.x-6, y:n.y-6, w:12, h:8 })) return true;
   }
@@ -2544,6 +3784,8 @@ async function changeRoom(roomKey, x, y) {
   FX.particles.length = 0; FX.fogA = 0; FX.magic = null;
   const room = Rooms[roomKey];
   Music.play(room.music || 'home');
+  Weather.apply(room);
+  Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
   Game.mode = wasCutscene ? 'cutscene' : 'explore';
   await fadeIn(300);
   UI.toast(room.name, 1200);
@@ -4895,27 +6137,44 @@ function drawRoom() {
     camX += (Math.random()-.5) * FX.shake;
     camY += (Math.random()-.5) * FX.shake;
   }
+  camX = Math.round(camX); camY = Math.round(camY);
   Game.cam.x = camX; Game.cam.y = camY;
 
-  ctx.save();
-  ctx.translate(-Math.round(camX), -Math.round(camY));
-  room.bgPaint(ctx);
-  ctx.restore();
+  // 1. static background (painted once, then blitted)
+  ctx.drawImage(World.background(gameState.currentRoom), -camX, -camY);
 
-  // Y-sorted actors so the player can stand behind an NPC
-  const actors = roomNPCs(room).map(n => ({ y:n.y, npc:n }));
-  actors.push({ y:Player.y, player:true });
-  actors.sort((a,b) => a.y - b.y);
-  for (const a of actors) {
-    if (a.player) { Player.draw(ctx, camX, camY); continue; }
-    const n = a.npc;
-    const img = Assets.images[n.sprite];
+  // 2. anything the room wants to animate underneath the actors
+  if (room.underPaint) { ctx.save(); ctx.translate(-camX, -camY); room.underPaint(ctx); ctx.restore(); }
+
+  // 3. props, NPCs and the player, sorted by depth so you walk behind things
+  const draws = [];
+  for (const o of World.objectsOf(room)) draws.push({ y:o.y, obj:o });
+  for (const n of roomNPCs(room)) draws.push({ y:n.y, npc:n });
+  draws.push({ y:Player.y, player:true });
+  draws.sort((a, b) => a.y - b.y);
+  for (const d of draws) {
+    if (d.obj) {
+      const dm = Art.meta(d.obj.t);
+      let faded = false;
+      if (dm && dm.fade && d.obj.y > Player.y) {
+        const sx = d.obj.x - dm.ax, sy = d.obj.y - dm.ay;
+        if (Player.x > sx - 2 && Player.x < sx + dm.w + 2 &&
+            Player.y > sy && Player.y - 20 < sy + dm.h) { ctx.globalAlpha = .42; faded = true; }
+      }
+      Art.drawAt(ctx, d.obj, camX, camY);
+      if (faded) ctx.globalAlpha = 1;
+      continue;
+    }
+    if (d.player) { Player.draw(ctx, camX, camY); continue; }
+    const n = d.npc, img = Assets.images[n.sprite];
     if (!img) continue;
     const px = Math.round(n.x - 8 - camX), py = Math.round(n.y - 16 - camY);
-    ctx.fillStyle = 'rgba(0,0,0,.3)';
-    ctx.beginPath(); ctx.ellipse(px+8, py+20, 6, 2, 0, 0, Math.PI*2); ctx.fill();
+    shadowEllipse(ctx, px + 8, py + 20, 6, 2, .3);
     ctx.drawImage(img, px, py);
   }
+
+  // 4. room-specific animated overlay (runes, glows, story markers)
+  if (room.overPaint) { ctx.save(); ctx.translate(-camX, -camY); room.overPaint(ctx); ctx.restore(); }
 
   FX.drawMagic(ctx, camX, camY);
   FX.drawParticles(ctx, camX, camY);
@@ -4927,7 +6186,13 @@ function drawRoom() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, CONFIG.VIEW_W, CONFIG.VIEW_H);
   }
 
-  // interaction hint
+  // 5. weather and light sit above the world but below the interface
+  Weather.drawRain(ctx);
+  Weather.drawLeaves(ctx);
+  Lighting.draw(ctx, room, camX, camY);
+  Weather.drawFog(ctx);
+
+  // 6. interaction hint
   const near = (Game.mode === 'explore' && !Dialogue.active) ? findNearestInteractable() : null;
   if (near) {
     const ref = near.ref;
@@ -4936,7 +6201,7 @@ function drawRoom() {
     const label = (near.type === 'obj') ? (ref.prompt || 'A') : (ref.name || 'A');
     ctx.font = '9px Courier New';
     const w = ctx.measureText(label).width + 10;
-    ctx.fillStyle = 'rgba(0,0,0,.75)';
+    ctx.fillStyle = 'rgba(12,10,16,.85)';
     ctx.fillRect(hx - w/2, hy - 10, w, 12);
     ctx.strokeStyle = '#c0304d'; ctx.lineWidth = 1;
     ctx.strokeRect(hx - w/2 + .5, hy - 9.5, w, 12);
@@ -4976,7 +6241,7 @@ function tick(t) {
     Dialogue.update(dt);
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
-    if (room) { FX.fogA *= 0.9; FX.ambient(room); }
+    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); }
     drawRoom();
   }
   requestAnimationFrame(tick);
@@ -5017,6 +6282,9 @@ function beginPlay() {
   FX.clearAll(); FX.refreshCorruption();
   const room = Rooms[gameState.currentRoom];
   Music.play(room.music || 'home');
+  Weather.apply(room);
+  Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
+  World.invalidate();
   requestAnimationFrame(tick);
   if (room.onEnter) room.onEnter();          // fixes "scene never replays after load"
   saveGame();
