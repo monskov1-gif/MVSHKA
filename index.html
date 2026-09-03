@@ -537,21 +537,27 @@ const Assets = {
       img.src = src;
     });
   },
+  /* 16x20 overworld doll.
+     opts: hair 'bob'|'long'|'short', horns, sheen, streak, band, bow, tail,
+           skirt, accent, legs, shoes, cape, aura, skin, glowEye            */
   makeChibi(bodyColor, hairColor, opts={}) {
     const eyeColor = opts.eye || '#000';
-    const skin = opts.skin || '#f2d0c0';
+    const skin  = opts.skin  || '#f2d0c0';
+    const skirt = opts.skirt || bodyColor;
     const c = document.createElement('canvas');
     c.width = 16; c.height = 20;
     const g = c.getContext('2d');
-    if (opts.aura) {
-      g.fillStyle = opts.aura; g.globalAlpha = .35;
-      g.fillRect(2,0,12,20); g.globalAlpha = 1;
+    if (opts.aura) { g.fillStyle = opts.aura; g.globalAlpha = .35; g.fillRect(2,0,12,20); g.globalAlpha = 1; }
+    if (opts.tail) {
+      g.fillStyle = opts.tail;
+      g.fillRect(2,14,2,2); g.fillRect(1,15,2,3); g.fillRect(0,17,2,3);
+      g.fillStyle = '#fff'; g.globalAlpha = .35; g.fillRect(0,19,2,1); g.globalAlpha = 1;
     }
-    // horns sit above and behind the hairline
     if (opts.horns) {
       g.fillStyle = opts.horns;
       g.fillRect(3,0,2,2); g.fillRect(2,0,1,1);
       g.fillRect(11,0,2,2); g.fillRect(13,0,1,1);
+      if (opts.hornEdge) { g.fillStyle = opts.hornEdge; g.fillRect(2,0,1,1); g.fillRect(13,0,1,1); }
     }
     g.fillStyle = hairColor; g.fillRect(3,1,10,6);
     g.fillStyle = skin;      g.fillRect(4,3,8,7);
@@ -560,19 +566,32 @@ const Assets = {
     if (hair === 'long') {
       g.fillRect(2,4,2,10); g.fillRect(12,4,2,10);
     } else if (hair === 'bob') {
-      // chin-length with the ends flaring outward
       g.fillRect(2,3,2,6); g.fillRect(12,3,2,6);
       g.fillRect(1,8,3,2); g.fillRect(12,8,3,2);
     }
-    if (opts.sheen) { g.fillStyle = opts.sheen; g.fillRect(4,1,8,1); g.fillRect(3,2,2,1); }
+    if (opts.sheen)  { g.fillStyle = opts.sheen;  g.fillRect(4,1,8,1); g.fillRect(3,2,2,1); }
+    if (opts.streak) { g.fillStyle = opts.streak; g.fillRect(3,2,1,5); g.fillRect(2,4,1,4); }
+    if (opts.band)   { g.fillStyle = opts.band;   g.fillRect(3,1,10,1); g.fillRect(2,2,1,1); g.fillRect(13,2,1,1); }
+    if (opts.bow) {
+      g.fillStyle = opts.bow;
+      g.fillRect(1,2,2,2); g.fillRect(4,2,2,2); g.fillRect(3,2,1,2);   // wings + knot
+      g.fillStyle = '#fff'; g.globalAlpha = .45; g.fillRect(1,2,1,1); g.fillRect(5,2,1,1); g.globalAlpha = 1;
+    }
     g.fillStyle = eyeColor; g.fillRect(6,6,1,2); g.fillRect(9,6,1,2);
     if (opts.glowEye) { g.fillStyle = opts.glowEye; g.fillRect(6,6,1,1); g.fillRect(9,6,1,1); }
-    g.fillStyle = bodyColor; g.fillRect(4,10,8,7);
+    // torso, then a slightly wider skirt, then socks / boots
+    g.fillStyle = bodyColor; g.fillRect(4,10,8,4);
+    if (opts.accent) { g.fillStyle = opts.accent; g.fillRect(5,10,6,1); }
+    g.fillStyle = skirt;   g.fillRect(3,14,10,3);
+    g.fillStyle = opts.legs || '#222';
+    g.fillRect(4,17,3,3); g.fillRect(9,17,3,3);
+    if (opts.shoes) { g.fillStyle = opts.shoes; g.fillRect(4,19,3,1); g.fillRect(9,19,3,1); }
     if (opts.cape) { g.fillStyle = opts.cape; g.fillRect(2,10,2,8); g.fillRect(12,10,2,8); }
-    g.fillStyle = opts.legs || '#222'; g.fillRect(4,17,3,3); g.fillRect(9,17,3,3);
     g.fillStyle = bodyColor; g.fillRect(3,11,1,4); g.fillRect(12,11,1,4);
     return c;
   },
+
+  /* 64x64 dialogue portrait: head, plus shoulders in the character's outfit. */
   makePortrait(bodyColor, hairColor, expression='normal', accent='#c0304d', opts={}) {
     const c = document.createElement('canvas');
     c.width = 64; c.height = 64;
@@ -589,6 +608,9 @@ const Assets = {
       g.fillStyle = opts.horns;
       g.beginPath(); g.moveTo(17,12); g.lineTo(7,0); g.lineTo(22,9); g.closePath(); g.fill();
       g.beginPath(); g.moveTo(47,12); g.lineTo(57,0); g.lineTo(42,9); g.closePath(); g.fill();
+      g.strokeStyle = opts.hornEdge || 'rgba(255,255,255,.35)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(17,12); g.lineTo(7,0); g.stroke();
+      g.beginPath(); g.moveTo(47,12); g.lineTo(57,0); g.stroke();
     }
     g.fillStyle = skin; g.fillRect(14,14,36,36);
     g.fillStyle = hairColor;
@@ -607,7 +629,19 @@ const Assets = {
     }
     g.fillStyle = skin; g.fillRect(18,18,28,28);
     g.fillStyle = hairColor; g.fillRect(18,18,28,6);
-    if (opts.sheen) { g.fillStyle = opts.sheen; g.fillRect(20,18,9,2); }
+    if (opts.sheen)  { g.fillStyle = opts.sheen;  g.fillRect(20,18,9,2); }
+    if (opts.streak) { g.fillStyle = opts.streak; g.fillRect(10,12,6,24); g.fillRect(18,18,4,6); }
+    if (opts.band) {
+      g.fillStyle = opts.band;
+      g.fillRect(13,10,38,4); g.fillRect(11,13,3,4); g.fillRect(50,13,3,4);
+    }
+    if (opts.bow) {
+      g.fillStyle = opts.bow;
+      g.beginPath(); g.moveTo(11,6); g.lineTo(3,2);  g.lineTo(3,13); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(13,6); g.lineTo(21,2); g.lineTo(21,13); g.closePath(); g.fill();
+      g.fillRect(10,5,5,5);
+      g.fillStyle = '#fff'; g.globalAlpha = .4; g.fillRect(5,4,4,2); g.fillRect(16,4,4,2); g.globalAlpha = 1;
+    }
     const eye = opts.glowEye || '#000';
     g.fillStyle = eye;
     if (expression === 'shocked') {
@@ -638,30 +672,47 @@ const Assets = {
     else if (expression === 'talk') g.fillRect(28,40,8,3);
     else if (expression === 'empty') g.fillRect(29,41,6,1);
     else g.fillRect(28,40,8,2);
+    // shoulders in the character's own clothes
+    g.fillStyle = skin;      g.fillRect(27,46,10,8);
+    g.fillStyle = bodyColor; g.fillRect(3,53,58,11);
+    g.fillStyle = opts.collar || accent; g.fillRect(24,53,16,4);
+    if (hair === 'long') { g.fillStyle = hairColor; g.fillRect(8,50,8,14); g.fillRect(48,50,8,14); }
     g.strokeStyle = accent; g.lineWidth = 1; g.strokeRect(0.5,0.5,63,63);
     return c;
   },
   build() {
-    // Ная — блондинка с каре; Сью — длинные чёрные;
-    // Шарлотта — нежно-розовое каре и рога; Лиллит — белые.
-    this.images.naya      = this.makeChibi('#c0304d', '#e8d08a', {hair:'bob'});
-    this.images.nayaDark  = this.makeChibi('#7a1030', '#b09050', {hair:'bob', glowEye:'#ff3050', aura:'#6a0020'});
-    this.images.sue       = this.makeChibi('#e0c060', '#2a2634', {hair:'long', sheen:'#4c4660'});
-    this.images.sueGhost  = this.makeChibi('#8a90a0', '#4a4a56', {hair:'long', skin:'#c8c8d0'});
-    this.images.sueHell   = this.makeChibi('#2a1030', '#1e1826', {hair:'long', sheen:'#7a4420', glowEye:'#ffb020', aura:'#c06010', cape:'#3a1020'});
-    this.images.chris     = this.makeChibi('#3050a0', '#402010');
-    this.images.charlotte = this.makeChibi('#5a1030', '#f0a8c8', {hair:'bob', horns:'#e8c0d4', glowEye:'#ff4060'});
-    this.images.lilith    = this.makeChibi('#1a1020', '#eceaf4', {hair:'long', glowEye:'#ff2040', cape:'#2a0010'});
-    this.images.genevieve = this.makeChibi('#20603a', '#603820');
-    this.images.witch1    = this.makeChibi('#402060', '#e0d0c0');
-    this.images.witch2    = this.makeChibi('#603020', '#301020');
-    this.images.witch3    = this.makeChibi('#204060', '#203040', {longHair:true});
-    this.images.customer  = this.makeChibi('#607060', '#403020');
-    this.images.friend    = this.makeChibi('#a06090', '#602040');
-    this.images.neighbor  = this.makeChibi('#5a5a4a', '#8a8a80');
-    this.images.acolyte   = this.makeChibi('#38604a', '#2a2018');
-    this.images.imp       = this.makeChibi('#701020', '#300810', {glowEye:'#ffa020'});
+    /* Палитры по референсам:
+       Ная      — светлое каре с розовой прядью, белый ободок, синий свитер,
+                  чёрная юбка, серо-белые гольфы, чёрные туфли;
+       Сью      — длинные чёрные волосы, розовый бант, коричневый кардиган,
+                  белый топ, розовая юбка, кремовые ботинки;
+       Шарлотта — розовое каре, рога, полностью чёрный наряд, розовый хвост;
+       Лиллит   — белые волосы, рогатая корона, чёрный плащ, тёмно-красное платье. */
+    const NAYA  = {hair:'bob', band:'#f0eeee', streak:'#d99aa4',
+                   skirt:'#1c1a20', accent:'#5f7fae', legs:'#ccc6c6', shoes:'#2a2a30'};
+    const SUE   = {hair:'long', sheen:'#4a4258', bow:'#f0b8ca',
+                   skirt:'#eec9d4', accent:'#f2ecec', legs:'#f3ebe9', shoes:'#e0b6c4'};
+    const CHAR  = {hair:'bob', horns:'#d8b0b0', tail:'#d8a0a4', glowEye:'#ff4060',
+                   skirt:'#100e14', accent:'#3a3440', legs:'#1a1620', shoes:'#0c0a10'};
+    const LILI  = {hair:'long', horns:'#3a2432', hornEdge:'#9a7a8e', glowEye:'#c04a46', cape:'#221a20',
+                   skirt:'#7d3c3a', accent:'#7d3c3a', legs:'#1a1418'};
 
+    this.images.naya      = this.makeChibi('#3f5c8a', '#dcc09c', NAYA);
+    this.images.nayaDark  = this.makeChibi('#232a3d', '#b5996f',
+                              Object.assign({}, NAYA, {skirt:'#0f0e12', accent:'#3a4358',
+                              legs:'#8a8490', glowEye:'#ff3050', aura:'#6a0020'}));
+    this.images.sue       = this.makeChibi('#6b4a3a', '#241f28', SUE);
+    this.images.sueGhost  = this.makeChibi('#6a6068', '#4a4a56',
+                              Object.assign({}, SUE, {skin:'#c8c8d0', sheen:'#6a6a7a',
+                              bow:'#9a90a0', skirt:'#b8b0b8', accent:'#c8c8d0',
+                              legs:'#d8d4d8', shoes:'#b0aab4'}));
+    this.images.sueHell   = this.makeChibi('#3a2018', '#241f28',
+                              Object.assign({}, SUE, {sheen:'#8a4a1c', bow:'#c06010',
+                              skirt:'#5a2030', accent:'#c06010', legs:'#2a1a20',
+                              shoes:'#140e12', glowEye:'#ffb020', aura:'#c06010'}));
+    this.images.chris     = this.makeChibi('#3050a0', '#402010', {skirt:'#2a3450', legs:'#2a2a30'});
+    this.images.charlotte = this.makeChibi('#16141a', '#eab8c0', CHAR);
+    this.images.lilith    = this.makeChibi('#1a1418', '#e0dcd8', LILI);
     const P = (key, body, hair, exprs, accent, opts) => {
       exprs.forEach(e => {
         const cv = this.makePortrait(body, hair, e, accent, opts||{});
@@ -669,14 +720,21 @@ const Assets = {
         this.portraitURL[`${key}_${e}`] = cv.toDataURL();   // cached once
       });
     };
-    P('naya',      '#c0304d','#e8d08a', ['normal','talk','angry','sad','shocked','smile','worried','empty'], '#c0304d', {hair:'bob'});
-    P('nayaDark',  '#7a1030','#b09050', ['normal','angry','empty','serious'], '#ff2040', {hair:'bob', glowEye:'#ff3050', bg:'#180008', aura:'#c0304d'});
-    P('sue',       '#e0c060','#2a2634', ['normal','talk','smile','worried','sad','angry','shocked'], '#e0a040', {hair:'long', sheen:'#4c4660', bg:'#35262e'});
-    P('sueGhost',  '#8a90a0','#4a4a56', ['empty','sad','normal'], '#8090a0', {hair:'long', sheen:'#6a6a7a', skin:'#c8c8d0', bg:'#141420'});
-    P('sueHell',   '#2a1030','#1e1826', ['normal','serious','angry','smile'], '#ffb020', {hair:'long', sheen:'#8a4a1c', glowEye:'#ffb020', bg:'#241010', aura:'#c06010'});
+    P('naya',      '#3f5c8a','#dcc09c', ['normal','talk','angry','sad','shocked','smile','worried','empty'], '#c0304d',
+      {hair:'bob', band:'#f0eeee', streak:'#d99aa4', collar:'#5f7fae', bg:'#232a38'});
+    P('nayaDark',  '#232a3d','#b5996f', ['normal','angry','empty','serious'], '#ff2040',
+      {hair:'bob', band:'#8a8490', streak:'#8a4048', collar:'#3a4358', glowEye:'#ff3050', bg:'#150c14', aura:'#c0304d'});
+    P('sue',       '#6b4a3a','#241f28', ['normal','talk','smile','worried','sad','angry','shocked'], '#e0a040',
+      {hair:'long', sheen:'#4a4258', bow:'#f0b8ca', collar:'#f2ecec', bg:'#38282c'});
+    P('sueGhost',  '#6a6068','#4a4a56', ['empty','sad','normal'], '#8090a0',
+      {hair:'long', sheen:'#6a6a7a', bow:'#9a90a0', collar:'#c8c8d0', skin:'#c8c8d0', bg:'#141420'});
+    P('sueHell',   '#3a2018','#241f28', ['normal','serious','angry','smile'], '#ffb020',
+      {hair:'long', sheen:'#8a4a1c', bow:'#c06010', collar:'#c06010', glowEye:'#ffb020', bg:'#241010', aura:'#c06010'});
     P('chris',     '#3050a0','#402010', ['normal','angry','sad'], '#3050a0', {hair:'short'});
-    P('charlotte', '#5a1030','#f0a8c8', ['normal','smile','serious','angry'], '#f0a0c8', {hair:'bob', horns:'#e8c0d4', glowEye:'#ff4060'});
-    P('lilith',    '#1a1020','#eceaf4', ['neutral','intimidating','normal'], '#a01030', {hair:'long', glowEye:'#ff2040', bg:'#180008'});
+    P('charlotte', '#16141a','#eab8c0', ['normal','smile','serious','angry'], '#f0a0c8',
+      {hair:'bob', horns:'#d8b0b0', collar:'#3a3440', glowEye:'#ff4060', bg:'#241820'});
+    P('lilith',    '#1a1418','#e0dcd8', ['neutral','intimidating','normal'], '#a01030',
+      {hair:'long', horns:'#3a2432', hornEdge:'#a88a9c', collar:'#7d3c3a', glowEye:'#c04a46', bg:'#1a1014'});
     P('genevieve', '#20603a','#603820', ['normal','worried','angry','sad','serious'], '#20a04a', {hair:'short'});
     P('witch1',    '#402060','#e0d0c0', ['normal','worried','shocked'], '#8060c0', {hair:'short'});
     P('witch2',    '#603020','#301020', ['normal','worried','angry'], '#a06040', {hair:'short'});
