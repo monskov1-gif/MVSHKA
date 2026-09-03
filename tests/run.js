@@ -57,6 +57,7 @@ async function endingI() {
     console.log('  I: refused=%s trust=%s', s.flags.includes('sueRefused'), s.stats.trustSue);
     if (!s.flags.includes('sueRefused')) throw new Error('I: expected sueRefused, trust='+s.stats.trustSue);
     await H.step(page,'obj','door',[],'I');
+    await H.step(page,'obj','toStairs',[],'I');
     await H.step(page,'obj','toStreet',[],'I');
     await H.step(page,'obj','toRightHouse',[],'I');
     await H.step(page,'npc','Женевьева',[],'I');   // lonerGenevieve

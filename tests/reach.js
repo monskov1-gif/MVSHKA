@@ -4,6 +4,7 @@ const ENTRY = {
   hell:[120,95], lilithHall:[120,268], genevieveHouse:[120,258], communeHall:[120,268],
   witch1House:[120,258], witch2House:[120,258], nightSpot:[120,268], witch3House:[120,262],
   backAlley:[120,280], hellFinal:[120,265], hellSue:[120,250], parkWalk:[120,290],
+  kitchen:[120,258], bathroom:[120,240], balcony:[120,192], stairwell:[120,108], oldTown:[30,280],
 };
 (async () => {
   const out = await H.run('REACH', async page => {

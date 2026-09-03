@@ -78,45 +78,52 @@ async function newGame(page) {
 async function opening(page, picks, tag) {
   await step(page, 'obj', 'table', [], tag);                       // crystal
   await step(page, 'obj', 'door', [], tag);                        // prologue -> corridor
+  await step(page, 'obj', 'toStairs', [], tag);                    // hallway -> stairwell
   await step(page, 'obj', 'toStreet', [], tag);                    // meetSue -> street
   await step(page, 'obj', 'toCafe', [picks.cafe], tag);            // cafe scene -> naya room
   await step(page, 'npc', 'Сью', [picks.home], tag);               // home talk -> hell
   await step(page, 'obj', 'toLilith', [picks.lilith], tag);        // lilith -> naya room
   await step(page, 'npc', 'Сью', [], tag);                         // sueAfterHell
   await step(page, 'obj', 'door', [], tag);
+  await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
   await step(page, 'obj', 'toRightHouse', [], tag);                // genevieve house
   await step(page, 'npc', 'Женевьева', [picks.gen], tag);          // meetGenevieve
   await step(page, 'obj', 'toCommune', [], tag);                   // commune intro
   await step(page, 'obj', 'exit', [], tag);
   await step(page, 'obj', 'exit', [], tag);                        // -> street
-  await step(page, 'obj', 'toHome', [], tag);                      // -> corridor
+  await step(page, 'obj', 'toHome', [], tag);                      // -> stairwell
+  await step(page, 'obj', 'toFlat', [], tag);                      // -> hallway
   await step(page, 'obj', 'toRoom', [], tag);                      // -> naya room
 }
 
 /* --- shared amulet arc (requires sueAgreed) --- */
 async function amuletArc(page, picks, tag) {
   await step(page, 'obj', 'door', [], tag);
+  await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
-  await step(page, 'obj', 'toLeftHouse', [], tag);                // witch1 house
+  await step(page, 'obj', 'toLeftHouse', [], tag);                // Madlen's house
   await step(page, 'obj', 'altar', [picks.amulet1], tag);         // -> naya room
   await step(page, 'obj', 'door', [], tag);
+  await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
   await step(page, 'obj', 'toRightHouse', [], tag);               // genevieve
   await step(page, 'obj', 'toCommune', [], tag);                  // panic scene
   await step(page, 'obj', 'exit', [], tag);
   await step(page, 'obj', 'exit', [], tag);                       // -> street
-  await step(page, 'obj', 'toLeftHouse', [], tag);                // witch2 house
+  await step(page, 'obj', 'toOldTown', [], tag);                  // old quarter
+  await step(page, 'obj', 'toRose', [], tag);                     // Rose's own house
   for (let i = 0; i < 3; i++) await step(page, 'npc', 'Роза', [], tag);
   await step(page, 'obj', 'cabinet', [picks.amulet2], tag);       // -> naya room
   await step(page, 'obj', 'door', [], tag);
+  await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
   await step(page, 'obj', 'toRightHouse', [], tag);               // genevieve
   await step(page, 'obj', 'toCommune', [], tag);                  // ward scene
   await step(page, 'obj', 'exit', [], tag);
-  await step(page, 'obj', 'exit', [], tag);
-  await step(page, 'obj', 'toHome', [], tag);                     // corridor
-  await step(page, 'obj', 'toNight', [], tag);                    // nightSpot
+  await step(page, 'obj', 'exit', [], tag);                       // -> street
+  await step(page, 'obj', 'toOldTown', [], tag);
+  await step(page, 'obj', 'toNightRoad', [], tag);                // out of town
   await step(page, 'obj', 'enter', [], tag);                      // witch3 house
   await step(page, 'obj', 'rune1', [], tag);
   await step(page, 'obj', 'rune2', [], tag);
