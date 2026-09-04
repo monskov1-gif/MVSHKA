@@ -869,6 +869,17 @@ const Assets = {
                               skirt:'#08070a', accent:'#2a2030', legs:'#4a4450',
                               shoes:'#08070a', glowEye:'#ff2a40', aura:'#8a0020'}));
     this.images.chris     = this.makeChibi('#3050a0', '#402010', {hair:'short', skirt:'#2a3450', legs:'#2a2a30'});
+    this.images.drizella  = this.makeChibi('#4a3f5a', '#e8dcae',        // мачеха
+      {hair:'long', sheen:'#f2ecc8', glowEye:'#3f7a52', accent:'#9a8ab0',
+       skirt:'#2f2838', legs:'#4a4450', shoes:'#241f2c'});
+    this.images.stacy     = this.makeChibi('#c07a9a', '#f0e4b8',        // сводная сестра
+      {hair:'long', sheen:'#fff2cc', bow:'#f0b8ca', glowEye:'#4a8a5e',
+       accent:'#f2d8e4', skirt:'#d894ae', legs:'#f3ebe9', shoes:'#e0b6c4'});
+    this.images.frank     = this.makeChibi('#5a5a52', '#6a5a48',        // отец
+      {hair:'short', accent:'#7d7a70', skirt:'#4a4a44', legs:'#3f3f3a', shoes:'#2e2e2a'});
+    this.images.nayaTeen  = this.makeChibi('#4a4658', '#dcc09c',        // Ная в семнадцать
+      {hair:'bob', band:'#8a8490', streak:'#a87a84', accent:'#5a5668',
+       skirt:'#2a2832', legs:'#9a9490', shoes:'#2a2a30'});
 
     // --- the rest of the cast. Everyone who can be talked to has a body. ---
     this.images.genevieve = this.makeChibi('#3f6b4a', '#7d6a52',
@@ -921,6 +932,13 @@ const Assets = {
     P('nayaHell',  '#161a26','#8a7a5e', ['normal','empty','serious','angry'], '#ff2a40',
       {hair:'bob', band:'#5a5060', streak:'#8a2440', collar:'#2a2030', glowEye:'#ff2a40', bg:'#0e0810', aura:'#8a0020'});
     P('chris',     '#3050a0','#402010', ['normal','angry','sad'], '#3050a0', {hair:'short'});
+    P('drizella',  '#4a3f5a','#e8dcae', ['normal','serious','angry','smile'], '#9a8ab0',
+      {hair:'long', sheen:'#f2ecc8', collar:'#9a8ab0', glowEye:'#3f7a52', bg:'#2a2434'});
+    P('stacy',     '#c07a9a','#f0e4b8', ['normal','smile','angry'], '#f0b8ca',
+      {hair:'long', sheen:'#fff2cc', bow:'#f0b8ca', collar:'#f2d8e4', glowEye:'#4a8a5e', bg:'#3a2c34'});
+    P('frank',     '#5a5a52','#6a5a48', ['normal','sad','worried'], '#7d7a70', {hair:'short', bg:'#2e2e2a'});
+    P('nayaTeen',  '#4a4658','#dcc09c', ['normal','sad','angry','empty','shocked'], '#a87a84',
+      {hair:'bob', band:'#8a8490', streak:'#a87a84', collar:'#5a5668', bg:'#26242e'});
     P('charlotte', '#16141a','#eab8c0', ['normal','smile','serious','angry'], '#f0a0c8',
       {hair:'bob', horns:'#d8b0b0', collar:'#3a3440', glowEye:'#ff4060', bg:'#241820'});
     P('lilith',    '#1a1418','#e0dcd8', ['neutral','intimidating','normal'], '#a01030',
@@ -959,11 +977,16 @@ function freshState() {
     playerX:120, playerY:200,
     playerDir:'down',
     act:0,
+    chapter:1,
     eventStep:0,
     flags: {
       prologueComplete:false, prologPlayground:false, prologNayaSeen:false, mainStoryStarted:false,
+      // пролог, часть вторая: дом отца
+      prologBackstoryStarted:false, backstoryDone:false, pastPhotos:false, pastBox:false,
+      pastMotherPhoto:false, pastCrystal:false, pastDrizellaDone:false, pastStacyDone:false,
+      pastFrankDone:false, pastTalkedAll:false,
       metSue:false, cafeSceneComplete:false,
-      waitingAtAud:false, metGenevieveUni:false, crystalReacted:false,
+      waitingAtAud:false, metGenevieveUni:false, crystalReacted:false, oldWingOpen:false,
       investigatedUniversity:false, learnedMedea:false, learnedWitches:false,
       homeTalkDone:false, portalOpened:false, metCharlotte:false, metLilith:false,
       returnedFromHell1:false, toldSueWitch:false, foundGenevieve:false,
@@ -2489,6 +2512,106 @@ function woodGrain(g, x, y, w, h, col) {
 })();
 
 /* =====================================================================
+   ART LIBRARY — университетский корпус и городская остановка.
+   Окна в коридорах рисует сама комната (ритм «окно — простенок — окно»
+   и свет на полу дешевле держать в запечённом фоне), а объектами здесь
+   становится то, что стоит на полу и должно сортироваться по глубине.
+===================================================================== */
+(function defineUniProps() {
+  const D = (k, m, f) => Art.def(k, m, f);
+
+  /* ---- остановка на Мейпл-стрит ---- */
+  D('bus_stop', {w:64,h:56,ax:32,ay:54,foot:{x:-32,y:-12,w:64,h:14},
+                 light:{dy:-34,r:44,c:'#e8e0c0',i:.34}}, g => {
+    shadowEllipse(g, 32, 54, 26, 3, .24);
+    g.fillStyle = '#2b3238'; g.fillRect(4, 8, 4, 46); g.fillRect(56, 8, 4, 46);   // стойки
+    g.fillStyle = '#3f4a52'; g.fillRect(0, 2, 64, 8);                              // навес
+    g.fillStyle = '#54606a'; g.fillRect(0, 2, 64, 2);
+    g.fillStyle = '#1e2429'; g.fillRect(0, 9, 64, 2);
+    g.fillStyle = 'rgba(168,192,216,.30)'; g.fillRect(8, 12, 48, 26);              // стекло
+    g.fillStyle = '#6a7884'; g.fillRect(30, 12, 2, 26);
+    g.fillStyle = '#c9a05a'; g.fillRect(10, 14, 20, 10);                           // расписание
+    g.fillStyle = '#2e2620'; for (let i=0;i<4;i++) g.fillRect(12, 16+i*2, 14, 1);
+    g.fillStyle = '#5a4636'; g.fillRect(8, 38, 48, 5);                             // скамья
+    g.fillStyle = '#6b543f'; g.fillRect(8, 38, 48, 2);
+    g.fillStyle = '#2b3238'; g.fillRect(12, 43, 3, 8); g.fillRect(49, 43, 3, 8);
+    g.fillStyle = '#c0304d'; g.fillRect(26, 44, 12, 9);                            // табличка «У»
+    g.fillStyle = '#f0e0e4'; g.fillRect(30, 46, 4, 5);
+  });
+
+  /* ---- главная лестница холла ---- */
+  D('stairs_main', {w:96,h:64,ax:48,ay:60,foot:{x:-48,y:-60,w:96,h:62}}, g => {
+    for (let i = 0; i < 6; i++) {
+      const y = 2 + i * 9, w = 66 + i * 5, x = 48 - w / 2;
+      g.fillStyle = '#5a4636'; g.fillRect(x, y, w, 6);
+      g.fillStyle = '#7d6248'; g.fillRect(x, y, w, 3);
+      g.fillStyle = '#8d7154'; g.fillRect(x, y, w, 1);
+      g.fillStyle = '#3f3126'; g.fillRect(x, y + 6, w, 2);
+    }
+    g.fillStyle = '#8a3040'; for (let i = 0; i < 6; i++) g.fillRect(48 - 14, 2 + i * 9, 28, 8);   // ковровая дорожка
+    g.fillStyle = '#9c3a4c'; for (let i = 0; i < 6; i++) g.fillRect(48 - 12, 2 + i * 9, 24, 3);
+    g.fillStyle = '#4a3a2c';                                                        // перила
+    g.beginPath(); g.moveTo(6, 60); g.lineTo(16, 2); g.lineTo(21, 2); g.lineTo(12, 60); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(90, 60); g.lineTo(80, 2); g.lineTo(75, 2); g.lineTo(84, 60); g.closePath(); g.fill();
+    g.fillStyle = '#6b543f';
+    for (let i = 0; i < 5; i++) { g.fillRect(9 + i * 2, 54 - i * 11, 3, 9); g.fillRect(85 - i * 2, 54 - i * 11, 3, 9); }
+  });
+
+  /* ---- фонтан во внутреннем дворе ---- */
+  D('fountain', {w:70,h:44,ax:35,ay:38,foot:{x:-35,y:-34,w:70,h:36}}, g => {
+    shadowEllipse(g, 35, 40, 30, 5, .22);
+    g.fillStyle = '#5f5c56'; g.beginPath(); g.ellipse(35, 26, 34, 16, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#6e6a62'; g.beginPath(); g.ellipse(35, 24, 32, 14, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#3a4a52'; g.beginPath(); g.ellipse(35, 25, 27, 11, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#4d626c'; g.beginPath(); g.ellipse(35, 24, 25, 9, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = 'rgba(200,224,236,.30)'; g.beginPath(); g.ellipse(28, 21, 12, 4, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#6e6a62'; g.fillRect(31, 6, 8, 18);                              // тумба
+    g.fillStyle = '#7d7970'; g.fillRect(31, 6, 3, 18);
+    g.fillStyle = '#8a867c'; g.beginPath(); g.ellipse(35, 6, 11, 4, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#9a968c'; g.beginPath(); g.ellipse(35, 4, 5, 2, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = 'rgba(180,210,230,.5)'; g.fillRect(34, 0, 2, 6);
+  });
+
+  /* ---- деревянная колонна коридора ---- */
+  D('pillar_wood', {w:22,h:76,ax:11,ay:72,foot:{x:-9,y:-10,w:18,h:12}, fade:true}, g => {
+    shadowEllipse(g, 11, 72, 9, 3, .26);
+    g.fillStyle = '#4a3a2c'; g.fillRect(1, 64, 20, 8);
+    g.fillStyle = '#5a4636'; g.fillRect(3, 62, 16, 3);
+    g.fillStyle = '#6b543f'; g.fillRect(5, 8, 12, 55);
+    g.fillStyle = '#7d6248'; g.fillRect(5, 8, 4, 55);
+    g.fillStyle = '#4f3d2c'; g.fillRect(14, 8, 3, 55);
+    g.fillStyle = '#4a3a2c'; g.fillRect(1, 2, 20, 8);
+    g.fillStyle = '#5f4530'; g.fillRect(1, 2, 20, 3);
+    g.fillStyle = '#c9a05a'; g.fillRect(3, 9, 16, 1);
+  });
+
+  /* ---- раздача в столовой ---- */
+  D('serving_line', {w:80,h:34,ax:40,ay:30,foot:{x:-40,y:-20,w:80,h:22}}, g => {
+    shadowEllipse(g, 40, 31, 34, 3, .22);
+    g.fillStyle = '#8d949c'; g.fillRect(0, 8, 80, 20);                              // нержавейка
+    g.fillStyle = '#a8aeb6'; g.fillRect(0, 8, 80, 4);
+    g.fillStyle = '#6a7078'; g.fillRect(0, 24, 80, 4);
+    g.fillStyle = '#5f666e'; for (let x = 6; x < 76; x += 18) g.fillRect(x, 12, 14, 10);
+    g.fillStyle = '#c2703c'; g.fillRect(9, 14, 8, 5);
+    g.fillStyle = '#6a8a5a'; g.fillRect(27, 14, 8, 5);
+    g.fillStyle = '#c9992f'; g.fillRect(45, 14, 8, 5);
+    g.fillStyle = '#a8506a'; g.fillRect(63, 14, 8, 5);
+    g.fillStyle = '#b8b4ac'; g.fillRect(0, 2, 80, 5);                               // полка-витрина
+    g.fillStyle = 'rgba(200,224,236,.35)'; g.fillRect(0, 0, 80, 3);
+  });
+
+  /* ---- длинный стол столовой ---- */
+  D('canteen_table', {w:78,h:26,ax:39,ay:24,foot:{x:-39,y:-16,w:78,h:18}}, g => {
+    shadowEllipse(g, 39, 24, 33, 3, .2);
+    box34(g, 0, 0, 78, 9, 8, '#9a8a70', '#7a6a52');
+    g.fillStyle = '#b0a088'; g.fillRect(0, 0, 78, 2);
+    legs(g, 6, 17, 66, 7, '#4a4550');
+    g.fillStyle = '#cfd8d0'; g.fillRect(14, 3, 9, 5); g.fillRect(44, 2, 9, 5);
+    g.fillStyle = '#8d949c'; g.fillRect(26, 4, 6, 2); g.fillRect(56, 3, 6, 2);
+  });
+})();
+
+/* =====================================================================
    WORLD — the layer that turns rooms from "paint rectangles every frame"
    into a scene: a cached background, a sorted prop layer, weather and light.
 ===================================================================== */
@@ -3029,6 +3152,79 @@ function paintInterior(ctx, w, h, o) {
   ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(0, wallH, w, 6);
 }
 
+/* Длинный университетский коридор: стена с ритмом высоких окон, полосы
+   света на полу под ними и ряд дверей с табличками. Рисуется один раз в
+   кэш фона, поэтому окон может быть сколько угодно. */
+function paintCorridor(ctx, W, H, o) {
+  o = o || {};
+  const wallH = o.wallH || 74;
+  const warm  = o.warm  || '#6f6152';
+  const warm2 = o.warm2 || '#5c5044';
+  const floor = o.floor || '#8a7454';
+  const floor2= o.floor2|| '#77603f';
+  // стена и деревянные панели
+  ctx.fillStyle = warm; ctx.fillRect(0, 0, W, wallH);
+  ctx.fillStyle = warm2;
+  for (let x = 0; x < W; x += 16) ctx.fillRect(x, 0, 2, wallH);
+  ctx.fillStyle = shade(warm, .74); ctx.fillRect(0, wallH - 16, W, 4);
+  ctx.fillStyle = shade(warm, .86); ctx.fillRect(0, wallH - 12, W, 12);
+  ctx.fillStyle = shade(warm, 1.12); ctx.fillRect(0, wallH - 2, W, 2);
+  // пол в доску вдоль коридора
+  ctx.fillStyle = floor; ctx.fillRect(0, wallH, W, H - wallH);
+  ctx.fillStyle = floor2;
+  for (let y = wallH + 7; y < H; y += 13) ctx.fillRect(0, y, W, 1);
+  for (let x = 0; x < W; x += 64) {
+    const off = ((x / 64) | 0) % 2 ? 6 : 0;
+    for (let y = wallH + off; y < H; y += 26) ctx.fillRect(x, y, 1, 13);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(0, wallH, W, 7);
+  // окна: высокие, встроенные в стену, с одинаковым шагом
+  const wins = o.windows || [];
+  wins.forEach(wx => {
+    ctx.fillStyle = shade(warm, .62); ctx.fillRect(wx - 3, 8, 38, wallH - 26);
+    const sky = ctx.createLinearGradient(0, 10, 0, wallH - 20);
+    sky.addColorStop(0, o.skyTop || '#9db0c4'); sky.addColorStop(1, o.skyBot || '#c2c0ac');
+    ctx.fillStyle = sky; ctx.fillRect(wx, 11, 32, wallH - 32);
+    // осенний двор за стеклом
+    ctx.fillStyle = o.leaf1 || '#a8412c';
+    ctx.beginPath(); ctx.arc(wx + 9, 30, 8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = o.leaf2 || '#c2702c';
+    ctx.beginPath(); ctx.arc(wx + 23, 26, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#4a3a30'; ctx.fillRect(wx + 8, 30, 2, 12); ctx.fillRect(wx + 22, 26, 2, 16);
+    ctx.fillStyle = o.ground || '#5e6338'; ctx.fillRect(wx, wallH - 30, 32, 10);
+    // переплёт
+    ctx.fillStyle = shade(warm, .5);
+    ctx.fillRect(wx + 15, 11, 2, wallH - 32);
+    ctx.fillRect(wx, 11 + (wallH - 32) / 2, 32, 2);
+    ctx.fillStyle = shade(warm, 1.2); ctx.fillRect(wx - 3, 8, 38, 3);
+    ctx.fillStyle = shade(warm, .7);  ctx.fillRect(wx - 5, wallH - 22, 42, 5);
+    // мягкое пятно света, лежащее на полу под окном
+    const g = ctx.createLinearGradient(0, wallH, 0, H);
+    const a = o.lightA === undefined ? .16 : o.lightA;
+    g.addColorStop(0, `rgba(255,238,200,${a})`);
+    g.addColorStop(.55, `rgba(255,236,196,${(a*.45).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(255,232,190,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(wx - 4, wallH); ctx.lineTo(wx + 36, wallH);
+    ctx.lineTo(wx + 54, H); ctx.lineTo(wx - 22, H);
+    ctx.closePath(); ctx.fill();
+  });
+  // двери с табличками
+  (o.doors || []).forEach(([dx, label]) => {
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(dx, wallH - 46, 32, 46);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(dx + 2, wallH - 44, 28, 44);
+    ctx.fillStyle = '#4a3524'; ctx.fillRect(dx + 5, wallH - 40, 22, 15); ctx.fillRect(dx + 5, wallH - 22, 22, 15);
+    ctx.fillStyle = '#3f2c1c'; ctx.fillRect(dx, wallH - 46, 32, 2);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(dx + 25, wallH - 24, 3, 4);
+    if (label) {
+      ctx.fillStyle = '#d8cfae'; ctx.fillRect(dx + 8, wallH - 54, 16, 7);
+      ctx.fillStyle = '#3a3026'; ctx.font = '5px Courier New'; ctx.textAlign = 'center';
+      ctx.fillText(label, dx + 16, wallH - 48); ctx.textAlign = 'left';
+    }
+  });
+}
+
 /* Small shared painters */
 function paintDoor(ctx, x, y, w=30, h=15) {
   ctx.fillStyle = '#2a1810'; ctx.fillRect(x, y, w, h);
@@ -3053,6 +3249,43 @@ function paintRunes(ctx, pts, color='#40a0ff', t=0) {
    the world rebuilds itself correctly after any save/load.
 ===================================================================== */
 function roomNPCs(room) { return (room.npcs || []).filter(n => !n.when || n.when()); }
+/* Фоновые NPC ходят по заранее заданным точкам: сложный AI ради трёх
+   студентов не нужен, а коридор от этого сразу становится живым.
+   Маршруты замкнутые, поэтому персонаж может ходить по кругу бесконечно. */
+const Patrol = {
+  update(dt, room) {
+    if (Game.mode === 'menu' || Game.montage) return;
+    for (const n of (room.npcs || [])) {
+      if (!n.path || n.path.length < 2) continue;
+      if (n.when && !n.when()) continue;
+      const st = n._p || (n._p = { i:1, wait:0, sx:n.x, sy:n.y });
+      if (st.wait > 0) { st.wait -= dt; n.moving = false; continue; }
+      const [tx, ty] = n.path[st.i];
+      const dx = tx - n.x, dy = ty - n.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 1.6) {                       // дошёл до точки — постоять и оглядеться
+        st.i = (st.i + 1) % n.path.length;
+        st.wait = (n.pause === 0) ? 0 : (400 + Math.random() * 2100);
+        n.moving = false;
+        continue;
+      }
+      const sp = (n.speed || 0.42) * (dt / 16.6);
+      n.x += dx / d * sp; n.y += dy / d * sp;
+      n.moving = true;
+    }
+  },
+  /* при загрузке комнаты вернуть всех на исходные места */
+  reset(room) {
+    for (const n of (room.npcs || [])) {
+      if (!n.path || !n._p) continue;
+      n.x = n._p.sx; n.y = n._p.sy; n._p.i = 1; n._p.wait = 0; n.moving = false;
+    }
+  }
+};
+
+/* Статисты, расставленные текущей сценой: рисуются и сортируются как NPC,
+   но не интерактивны и живут только до конца сцены или смены комнаты. */
+function roomCast() { return Game.cast || []; }
 function roomObjs(room) { return (room.interactables || []).filter(o => !o.when || o.when()); }
 
 const Rooms = {
@@ -3298,7 +3531,7 @@ corridor1: {
     door(8, 88, 24, 56, 'КУХНЯ', 36, 84, true);
     door(8, 176, 24, 56, 'ВАННАЯ', 36, 172, true);
     door(248, 112, 24, 56, 'БАЛКОН', 206, 108, true);
-    door(114, 244, 52, 20, 'ПОДЪЕЗД', 116, 276, false);
+    door(114, 244, 52, 20, 'ПРИХОЖАЯ', 114, 276, false);
   },
   objects: [
     { t:'coat_rack', x:238, y:238 },
@@ -3321,7 +3554,7 @@ corridor1: {
       action: async ()=> await changeRoom('bathroom', 120, 250) },
     { x:232,y:114,w:38,h:52, name:'toBalcony', prompt:'Балкон',
       action: async ()=> await changeRoom('balcony', 140, 196) },
-    { x:118,y:222,w:44,h:32, name:'toStairs', prompt:'В подъезд',
+    { x:118,y:222,w:44,h:32, name:'toStairs', prompt:'В прихожую',
       action: async ()=> await changeRoom('stairwell', 120, 108) },
     { x:28,y:228,w:40,h:40, name:'shoes', prompt:'Обувь', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
@@ -3416,14 +3649,14 @@ street: {
     // --- signage baked into the ground layer
     ctx.font = '7px Courier New';
     ctx.fillStyle = '#c0a8e0'; ctx.fillText('КВАРТАЛ', 8, 268);
-    ctx.fillStyle = '#a8c0e0'; ctx.fillText('УНИВЕРСИТЕТ', 190, 246);
+    ctx.fillStyle = '#a8c0e0'; ctx.fillText('ОСТАНОВКА', 196, 168);
     ctx.fillStyle = '#e0a0b0'; ctx.fillText('ДОМОЙ', 46, 130);
     ctx.fillStyle = '#b8c8d8'; ctx.fillText('ЦЕРКОВЬ', 452, 130);
     ctx.fillStyle = '#a8a090'; ctx.fillText('МАСТЕРСКАЯ', 528, 130);
     ctx.fillStyle = '#a0d0a0'; ctx.fillText('ПАРК', 588, 268);
     ctx.fillStyle = '#fff'; ctx.font = '9px Courier New'; ctx.fillText('CAFE', 156, 40);
     if (F('foundGenevieve')) { ctx.fillStyle='#a0e0a0'; ctx.font='7px Courier New'; ctx.fillText('ЖЕНЕВЬЕВА', 350, 44); }
-    if (F('sueAgreed') && !F('firstAmulet') || F('sueRefused')) {
+    if (F('invitationPlan') && !F('firstAmulet') || F('sueRefused')) {
       ctx.fillStyle='#e0a0b0'; ctx.font='7px Courier New'; ctx.fillText('МАДЛЕН', 262, 30);
     }
     if (F('lonerDoorFail') && !F('lonerCaught')) {
@@ -3435,14 +3668,6 @@ street: {
       ctx.fillStyle = 'rgba(192,48,77,' + (0.14 + 0.09*Math.sin(Date.now()/500)).toFixed(3) + ')';
       ctx.fillRect(2,252,42,60);
     }
-    if (Game.chase && Game.chase.active) {
-      const left = Math.max(0, Math.ceil(Game.chase.t/1000));
-      const cx = Game.cam.x;
-      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(cx+70, 158, 100, 16);
-      ctx.strokeStyle = '#c0304d'; ctx.strokeRect(cx+70.5, 158.5, 99, 15);
-      ctx.fillStyle = '#ff6070'; ctx.font = '9px Courier New'; ctx.textAlign='center';
-      ctx.fillText('БЕГИ ДОМОЙ  ' + left, cx+120, 169); ctx.textAlign='left';
-    }
   },
   objects: [
     { t:'house_b', x:74,  y:120 },                                   // Naya's block
@@ -3453,7 +3678,7 @@ street: {
     // far pavement dressing
     { t:'lamp_street', x:32,  y:146 }, { t:'lamp_street', x:150, y:146 },
     { t:'lamp_street', x:262, y:146 }, { t:'lamp_street', x:372, y:146 },
-    { t:'mailbox', x:110, y:144 }, { t:'hydrant', x:238, y:144 },
+    { t:'bus_stop', x:218, y:146 }, { t:'hydrant', x:110, y:144 },
     { t:'sign_street', x:14, y:146 },
     { t:'bin', x:342, y:144 },
     // near pavement: trees along the verge
@@ -3496,21 +3721,29 @@ street: {
         if (Game.chase && Game.chase.active) { Chase.reachedHome(); return; }
         await changeRoom('stairwell', 120, 250);
       }},
-    { x:282,y:118,w:36,h:30, name:'toLeftHouse', prompt:'Дом Мадлен', action: async ()=> {
+    { x:282,y:118,w:36,h:30, name:'toLeftHouse',
+      prompt:()=> F('invitationPlan') || F('firstAmulet') || F('sueRefused') ? 'Дом Мадлен' : 'Соседний дом',
+      action: async ()=> {
         if (F('sueRefused')) { Scene.play('lonerDoor'); return; }
         if (!F('foundGenevieve')) { UI.toast('Дверь заперта.'); return; }
         if (!F('sueAgreed')) { UI.toast('Одной туда нельзя. Нужен человек рядом.'); return; }
         if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'sad',text:'Здесь больше делать нечего.'}]);
         await changeRoom('witch1House', 120, 258);
       }},
-    { x:370,y:118,w:36,h:30, name:'toRightHouse', prompt:'Дом Женевьевы', action: async ()=> {
+    { x:370,y:118,w:36,h:30, name:'toRightHouse',
+      prompt:()=> F('foundGenevieve') ? 'Дом Женевьевы' : 'Заколоченный дом',
+      action: async ()=> {
         if (!F('returnedFromHell1')) { UI.toast('Заколочено. Тут давно никто не живёт.'); return; }
         await changeRoom('genevieveHouse', 120, 258);
       }},
-    { x:196,y:250,w:44,h:60, name:'toUni', prompt:'Университет', action: async ()=> {
+    { x:186,y:126,w:64,h:34, name:'toUni', prompt:'Остановка: университет', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
-        if (!F('mainStoryStarted')) { UI.toast('Мне там нечего делать.'); return; }
-        await changeRoom('uniCourtyard', 170, 200);
+        if (!F('mainStoryStarted')) {
+          return Dialogue.start([{who:'naya',expr:'normal',text:'Автобус до университета. Мне туда сегодня незачем.'}]);
+        }
+        Audio.door();
+        UI.toast('Двенадцать минут на автобусе', 1600);
+        await changeRoom('uniHallMain', 190, 300);
       }},
     { x:6,y:252,w:34,h:60, name:'toOldTown', prompt:'Старый квартал', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Туда нельзя. Только домой.'); return; }
@@ -3524,8 +3757,8 @@ street: {
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Мокрая. Мы сидели тут в сентябре и ели мороженое, потому что она сказала, что "ещё лето".'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Мокрая. Как и всё в этом городе последние две недели.'}]);
       }},
-    { x:100,y:130,w:26,h:26, name:'mail', prompt:'Ящик', action(){
-        Dialogue.start([{who:'naya',expr:'normal',text:'Чужой почтовый ящик. Пусто. Даже реклама сюда доходить перестала.'}]);
+    { x:96,y:130,w:26,h:26, name:'mail', prompt:'Гидрант', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Пожарный гидрант, покрашенный поверх ржавчины. Три слоя краски, ржавчина всё равно проступает.'}]);
       }},
     { x:96,y:224,w:48,h:26, name:'carLook', prompt:'Машина',
       when:()=> !F('sueDead'),
@@ -3898,7 +4131,26 @@ lilithHall: {
         Dialogue.start([{who:'naya',expr:'sad',text:'Четыре статуи вдоль стены. Агата, Беатрис, Руби — и четвёртая, у которой сбит даже постамент.'}]);
       }},
   ],
-  npcs: [],
+  npcs: [
+    { x:180, y:132, sprite:'lilith', name:'Лиллит',
+      dialogue:()=> {
+        if (!F('metLilith')) return Scene.play('meetLilith');
+        if (F('evilRecognised')) return Dialogue.start([
+          {who:'lilith',expr:'neutral',text:'Слово сказано. Больше между нами ничего нет.'},
+        ]);
+        if (F('thirdAmulet')) return Dialogue.start([
+          {who:'lilith',expr:'intimidating',text:'Три имени у тебя. Четвёртое ты уже отдала, сама того не заметив.'},
+        ]);
+        return Dialogue.start([
+          {who:'lilith',expr:'neutral',text:'Три амулета. Три имени. Я не повторяю условий дважды.'},
+        ]);
+      }},
+    { x:120, y:176, sprite:'charlotte', name:'Шарлотта',
+      when:()=> F('metLilith') && !F('evilRecognised'),
+      dialogue:()=> Dialogue.start([
+        {who:'charlotte',expr:'normal',text:'Не смотри ей в глаза дольше, чем нужно. Это не суеверие, это вежливость.'},
+      ]) },
+  ],
   onEnter() { if (!F('metLilith')) setTimeout(()=> Scene.play('meetLilith'), 520); }
 },
 
@@ -4007,9 +4259,16 @@ communeHall: {
     /* большая общая комната: ведьмы живут почти обычной жизнью,
        и всё «страшное» стоит на полках между вареньем и книгами */
     paintInterior(ctx, 300, 300, { wall:'#3f4a3e', wall2:'#354034', floor:'#6b5a42', floor2:'#5b4c37', wallH:62 });
-    ctx.fillStyle = '#2a3428'; ctx.fillRect(240, 66, 46, 56);      // дверной проём вглубь дома
-    ctx.fillStyle = '#1d251c'; ctx.fillRect(244, 70, 38, 52);
-    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('ВНИЗ', 250, 130);
+    if (F('evilTrialOffered')) {                                   // люк в подпол открывают только для испытания
+      ctx.fillStyle = '#2a3428'; ctx.fillRect(240, 66, 46, 56);
+      ctx.fillStyle = '#1d251c'; ctx.fillRect(244, 70, 38, 52);
+      ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('ВНИЗ', 250, 130);
+    } else {
+      ctx.fillStyle = '#3f4a3e'; ctx.fillRect(240, 66, 46, 56);     // просто стена с полкой
+      ctx.fillStyle = '#354034'; ctx.fillRect(244, 70, 38, 52);
+      ctx.fillStyle = '#5a4636'; ctx.fillRect(244, 88, 38, 4);
+      ctx.fillStyle = '#8a9a7a'; ctx.fillRect(250, 76, 6, 12); ctx.fillRect(262, 78, 6, 10);
+    }
     /* меловой круг для собраний — вытоптан за десятки лет */
     ctx.strokeStyle = F('communeWarded') ? '#40a0ff' : '#7d7a5a'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.ellipse(150,196,92,44,0,0,Math.PI*2); ctx.stroke();
@@ -4032,7 +4291,6 @@ communeHall: {
     if (!F('communePanic') && Math.random()<0.04) FX.spawn(52,150,1,{color:'#c9a05a',rise:-0.3,life:50});
   },
   objects: [
-    { t:'rug_warm', x:150, y:196 },
     { t:'library_shelf', x:44, y:130 },
     { t:'jar_shelf', x:96, y:126 },
     { t:'herb_shelf', x:196, y:124 },
@@ -4043,14 +4301,15 @@ communeHall: {
     { t:'cauldron', x:24, y:196 },
     { t:'candle_row', x:150, y:88 },
     { t:'candle', x:126, y:140 }, { t:'candle', x:176, y:140 },
-    { t:'armchair', x:38, y:250 }, { t:'armchair', x:262, y:250 },
+    // стулья вдоль стен: их выносят в круг на собрание и убирают обратно
+    { t:'chair_wood', x:36, y:236 }, { t:'chair_wood', x:36, y:264 },
+    { t:'chair_wood', x:264, y:236 }, { t:'chair_wood', x:264, y:264 },
     { t:'coat_rack', x:104, y:262 },
     { t:'plant_pot', x:20, y:276 }, { t:'plant_pot', x:222, y:272 },
-    { t:'cat_bed', x:196, y:264 },
   ],
   walls: [
     {x:0,y:0,w:300,h:62},{x:0,y:0,w:8,h:300},{x:292,y:0,w:8,h:300},{x:0,y:295,w:300,h:5},
-    {x:240,y:62,w:46,h:60},
+    {x:240,y:62,w:46,h:56},
   ],
   interactables: [
     { x:130,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> {
@@ -5179,6 +5438,9 @@ parkWalk: {
   interactables: [
     { x:6,y:244,w:34,h:48, name:'toStreet', prompt:'На Мейпл-стрит',
       action: async ()=> await changeRoom('street', 596, 270) },
+    { x:300,y:244,w:44,h:48, name:'parkBack', prompt:'Назад к коммуне',
+      when:()=> !(Game.chase && Game.chase.active),
+      action(){ Dialogue.start([{who:'naya',expr:'normal',text:'Через сад Женевьевы. Не сегодня.'}]); }},
     { x:200,y:158,w:100,h:26, name:'pond', prompt:'Пруд', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Утки улетели ещё в октябре. Сью каждый год расстраивалась, как в первый раз.'},
@@ -5718,6 +5980,187 @@ prologueHell: {
 },
 
 /* ---------------------------------------------------------------- */
+/* ДОМ ОТЦА. Пролог, семнадцать лет Нае. Дорогая гостиная, в которой
+   у неё нет ни одной своей вещи, и чердак, где у неё есть всё. */
+oldHouse: {
+  name:"Дом отца. Гостиная", music:'sad', w:320, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 },
+  light:{ tint:'#1c1a24', dark:.22 },
+  lights:[{x:160,y:150,r:64,c:'#e8dcc0',i:.42},{x:262,y:60,r:44,c:'#9fc0e0',i:.24}],
+  sun:{ x:262, y:62, w:40, len:130, tilt:-.28, a:.10 },
+  bgPaint(ctx) {
+    const W = 320, H = 300;
+    paintInterior(ctx, W, H, { wall:'#5f5a68', wall2:'#4e4a58', floor:'#8a7454', floor2:'#77603f', wallH:60 });
+    // светлые обои в вертикальную полоску — дом, за которым следят
+    ctx.fillStyle = 'rgba(230,220,236,.07)';
+    for (let x = 4; x < W; x += 10) ctx.fillRect(x, 0, 4, 58);
+    ctx.fillStyle = '#3f3b48'; ctx.fillRect(0, 54, W, 4);
+    ctx.fillStyle = '#6e697a'; ctx.fillRect(0, 58, W, 2);
+    // паркет ёлочкой в парадной части
+    ctx.fillStyle = '#7d6448';
+    for (let y = 62; y < 190; y += 10) for (let x = 0; x < W; x += 20) {
+      ctx.fillRect(x, y, 9, 4); ctx.fillRect(x + 10, y + 5, 9, 4);
+    }
+    // ковёр, на который Нае не разрешают ступать в уличной обуви
+    ctx.fillStyle = '#5f4a58'; ctx.fillRect(90, 176, 140, 76);
+    ctx.fillStyle = '#6f5868'; ctx.fillRect(94, 180, 132, 68);
+    ctx.fillStyle = '#8a6e80'; ctx.fillRect(104, 190, 112, 48);
+    ctx.fillStyle = '#5f4a58'; ctx.fillRect(120, 202, 80, 24);
+    // лестница на чердак — узкая, в углу, без ковра
+    ctx.fillStyle = '#4a3a2c'; ctx.fillRect(8, 62, 54, 76);
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = i % 2 ? '#6b543f' : '#5a4636';
+      ctx.fillRect(10, 64 + i * 12, 50 - i * 2, 10);
+    }
+    ctx.fillStyle = '#2a2018'; ctx.fillRect(8, 62, 54, 3);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('НАВЕРХ', 12, 148);
+    paintDoor(ctx, 145, 285);
+  },
+  objects: [
+    { t:'window_in', x:262, y:44 },
+    { t:'painting', x:160, y:30 }, { t:'painting', x:206, y:30 },
+    { t:'photo_frame', x:110, y:30 }, { t:'photo_frame', x:130, y:30 },
+    { t:'clock', x:60, y:28 },
+    { t:'sofa_modern', x:160, y:246 },
+    { t:'table_round', x:160, y:206 },
+    { t:'vase_flowers', x:160, y:196 },
+    { t:'armchair', x:96, y:216 }, { t:'armchair', x:230, y:216 },
+    { t:'dresser', x:288, y:150 },
+    { t:'tv_stand', x:100, y:132 },
+    { t:'bookshelf', x:212, y:118 },
+    { t:'lamp_floor', x:262, y:190 },
+    { t:'plant_pot', x:294, y:262 }, { t:'plant_pot', x:24, y:272 },
+    { t:'coat_rack', x:100, y:274 },
+  ],
+  walls: [
+    {x:0,y:0,w:320,h:60},{x:0,y:0,w:8,h:300},{x:312,y:0,w:8,h:300},{x:0,y:295,w:320,h:5},
+  ],
+  interactables: [
+    { x:12,y:110,w:48,h:34, name:'toAttic', prompt:'Наверх, к себе',
+      action: async ()=> await changeRoom('oldHouseAttic', 120, 250) },
+    { x:140,y:262,w:44,h:32, name:'frontDoor', prompt:'Входная дверь', action(){
+        if (F('pastTalkedAll')) return Scene.play('prologLeave');
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Сью ждёт за оградой. Она всегда ждёт за оградой — в дом её не зовут.'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Сначала — обойти дом. Последний раз.)'},
+        ]);
+      }},
+    { x:88,y:16,w:64,h:38, name:'photosPast', prompt:'Фотографии', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'Свадьба отца и Дризеллы. Стейси в три года. Стейси в семь. Стейси в двенадцать.'},
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'Меня на этой стене нет. Я проверяла в детстве, чтобы больше не проверять.'},
+        ]);
+        setFlag('pastPhotos');
+      }},
+    { x:78,y:110,w:44,h:34, name:'tvPast', prompt:'Телевизор', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Работает всегда. Отец включает его, когда не хочет разговаривать.'},
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'То есть всегда.'},
+        ]);
+      }},
+    { x:192,y:96,w:44,h:34, name:'shelfPast', prompt:'Полка', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Дипломы Стейси. Танцы, вокал, конкурс чтецов.'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Мой аттестат лежит наверху в коробке. Его никто не просил показать.)'},
+        ]);
+      }},
+    { x:268,y:130,w:44,h:34, name:'dresserPast', prompt:'Комод', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Верхний ящик заперт. Там документы: мои, Стейси, все.'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Свои я забрала вчера. Ключ лежит там же, где лежал всегда.)'},
+        ]);
+      }},
+  ],
+  npcs: [
+    { x:230,y:250, sprite:'drizella', name:'Дризелла',
+      dialogue:()=> Scene.play('pastDrizella') },
+    { x:96,y:250, sprite:'stacy', name:'Стейси',
+      dialogue:()=> Scene.play('pastStacy') },
+    { x:262,y:160, sprite:'frank', name:'Фрэнк',
+      dialogue:()=> Scene.play('pastFrank') },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+oldHouseAttic: {
+  name:"Дом отца. Чердак", music:'sad', w:240, h:280,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
+  light:{ tint:'#1a1620', dark:.30 },
+  lights:[{x:120,y:44,r:44,c:'#9fc0e0',i:.34},{x:52,y:190,r:34,c:'#ffcf7a',i:.30}],
+  sun:{ x:120, y:46, w:32, len:120, tilt:.1, a:.11 },
+  bgPaint(ctx) {
+    const W = 240, H = 280;
+    paintInterior(ctx, W, H, { wall:'#4a4048', wall2:'#3d353c', floor:'#6b5842', floor2:'#5b4a36', wallH:52 });
+    // скошенные стропила — комната под самой крышей
+    ctx.fillStyle = '#3a3038';
+    ctx.beginPath(); ctx.moveTo(0,52); ctx.lineTo(56,52); ctx.lineTo(0,150); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(240,52); ctx.lineTo(184,52); ctx.lineTo(240,150); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#4a3a2c';
+    for (let i=0;i<3;i++) { ctx.fillRect(4+i*16, 54+i*30, 40-i*10, 4); ctx.fillRect(196-i*16, 54+i*30, 40-i*10, 4); }
+    // мансардное окно
+    ctx.fillStyle = '#2f2a34'; ctx.fillRect(96, 10, 48, 40);
+    const sky = ctx.createLinearGradient(0,12,0,48);
+    sky.addColorStop(0,'#7d8ea6'); sky.addColorStop(1,'#a8a898');
+    ctx.fillStyle = sky; ctx.fillRect(100, 14, 40, 32);
+    ctx.fillStyle = '#3f382e'; ctx.fillRect(119, 14, 2, 32); ctx.fillRect(100, 29, 40, 2);
+    ctx.fillStyle = 'rgba(200,220,240,.10)';
+    ctx.beginPath(); ctx.moveTo(96,52); ctx.lineTo(144,52); ctx.lineTo(170,H); ctx.lineTo(70,H); ctx.closePath(); ctx.fill();
+    paintDoor(ctx, 105, 265);
+  },
+  objects: [
+    { t:'bed_single', x:52, y:130 },
+    { t:'desk', x:186, y:140 },
+    { t:'chair_wood', x:186, y:162 },
+    { t:'chest', x:196, y:220 },
+    { t:'book_stack', x:160, y:126 },
+    { t:'photo_frame', x:80, y:34 },
+    { t:'lamp_floor', x:32, y:200 },
+    { t:'boots', x:64, y:238 },
+    { t:'rug_warm', x:120, y:206 },
+    { t:'cabinet', x:32, y:96 },
+  ],
+  walls: [
+    {x:0,y:0,w:240,h:52},{x:0,y:0,w:8,h:280},{x:232,y:0,w:8,h:280},{x:0,y:275,w:240,h:5},
+    {x:0,y:52,w:44,h:80},{x:196,y:52,w:44,h:80},
+  ],
+  interactables: [
+    { x:100,y:238,w:44,h:32, name:'toLiving', prompt:'Вниз',
+      action: async ()=> await changeRoom('oldHouse', 40, 150) },
+    { x:32,y:106,w:44,h:34, name:'bedPast', prompt:'Кровать', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Раскладушка, которую так и не заменили. Зимой сюда доходит холод от крыши.'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Зато отсюда никто не приходит проверять, чем я занята.)'},
+        ]);
+      }},
+    { x:166,y:118,w:44,h:34, name:'deskPast', prompt:'Стол', action(){
+        if (F('pastCrystal')) return Dialogue.start([{who:'nayaTeen',expr:'normal',name:'Ная',text:'Пусто. Всё уже в сумке.'}]);
+        Scene.play('pastCrystalScene');
+      }},
+    { x:176,y:200,w:44,h:34, name:'boxPast', prompt:'Коробка', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Аттестат, справка из поликлиники, читательский билет.'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Вся моя жизнь помещается в коробку из-под ботинок. Это даже удобно.)'},
+        ]);
+        setFlag('pastBox');
+      }},
+    { x:60,y:16,w:44,h:36, name:'photoPast', prompt:'Фотография', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'sad',name:'Ная',text:'Единственное фото матери, которое я успела вынести до того, как их выбросили.'},
+          {who:'nayaTeen',expr:'sad',name:'Ная',text:'Она здесь смеётся. Я не помню её смеха.'},
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Дризелла говорит про неё «та женщина». Отец не поправляет.)'},
+        ]);
+        setFlag('pastMotherPhoto');
+      }},
+    { x:96,y:56,w:48,h:34, name:'windowPast', prompt:'Окно', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Отсюда видно ограду и кусок дороги.'},
+          {who:'nayaTeen',expr:'smile',name:'Ная',text:'Сью стоит там с рюкзаком и делает вид, что не мёрзнет.'},
+        ]);
+      }},
+  ],
+  npcs: [],
+},
+/* ---------------------------------------------------------------- */
 playground: {
   name:"Детская площадка", music:'warm', w:300, h:300,
   zone:'town', weather:{ rain:0, fog:.06, wind:.3, leaves:.7 },
@@ -5785,152 +6228,598 @@ playground: {
 
 /* ---------------------------------------------------------------- */
 uniCourtyard: {
-  name:"Университет. Двор", music:'street', w:340, h:300, wet:true, wetFrom:100,
+  name:"Университет. Внутренний двор", music:'street', w:400, h:300, wet:true, wetFrom:100,
   zone:'town', weather:{ rain:.22, fog:.12, wind:.24, leaves:.45 },
   light:{ tint:'#161c2a', dark:.30 },
   lights:[{x:170,y:66,r:40,c:'#ffcf7a',i:.5},{x:96,y:70,r:30,c:'#f2c46a',i:.35},{x:250,y:70,r:30,c:'#f2c46a',i:.35}],
   bgPaint(ctx) {
-    const W = 340;
-    const sky = ctx.createLinearGradient(0,0,0,100);
+    const W = 400, H = 300;
+    const sky = ctx.createLinearGradient(0,0,0,44);
     sky.addColorStop(0, PAL.skyDusk); sky.addColorStop(1,'#6a6d7e');
-    ctx.fillStyle = sky; ctx.fillRect(0,0,W,100);
-    // the faculty building across the yard
-    ctx.fillStyle = '#4a4048'; ctx.fillRect(0, 8, W, 14);
-    ctx.fillStyle = '#8a8076'; ctx.fillRect(6, 20, W-12, 78);
-    ctx.fillStyle = '#736a62'; for (let y=24;y<98;y+=5) ctx.fillRect(6,y,W-12,1);
-    ctx.fillStyle = '#3a3038';
-    for (let i=0;i<8;i++) ctx.fillRect(20+i*40, 34, 18, 22);
-    ctx.fillStyle = PAL.windowLit;
-    for (let i=0;i<8;i++) if (i%3) ctx.fillRect(22+i*40, 36, 14, 18);
-    ctx.fillStyle = '#2f2a30'; ctx.fillRect(152, 62, 36, 38);
-    ctx.fillStyle = '#5f4530'; ctx.fillRect(155, 64, 30, 36);
-    ctx.fillStyle = '#c9a05a'; ctx.fillRect(179, 82, 3, 4);
-    ctx.fillStyle = '#d8d0c0'; ctx.font = '7px Courier New'; ctx.fillText('ФАКУЛЬТЕТ', 148, 32);
-    // paving
-    ctx.fillStyle = '#5f5a5c'; ctx.fillRect(0,100,W,200);
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,44);
+    // корпус напротив — тот же ритм окон, что и в коридорах изнутри
+    ctx.fillStyle = '#3f3840'; ctx.fillRect(0, 30, W, 12);
+    ctx.fillStyle = '#7d7368'; ctx.fillRect(0, 40, W, 62);
+    ctx.fillStyle = '#6b625a'; for (let y=44;y<100;y+=5) ctx.fillRect(0,y,W,1);
+    for (let i=0;i<9;i++) {
+      const x = 14 + i*44;
+      ctx.fillStyle = '#332c34'; ctx.fillRect(x, 50, 24, 34);
+      ctx.fillStyle = (i%3) ? PAL.windowLit : '#39414f'; ctx.fillRect(x+2, 52, 20, 30);
+      ctx.fillStyle = '#2a242c'; ctx.fillRect(x+11, 52, 2, 30);
+    }
+    ctx.fillStyle = '#5a5048'; ctx.fillRect(0, 96, W, 8);
+    // боковые крылья, замыкающие двор
+    ctx.fillStyle = '#6e655c'; ctx.fillRect(0, 96, 26, H-96); ctx.fillRect(374, 96, 26, H-96);
+    ctx.fillStyle = '#5f574f';
+    for (let y=104;y<H;y+=24) { ctx.fillRect(4, y, 16, 16); ctx.fillRect(380, y, 16, 16); }
+    ctx.fillStyle = '#39414f';
+    for (let y=106;y<H;y+=24) { ctx.fillRect(6, y+2, 12, 12); ctx.fillRect(382, y+2, 12, 12); }
+    // вход в холл
+    ctx.fillStyle = '#2f2a30'; ctx.fillRect(178, 62, 44, 42);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(182, 64, 36, 40);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(212, 84, 3, 4);
+    ctx.fillStyle = '#d8d0c0'; ctx.font = '7px Courier New'; ctx.fillText('ХОЛЛ', 186, 60);
+    // мощёный двор
+    ctx.fillStyle = '#5f5a5c'; ctx.fillRect(0,102,W,H-102);
     ctx.strokeStyle = '#544f51';
-    for (let y=104;y<300;y+=14) for (let x=(y%28?0:9);x<W;x+=19) ctx.strokeRect(x+.5,y+.5,18,13);
-    ctx.fillStyle = '#4c5a3a'; ctx.fillRect(0, 262, W, 38);
+    for (let y=106;y<H;y+=14) for (let x=(y%28?0:9);x<W;x+=19) ctx.strokeRect(x+.5,y+.5,18,13);
+    // газон и дорожки крестом
+    ctx.fillStyle = '#4c5a3a';
+    ctx.fillRect(40, 130, 130, 96); ctx.fillRect(230, 130, 130, 96);
+    ctx.fillStyle = '#6e6459'; ctx.fillRect(176, 102, 48, H-102); ctx.fillRect(0, 226, W, 34);
+    ctx.fillStyle = '#7d7266';
+    for (let x=0;x<W;x+=17) ctx.fillRect(x, 226, 1, 34);
+    ctx.fillStyle = 'rgba(120,140,160,.13)';
+    [[92,250,20,7],[300,246,16,6],[200,278,22,7]].forEach(([x,y,rx,ry])=>{
+      ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2); ctx.fill();
+    });
     const cols = [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
-    for (let i=0;i<180;i++) { ctx.fillStyle = cols[i%4]; ctx.fillRect((i*83)%W, 104+((i*37)%192), 3, 2); }
-    ctx.fillStyle = '#e0a0b0'; ctx.font = '7px Courier New'; ctx.fillText('В ГОРОД', 8, 292);
+    for (let i=0;i<220;i++) { ctx.fillStyle = cols[i%4]; ctx.fillRect((i*83)%W, 106+((i*37)%190), 3, 2); }
   },
   objects: [
-    { t:'statue', x:170, y:196 },
-    { t:'bench_stone', x:104, y:214 }, { t:'bench_stone', x:236, y:214 },
-    { t:'lamp_street', x:52, y:150 }, { t:'lamp_street', x:288, y:150 },
-    { t:'tree_gold', x:44, y:262 }, { t:'tree_rust', x:296, y:262 },
-    { t:'notice_board', x:250, y:120 },
-    { t:'bin', x:200, y:250 }, { t:'bush', x:130, y:270 }, { t:'bush', x:210, y:274 },
-    { t:'puddle', x:150, y:240 }, { t:'leaves_pile', x:90, y:250 },
+    { t:'fountain', x:200, y:196 },
+    { t:'bench_stone', x:110, y:222 }, { t:'bench_stone', x:290, y:222 },
+    { t:'bench_stone', x:64, y:272 }, { t:'bench_stone', x:336, y:272 },
+    { t:'lamp_street', x:150, y:130 }, { t:'lamp_street', x:250, y:130 },
+    { t:'tree_gold', x:70, y:172 }, { t:'tree_rust', x:330, y:172 },
+    { t:'tree_red', x:112, y:150 }, { t:'tree_orange', x:288, y:150 },
+    { t:'notice_board', x:258, y:118 },
+    { t:'bin', x:236, y:262 }, { t:'bin', x:164, y:262 },
+    { t:'bush', x:56, y:206 }, { t:'bush', x:344, y:206 },
+    { t:'puddle', x:96, y:250 }, { t:'puddle', x:304, y:246 },
+    { t:'leaves_pile', x:126, y:206 }, { t:'leaves_pile', x:276, y:210 },
   ],
   walls: [
-    {x:0,y:0,w:340,h:100},{x:0,y:0,w:8,h:300},{x:332,y:0,w:8,h:300},{x:0,y:295,w:340,h:5},
+    {x:0,y:0,w:400,h:102},{x:0,y:0,w:26,h:300},{x:374,y:0,w:26,h:300},{x:0,y:295,w:400,h:5},
   ],
   interactables: [
-    { x:150,y:98,w:40,h:30, name:'toHall', prompt:'Войти', action: async ()=> await changeRoom('uniHall', 120, 250) },
-    { x:6,y:262,w:36,h:34, name:'toStreet', prompt:'В город', action: async ()=> await changeRoom('street', 210, 160) },
-    { x:150,y:172,w:40,h:34, name:'statue', prompt:'Статуя', action(){
+    { x:180,y:98,w:44,h:30, name:'toHall', prompt:'В холл', action: async ()=> await changeRoom('uniHallMain', 34, 274) },
+    { x:172,y:168,w:56,h:34, name:'statue', prompt:'Фонтан', action(){
         if (F('learnedMedea')) return Dialogue.start([
-          {who:'naya',expr:'sad',text:'«Основательнице театрального отделения». Имя стёрлось, остался только год.'},
+          {who:'naya',expr:'sad',text:'На бортике выбито: «дар выпуска», и год. Имя жертвовательницы стёрлось.'},
           {who:'naya',expr:'shocked',text:'Тот же год, что в архивной папке. Совпадение, конечно.'},
         ]);
         Dialogue.start([
-          {who:'naya',expr:'normal',text:'Женщина с маской в руке. Табличка стёрлась до нечитаемости.'},
-          {who:'naya',expr:'normal',text:'Студенты трут ей ботинок на удачу перед экзаменом. Ботинок блестит.'},
+          {who:'naya',expr:'normal',text:'Фонтан в центре двора. Воду отключают в октябре, но в чаше всё равно всегда что-то есть.'},
+          {who:'naya',expr:'smile',text:'Монеты. Студенты бросают их перед сессией и потом же вылавливают.'},
         ]);
       }},
-    { x:232,y:104,w:40,h:32, name:'board', prompt:'Доска объявлений', action(){
+    { x:238,y:98,w:40,h:32, name:'board', prompt:'Доска объявлений', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'«Показ второго курса — в четверг». «Ищу соседа». «Верните мой зонт, я знаю, кто вы».'},
           {who:'naya',expr:'smile',text:'Внизу — расписание Ж. Морель. История театра, вторник и четверг.'},
         ]);
       }},
-    { x:86,y:196,w:38,h:30, name:'benchYard', prompt:'Скамейка', action(){
+    { x:92,y:200,w:38,h:30, name:'benchYard', prompt:'Скамейка', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Я жду её здесь третий раз за неделю. Уже знаю, какой камень тёплый от солнца.'}]);
+      }},
+    { x:150,y:118,w:100,h:30, name:'windowsYard', prompt:'Окна', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Окна коридоров выходят сюда со всех четырёх сторон. Из театрального крыла видно ровно этот фонтан.'},
+          {who:'naya',expr:'talk',text:'(Здание больше, чем та часть, куда меня пускают. Заметно больше.)'},
+        ]);
       }},
   ],
   npcs: [
-    { x:230,y:246, sprite:'friend', name:'Студентка',
+    { x:120,y:250, sprite:'friend', name:'Студентка', speed:0.34,
+      path:[[120,250],[280,248],[290,276],[110,278]],
       when:()=> !F('sueDead'),
       dialogue:()=> {
-        if (F('investigatedLibrary')) return Dialogue.start([{who:'sue',expr:'normal',name:'Студентка',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
+        if (F('investigatedUniversity')) return Dialogue.start([{who:'sue',expr:'normal',name:'Студентка',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
         return Dialogue.start([{who:'sue',expr:'smile',name:'Студентка',text:'Ты Сью ждёшь? Она ещё на сцене, у них прогон. Минут двадцать.'}]);
       }},
   ],
 },
 
 /* ---------------------------------------------------------------- */
-uniHall: {
-  name:"Университет. Коридор", music:'home', w:300, h:300,
+/* УНИВЕРСИТЕТ. Старый гуманитарно-театральный корпус: холл в центре,
+   от него два длинных крыла, внутренний двор и лестница в старую часть.
+   Дверей много, комнат за ними мало — здание должно казаться больше,
+   чем та часть, куда игрока реально пускают. */
+uniHallMain: {
+  name:"Университет. Главный холл", music:'home', w:380, h:340,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
-  light:{ tint:'#1a1a22', dark:.24 },
-  lights:[{x:60,y:30,r:44,c:'#ffe6b0',i:.45},{x:150,y:30,r:44,c:'#ffe6b0',i:.45},{x:240,y:30,r:44,c:'#ffe6b0',i:.45}],
-  sun:{ x:284, y:60, w:38, len:120, tilt:-.3, a:.10 },
+  light:{ tint:'#1a1a22', dark:.20 },
+  lights:[
+    {x:80,y:34,r:48,c:'#ffe6b0',i:.45},{x:190,y:30,r:56,c:'#ffe6b0',i:.5},{x:300,y:34,r:48,c:'#ffe6b0',i:.45},
+    {x:190,y:250,r:60,c:'#f2d8a8',i:.28},
+  ],
+  sun:{ x:190, y:96, w:76, len:190, tilt:0, a:.16 },
   bgPaint(ctx) {
-    paintInterior(ctx, 300, 300, { wall:'#6d6455', wall2:'#5b5346', floor:'#8a8276', floor2:'#797167', wallH:58, tiles:true });
-    ctx.fillStyle = '#4e4739'; ctx.fillRect(0, 54, 300, 5);
-    ctx.fillStyle = '#3a3630'; ctx.fillRect(0, 58, 300, 3);
-    ctx.fillStyle = '#c8c0b0'; ctx.font = '6px Courier New';
-    ctx.fillText('АУД. 12', 44, 96); ctx.fillText('АУД. 14', 140, 96); ctx.fillText('СЦЕНА', 238, 96);
-    ctx.fillStyle = '#8a8276'; ctx.fillRect(0, 268, 300, 32);
-    ctx.fillStyle = '#e0a0b0'; ctx.font = '7px Courier New'; ctx.fillText('ВО ДВОР', 100, 292);
+    const W = 380, H = 340, wallH = 96;
+    paintInterior(ctx, W, H, { wall:'#6f6152', wall2:'#5c5044', floor:'#8a7454', floor2:'#77603f', wallH });
+    // высокие окна по обе стороны от лестницы
+    [26, 296].forEach(wx => {
+      ctx.fillStyle = '#4a4136'; ctx.fillRect(wx - 4, 10, 66, 74);
+      const sky = ctx.createLinearGradient(0, 12, 0, 82);
+      sky.addColorStop(0, '#9db0c4'); sky.addColorStop(1, '#c2c0ac');
+      ctx.fillStyle = sky; ctx.fillRect(wx, 14, 58, 66);
+      ctx.fillStyle = '#a8412c'; ctx.beginPath(); ctx.arc(wx + 16, 42, 12, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#c2702c'; ctx.beginPath(); ctx.arc(wx + 40, 36, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#4a3a30'; ctx.fillRect(wx + 15, 42, 3, 20); ctx.fillRect(wx + 39, 36, 3, 26);
+      ctx.fillStyle = '#5e6338'; ctx.fillRect(wx, 62, 58, 18);
+      ctx.fillStyle = '#3f382e'; ctx.fillRect(wx + 27, 14, 3, 66); ctx.fillRect(wx, 44, 58, 3);
+      ctx.fillStyle = '#7d6d5c'; ctx.fillRect(wx - 4, 10, 66, 4);
+      ctx.fillStyle = '#4a4136'; ctx.fillRect(wx - 6, 80, 70, 6);
+      const g = ctx.createLinearGradient(0, wallH, 0, H);
+      g.addColorStop(0, 'rgba(255,238,200,.20)'); g.addColorStop(1, 'rgba(255,232,190,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(wx - 6, wallH); ctx.lineTo(wx + 64, wallH);
+      ctx.lineTo(wx + 92, H); ctx.lineTo(wx - 34, H); ctx.closePath(); ctx.fill();
+    });
+    // проёмы: два крыла, двор, столовая
+    const arch = (x, w, label, lx) => {
+      ctx.fillStyle = '#3a2c1e'; ctx.fillRect(x, wallH - 56, w, 56);
+      ctx.fillStyle = '#211a14'; ctx.fillRect(x + 4, wallH - 52, w - 8, 52);
+      ctx.fillStyle = 'rgba(255,238,200,.07)'; ctx.fillRect(x + 4, wallH - 52, w - 8, 52);
+      ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText(label, lx, wallH + 10);
+    };
+    arch(4, 44, 'ТЕАТР', 6);
+    arch(332, 44, 'УЧЕБНОЕ', 326);
+    // парадный вход снизу
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(150, 306, 80, 34);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(154, 310, 72, 30);
+    ctx.fillStyle = '#a8c0d8'; ctx.fillRect(160, 314, 26, 18); ctx.fillRect(194, 314, 26, 18);
+    ctx.fillStyle = '#c8dcec'; ctx.fillRect(160, 314, 26, 5); ctx.fillRect(194, 314, 26, 5);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '7px Courier New'; ctx.fillText('НА УЛИЦУ', 162, 304);
+    // проход во двор и в столовую
+    ctx.fillStyle = '#2a3020'; ctx.fillRect(8, 250, 34, 58);
+    ctx.fillStyle = 'rgba(150,190,120,.16)'; ctx.fillRect(12, 254, 26, 50);
+    ctx.fillStyle = '#a0d0a0'; ctx.font = '6px Courier New'; ctx.fillText('ДВОР', 12, 246);
+    ctx.fillStyle = '#33291f'; ctx.fillRect(338, 250, 34, 58);
+    ctx.fillStyle = 'rgba(255,220,150,.12)'; ctx.fillRect(342, 254, 26, 50);
+    ctx.fillStyle = '#e0c090'; ctx.font = '6px Courier New'; ctx.fillText('СТОЛОВАЯ', 326, 246);
+    // мраморная розетка в центре пола
+    ctx.fillStyle = 'rgba(0,0,0,.08)';
+    ctx.beginPath(); ctx.ellipse(190, 246, 74, 34, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(201,160,90,.30)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(190, 246, 70, 32, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(190, 246, 46, 21, 0, 0, Math.PI*2); ctx.stroke();
   },
   objects: [
-    { t:'uni_door', x:56,  y:100 },
-    { t:'uni_door', x:152, y:100 },
-    { t:'uni_door', x:250, y:100 },
-    { t:'notice_board', x:104, y:76 },
-    { t:'lockers', x:200, y:148 }, { t:'lockers', x:246, y:148 },
-    { t:'radiator', x:120, y:132 }, { t:'radiator', x:284, y:196 },
-    { t:'bench_stone', x:88, y:198 }, { t:'bench_stone', x:212, y:210 },
-    { t:'book_stack', x:104, y:186 },
-    { t:'bin', x:66, y:208 }, { t:'bin', x:276, y:250 },
-    { t:'plant_pot', x:24, y:214 }, { t:'plant_pot', x:150, y:250 },
-    { t:'window_in', x:284, y:70 },
-    { t:'library_shelf', x:26, y:130 },
-    { t:'stool', x:150, y:196 },
+    { t:'stairs_main', x:190, y:150 },
+    { t:'pillar_wood', x:96,  y:168 }, { t:'pillar_wood', x:284, y:168 },
+    { t:'pillar_wood', x:72,  y:262 }, { t:'pillar_wood', x:308, y:262 },
+    { t:'notice_board', x:140, y:76 }, { t:'notice_board', x:240, y:76 },
+    { t:'clock', x:190, y:24 },
+    { t:'painting', x:114, y:44 }, { t:'painting', x:266, y:44 },
+    { t:'bench_stone', x:130, y:300 }, { t:'bench_stone', x:250, y:300 },
+    { t:'plant_pot', x:64,  y:314 }, { t:'plant_pot', x:316, y:314 },
+    { t:'plant_pot', x:120, y:170 }, { t:'plant_pot', x:260, y:170 },
+    { t:'bin', x:96, y:306 }, { t:'radiator', x:284, y:306 },
   ],
   walls: [
-    {x:0,y:0,w:300,h:58},{x:0,y:0,w:8,h:300},{x:292,y:0,w:8,h:300},{x:0,y:295,w:300,h:5},
+    {x:0,y:0,w:380,h:96},{x:0,y:0,w:8,h:340},{x:372,y:0,w:8,h:340},{x:0,y:335,w:380,h:5},
   ],
   interactables: [
-    { x:100,y:264,w:44,h:32, name:'toYard', prompt:'Во двор', action: async ()=> await changeRoom('uniCourtyard', 170, 130) },
-    { x:38,y:100,w:38,h:34, name:'toLib', prompt:'Библиотека', action: async ()=> await changeRoom('uniLibrary', 120, 258) },
-    { x:134,y:100,w:38,h:34, name:'aud14', prompt:'Аудитория 14', action(){
-        if (!F('metGenevieveUni')) { Scene.play('meetGenevieveUni'); return; }
-        Dialogue.start([{who:'naya',expr:'normal',text:'Дверь закрыта. Расписание на ней: «История театра. Морель Ж.»'}]);
+    { x:150,y:300,w:80,h:34, name:'toStreet', prompt:'На улицу',
+      action: async ()=> await changeRoom('street', 210, 200) },
+    { x:8,y:56,w:44,h:44, name:'toTheatre', prompt:'Театральное крыло',
+      action: async ()=> await changeRoom('uniCorridorTheatre', 596, 156) },
+    { x:328,y:56,w:44,h:44, name:'toStudy', prompt:'Учебное крыло',
+      action: async ()=> await changeRoom('uniCorridorLib', 44, 156) },
+    { x:10,y:250,w:36,h:58, name:'toYard', prompt:'Во внутренний двор',
+      action: async ()=> await changeRoom('uniCourtyard', 200, 268) },
+    { x:336,y:250,w:36,h:58, name:'toCanteen', prompt:'Столовая',
+      action: async ()=> await changeRoom('uniCanteen', 170, 268) },
+    { x:150,y:104,w:80,h:44, name:'toOldWing', prompt:'Наверх, в старое крыло',
+      action: async ()=> {
+        if (!F('oldWingOpen')) {
+          return Dialogue.start([
+            {who:'naya',expr:'normal',text:'Лестница наверх. Поперёк ступеней — ленточка и табличка «ремонт».'},
+            {who:'naya',expr:'talk',text:'(Пыли на ленточке столько, что ремонт идёт не первый год.)'},
+          ]);
+        }
+        await changeRoom('uniOldWing', 470, 150);
       }},
-    { x:232,y:100,w:38,h:34, name:'toStage', prompt:'Сцена', action: async ()=> await changeRoom('uniStage', 120, 262) },
-    { x:86,y:60,w:38,h:32, name:'boardHall', prompt:'Объявления', action(){
-        Dialogue.start([{who:'naya',expr:'normal',text:'Расписание, объявление о наборе в мастерскую и выцветшая афиша прошлогоднего показа.'}]);
-      }},
-    { x:180,y:126,w:88,h:32, name:'lockersHall', prompt:'Шкафчики', action(){
-        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
-          {who:'naya',expr:'empty',text:'Её шкафчик — четвёртый слева. На дверце наклейка с кошкой.'},
-          {who:'naya',expr:'empty',text:'Его ещё не вскрыли. Значит, никто пока не знает.'},
+    { x:120,y:58,w:44,h:38, name:'boardMain', prompt:'Расписание', action(){
+        if (F('waitingAtAud')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'«История театра, ауд. 14, Морель Ж.» Каждый вторник и четверг.'},
+          {who:'naya',expr:'talk',text:'(Сегодня четверг.)'},
         ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Расписание на четыре курса. Половина листов подписана от руки поверх напечатанного.'}]);
+      }},
+    { x:220,y:58,w:44,h:38, name:'boardShows', prompt:'Афиши', action(){
         Dialogue.start([
-          {who:'naya',expr:'normal',text:'Ряд шкафчиков. Половина не закрывается, вторая половина не открывается.'},
-          {who:'naya',expr:'smile',text:'У Сью — четвёртый слева. Она наклеила на него кошку, чтобы «было видно издалека».'},
+          {who:'naya',expr:'normal',text:'Афиши прошлых показов. «Медея», позапрошлый год.'},
+          {who:'naya',expr:'shocked',text:'(...)'},
+          {who:'naya',expr:'talk',text:'(Совпадение. Это просто пьеса, её ставят все.)'},
         ]);
       }},
-    { x:70,y:176,w:44,h:34, name:'benchHall', prompt:'Скамья', action(){
-        if (F('waitingAtAud')) return Dialogue.start([{who:'naya',expr:'normal',text:'Я сижу тут третий раз за неделю и делаю вид, что жду человека.'}]);
-        Dialogue.start([{who:'naya',expr:'normal',text:'Каменная скамья у стены. Холодная — сюда не достаёт батарея.'}]);
-      }},
-    { x:8,y:114,w:38,h:34, name:'shelfHall', prompt:'Стеллаж', action(){
-        Dialogue.start([{who:'naya',expr:'normal',text:'Списанные учебники, которые никто не забирает. Верхний том — «Обряд и представление».'}]);
+    { x:96,y:60,w:40,h:36, name:'portraits', prompt:'Портреты', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Портреты ректоров. Самый левый — тысяча восемьсот какой-то, лицо в трещинах лака.'},
+          {who:'naya',expr:'talk',text:'(Здание старше города вокруг него.)'},
+        ]);
       }},
   ],
   npcs: [
-    { x:172,y:246, sprite:'acolyte', name:'Студент',
+    { x:120, y:260, sprite:'acolyte', name:'Студентка', speed:0.42,
+      path:[[120,260],[300,258],[300,300],[120,300]],
       when:()=> !F('sueDead'),
-      dialogue:()=> {
-        if (F('learnedMedea')) return Dialogue.start([{who:'acolyte',expr:'worried',name:'Студент',text:'Ты вчера в архиве сидела? Морель потом туда заходила. Спрашивала, кто брал папки.'}]);
-        return Dialogue.start([{who:'acolyte',expr:'normal',name:'Студент',text:'Морель сегодня добрая. Значит, зачёт будет злой.'}]);
+      dialogue:()=> Dialogue.start([
+        {who:'acolyte',expr:'normal',name:'Студентка',text:'Ты ведь не с нашего факультета?'},
+        {who:'naya',expr:'normal',text:'Нет. Я жду Сью.'},
+        {who:'acolyte',expr:'normal',name:'Студентка',text:'А, актёрские. Они всегда задерживаются. Всегда.'},
+      ]) },
+    { x:300, y:180, sprite:'customer', name:'Преподаватель', speed:0.55,
+      path:[[300,180],[300,290],[90,290],[90,180]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> Dialogue.start([
+        {who:'customer',expr:'normal',name:'Преподаватель',text:'Четырнадцатая — в учебном крыле, до конца и налево. Не заблудитесь.'},
+      ]) },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+uniCorridorTheatre: {
+  name:"Университет. Театральное крыло", music:'home', w:640, h:340,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#1b1a20', dark:.22 },
+  lights:[
+    {x:80,y:150,r:44,c:'#ffe6b0',i:.34},{x:230,y:150,r:44,c:'#ffe6b0',i:.34},
+    {x:380,y:150,r:44,c:'#ffe6b0',i:.34},{x:530,y:150,r:44,c:'#ffe6b0',i:.34},
+  ],
+  bgPaint(ctx) {
+    paintCorridor(ctx, 640, 340, {
+      wallH:200, warm:'#6b5a48', warm2:'#584a3c', floor:'#8a7454', floor2:'#77603f',
+      windows:[60, 212, 364, 516],
+      doors:[[128,'101'],[176,'102'],[280,'103'],[428,'105'],[476,'106'],[576,'107']],
+      leaf1:'#a8412c', leaf2:'#c9992f',
+    });
+    // дверь на сцену — шире и без номера
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(314, 142, 52, 58);
+    ctx.fillStyle = '#5a1024'; ctx.fillRect(318, 146, 44, 54);
+    ctx.fillStyle = '#7a1830'; for (let i=0;i<5;i++) ctx.fillRect(320+i*9, 146, 6, 54);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(314, 138, 52, 4);
+    ctx.fillStyle = '#d8cfae'; ctx.fillRect(326, 128, 28, 9);
+    ctx.fillStyle = '#3a3026'; ctx.font = '5px Courier New'; ctx.fillText('СЦЕНА', 329, 135);
+    // указатели в торцах коридора
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('← ФОЙЕ, РЕКВИЗИТ', 12, 220);
+    ctx.fillText('ХОЛЛ →', 594, 220);
+  },
+  objects: [
+    { t:'pillar_wood', x:104, y:254 }, { t:'pillar_wood', x:400, y:254 },
+    { t:'bench_stone', x:200, y:244 }, { t:'bench_stone', x:452, y:246 },
+    { t:'poster', x:96, y:164 }, { t:'poster', x:248, y:164 }, { t:'poster', x:400, y:164 },
+    { t:'poster', x:552, y:164 },
+    { t:'photo_frame', x:212, y:160 }, { t:'photo_frame', x:344, y:216 },
+    { t:'notice_board', x:492, y:166 },
+    { t:'radiator', x:60, y:234 }, { t:'radiator', x:364, y:234 },
+    { t:'plant_pot', x:24, y:284 }, { t:'plant_pot', x:614, y:284 },
+    { t:'bin', x:150, y:280 }, { t:'bin', x:508, y:280 },
+    { t:'book_stack', x:206, y:230 },
+    { t:'mask_pair', x:284, y:164 },
+  ],
+  walls: [
+    {x:0,y:0,w:640,h:200},{x:0,y:0,w:8,h:340},{x:632,y:0,w:8,h:340},{x:0,y:335,w:640,h:5},
+  ],
+  interactables: [
+    { x:596,y:200,w:40,h:52, name:'toHall', prompt:'В холл',
+      action: async ()=> await changeRoom('uniHallMain', 34, 82) },
+    { x:316,y:200,w:48,h:36, name:'toStage', prompt:'Сцена',
+      action: async ()=> await changeRoom('uniStage', 120, 262) },
+    { x:8,y:224,w:40,h:56, name:'toFoyer', prompt:'Дальше по крылу', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Фойе, костюмерная, кладовая реквизита. Оттуда пахнет клеем и старой тканью.'},
+          {who:'naya',expr:'talk',text:'(Мне туда незачем. Я тут вообще на птичьих правах.)'},
+        ]);
+      }},
+    { x:472,y:160,w:44,h:40, name:'boardTheatre', prompt:'Объявления', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«Набор в мастерскую», «потерян шарф», «репетиция переносится».'},
+          {who:'naya',expr:'smile',text:'(Почерк на третьем листке я узнаю из тысячи.)'},
+        ]);
+      }},
+    { x:76,y:162,w:44,h:38, name:'posters', prompt:'Афиши', action(){
+        if (F('learnedMedea')) return Dialogue.start([
+          {who:'naya',expr:'empty',text:'«Медея», позапрошлый год. Я прохожу мимо этой афиши третий раз за неделю.'},
+          {who:'naya',expr:'empty',text:'(И только теперь читаю имя.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Афиши постановок за десять лет. Бумага выцвела до одинакового бежевого.'}]);
+      }},
+    { x:262,y:162,w:44,h:38, name:'masksLook', prompt:'Маски', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Две маски над дверью. Одна смеётся, вторая нет. Обе смотрят в коридор.'}]);
+      }},
+    { x:180,y:224,w:44,h:34, name:'benchTheatre', prompt:'Скамья', action(){
+        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
+          {who:'naya',expr:'empty',text:'Я сидела тут и ждала её. Каждый четверг.'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Скамья у стены. На ней кто-то забыл сценарий и стакан из кофейни.'}]);
       }},
   ],
+  npcs: [
+    { x:220, y:274, sprite:'friend', name:'Студентка', speed:0.40,
+      path:[[220,274],[520,272],[520,304],[180,304]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> {
+        if (F('investigatedUniversity')) return Dialogue.start([{who:'sue',expr:'normal',name:'Студентка',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
+        return Dialogue.start([{who:'sue',expr:'smile',name:'Студентка',text:'Ты Сью ждёшь? Она ещё на сцене, у них прогон. Минут двадцать.'}]);
+      }},
+    { x:480, y:300, sprite:'acolyte', name:'Студент', speed:0.5, pause:0,
+      path:[[480,300],[120,300],[120,268],[480,268]],
+      when:()=> !F('sueDead') },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+uniCorridorLib: {
+  name:"Университет. Учебное крыло", music:'home', w:640, h:340,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#1a1a22', dark:.22 },
+  lights:[
+    {x:110,y:150,r:44,c:'#ffe6b0',i:.34},{x:262,y:150,r:44,c:'#ffe6b0',i:.34},
+    {x:414,y:150,r:44,c:'#ffe6b0',i:.34},{x:566,y:150,r:44,c:'#ffe6b0',i:.34},
+  ],
+  bgPaint(ctx) {
+    paintCorridor(ctx, 640, 340, {
+      wallH:200, warm:'#6d6455', warm2:'#5b5346', floor:'#8a8276', floor2:'#797167',
+      windows:[92, 244, 396, 548],
+      doors:[[44,'12'],[168,'13'],[312,'15'],[472,'16'],[608,'17']],
+      leaf1:'#c2702c', leaf2:'#a8412c', ground:'#5a6340',
+    });
+    // аудитория 14 — сюжетная, поэтому шире и с настоящей табличкой
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(214, 144, 48, 56);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(218, 148, 40, 52);
+    ctx.fillStyle = '#4a3524'; ctx.fillRect(222, 152, 32, 18);
+    ctx.fillStyle = '#a8c0d8'; ctx.fillRect(224, 154, 28, 14);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(250, 178, 3, 5);
+    ctx.fillStyle = '#d8cfae'; ctx.fillRect(224, 132, 28, 10);
+    ctx.fillStyle = '#3a3026'; ctx.font = '6px Courier New'; ctx.fillText('14', 233, 140);
+    // дверь библиотеки
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(374, 142, 50, 58);
+    ctx.fillStyle = '#553f2a'; ctx.fillRect(378, 146, 42, 54);
+    ctx.fillStyle = '#3f2c1c'; ctx.fillRect(382, 150, 34, 46);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(414, 174, 3, 5);
+    ctx.fillStyle = '#d8cfae'; ctx.fillRect(380, 130, 38, 10);
+    ctx.fillStyle = '#3a3026'; ctx.font = '5px Courier New'; ctx.fillText('БИБЛИОТЕКА', 381, 138);
+    // кабинет Морель
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(522, 146, 38, 54);
+    ctx.fillStyle = '#4f3a26'; ctx.fillRect(525, 149, 32, 51);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(551, 176, 3, 4);
+    ctx.fillStyle = '#d8cfae'; ctx.fillRect(524, 134, 34, 10);
+    ctx.fillStyle = '#3a3026'; ctx.font = '5px Courier New'; ctx.fillText('МОРЕЛЬ Ж.', 525, 142);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('← ХОЛЛ', 12, 220);
+    ctx.fillText('АРХИВ, 201–208 →', 536, 220);
+  },
+  objects: [
+    { t:'lockers', x:120, y:254 }, { t:'lockers', x:166, y:254 },
+    { t:'lockers', x:452, y:254 }, { t:'lockers', x:498, y:254 },
+    { t:'pillar_wood', x:300, y:254 },
+    { t:'bench_stone', x:264, y:246 }, { t:'bench_stone', x:592, y:246 },
+    { t:'radiator', x:92, y:236 }, { t:'radiator', x:396, y:236 },
+    { t:'notice_board', x:344, y:166 },
+    { t:'painting', x:196, y:162 }, { t:'painting', x:480, y:162 },
+    { t:'plant_pot', x:24, y:290 }, { t:'plant_pot', x:614, y:290 },
+    { t:'bin', x:224, y:284 }, { t:'bin', x:560, y:284 },
+    { t:'book_stack', x:268, y:232 },
+    { t:'stool', x:340, y:278 },
+  ],
+  walls: [
+    {x:0,y:0,w:640,h:200},{x:0,y:0,w:8,h:340},{x:632,y:0,w:8,h:340},{x:0,y:335,w:640,h:5},
+  ],
+  interactables: [
+    { x:8,y:224,w:40,h:52, name:'toHall', prompt:'В холл',
+      action: async ()=> await changeRoom('uniHallMain', 346, 82) },
+    { x:376,y:200,w:46,h:36, name:'toLib', prompt:'Библиотека',
+      action: async ()=> await changeRoom('uniLibrary', 120, 258) },
+    { x:216,y:200,w:44,h:36, name:'aud14', prompt:'Аудитория 14', action(){
+        if (!F('metGenevieveUni')) { Scene.play('meetGenevieveUni'); return; }
+        Dialogue.start([{who:'naya',expr:'normal',text:'Дверь закрыта. Расписание на ней: «История театра. Морель Ж.»'}]);
+      }},
+    { x:524,y:200,w:36,h:36, name:'office', prompt:'Кабинет Морель', action(){
+        if (!F('metGenevieveUni')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Табличка: «Морель Ж.» Закрыто.'},
+        ]);
+        if (!F('learnedMedea')) return Dialogue.start([
+          {who:'naya',expr:'talk',text:'Закрыто. Внутри горит лампа — значит, она там и не открывает.'},
+          {who:'naya',expr:'normal',text:'(Пока рано. Мне нечего ей предъявить.)'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Дверь приоткрыта. Стол, книги, лампа. Всё как у любого преподавателя.'},
+          {who:'naya',expr:'talk',text:'Почти всё. На полке — сушёная трава в банке, подписанная тем же почерком, что и в её книге.'},
+        ]);
+      }},
+    { x:576,y:224,w:48,h:52, name:'toArchiveWing', prompt:'Дальше по крылу', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Коридор уходит дальше: двести первая, двести вторая, и так до конца.'},
+          {who:'naya',expr:'talk',text:'(Оттуда слышно пианино. Кто-то играет одно и то же место третий раз подряд.)'},
+        ]);
+      }},
+    { x:100,y:228,w:88,h:34, name:'lockersLib', prompt:'Шкафчики', action(){
+        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
+          {who:'naya',expr:'empty',text:'Её шкафчик — четвёртый слева. Наклейка с кошкой.'},
+          {who:'naya',expr:'empty',text:'Его ещё не вскрыли. Значит, тут пока никто не знает.'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Ряд шкафчиков. Половина не закрывается, вторая половина не открывается.'},
+          {who:'naya',expr:'smile',text:'У Сью — четвёртый слева. Она наклеила кошку, чтобы «было видно издалека».'},
+        ]);
+      }},
+    { x:324,y:162,w:44,h:38, name:'boardStudy', prompt:'Стенд', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Списки групп, объявление о пересдаче и расписание библиотеки: до восьми, по субботам до трёх.'}]);
+      }},
+  ],
+  npcs: [
+    { x:180, y:276, sprite:'customer', name:'Студент', speed:0.46,
+      path:[[180,276],[540,274],[540,306],[140,306]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> {
+        if (F('learnedMedea')) return Dialogue.start([{who:'customer',expr:'normal',name:'Студент',text:'Ты вчера в архиве сидела? Морель потом туда заходила. Спрашивала, кто брал папки.'}]);
+        return Dialogue.start([{who:'customer',expr:'normal',name:'Студент',text:'Морель сегодня добрая. Значит, зачёт будет злой.'}]);
+      }},
+    { x:560, y:302, sprite:'acolyte', name:'Студентка', speed:0.38,
+      path:[[560,302],[300,300],[300,272],[560,270]],
+      when:()=> !F('sueDead') },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+uniCanteen: {
+  name:"Университет. Столовая", music:'home', w:340, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#1e1a1a', dark:.18 },
+  lights:[
+    {x:90,y:30,r:46,c:'#ffe6b0',i:.5},{x:250,y:30,r:46,c:'#ffe6b0',i:.5},
+    {x:170,y:190,r:56,c:'#f2d8a8',i:.26},
+  ],
+  sun:{ x:296, y:70, w:44, len:140, tilt:-.28, a:.13 },
+  bgPaint(ctx) {
+    const W = 340, H = 300, wallH = 78;
+    paintInterior(ctx, W, H, { wall:'#6a6252', wall2:'#585144', floor:'#8d8a80', floor2:'#7d7a72', wallH, tiles:true });
+    // кафель над раздачей
+    ctx.fillStyle = '#7a8a7a'; ctx.fillRect(20, 20, 150, 40);
+    ctx.fillStyle = '#87977f';
+    for (let y=20;y<60;y+=8) for (let x=20;x<170;x+=8) ctx.fillRect(x+1, y+1, 6, 6);
+    ctx.fillStyle = '#5f6b5c'; ctx.fillRect(20, 20, 150, 2);
+    // окна во двор
+    [216, 282].forEach(wx => {
+      ctx.fillStyle = '#4a4136'; ctx.fillRect(wx - 4, 12, 52, 60);
+      const sky = ctx.createLinearGradient(0, 14, 0, 70);
+      sky.addColorStop(0, '#9db0c4'); sky.addColorStop(1, '#c2c0ac');
+      ctx.fillStyle = sky; ctx.fillRect(wx, 16, 44, 52);
+      ctx.fillStyle = '#a8412c'; ctx.beginPath(); ctx.arc(wx + 14, 38, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#5e6338'; ctx.fillRect(wx, 54, 44, 14);
+      ctx.fillStyle = '#3f382e'; ctx.fillRect(wx + 21, 16, 2, 52);
+      ctx.fillStyle = '#7d6d5c'; ctx.fillRect(wx - 4, 12, 52, 3);
+      const g = ctx.createLinearGradient(0, wallH, 0, H);
+      g.addColorStop(0, 'rgba(255,238,200,.18)'); g.addColorStop(1, 'rgba(255,232,190,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(wx - 6, wallH); ctx.lineTo(wx + 50, wallH);
+      ctx.lineTo(wx + 72, H); ctx.lineTo(wx - 28, H); ctx.closePath(); ctx.fill();
+    });
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('В ХОЛЛ', 150, 292);
+    paintDoor(ctx, 155, 285);
+  },
+  objects: [
+    { t:'serving_line', x:94, y:104 },
+    { t:'till', x:172, y:104 },
+    { t:'cake_case', x:44, y:106 },
+    { t:'menu_board', x:150, y:36 },
+    { t:'canteen_table', x:96,  y:176 }, { t:'canteen_table', x:240, y:176 },
+    { t:'canteen_table', x:96,  y:244 }, { t:'canteen_table', x:240, y:244 },
+    { t:'stool', x:60, y:190 }, { t:'stool', x:134, y:190 },
+    { t:'stool', x:204, y:190 }, { t:'stool', x:278, y:190 },
+    { t:'stool', x:60, y:258 }, { t:'stool', x:134, y:258 },
+    { t:'stool', x:204, y:258 }, { t:'stool', x:278, y:258 },
+    { t:'bin', x:22, y:276 }, { t:'bin', x:318, y:276 },
+    { t:'plant_pot', x:318, y:150 },
+    { t:'radiator', x:250, y:96 },
+  ],
+  walls: [
+    {x:0,y:0,w:340,h:78},{x:0,y:0,w:8,h:300},{x:332,y:0,w:8,h:300},{x:0,y:295,w:340,h:5},
+  ],
+  interactables: [
+    { x:150,y:262,w:44,h:32, name:'toHall', prompt:'В холл',
+      action: async ()=> await changeRoom('uniHallMain', 346, 274) },
+    { x:64,y:80,w:60,h:34, name:'serving', prompt:'Раздача', action(){
+        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
+          {who:'naya',expr:'empty',text:'Пахнет тушёной капустой. Я не ела с позавчера и всё равно не хочу.'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Суп, второе, компот. Женщина на раздаче кладёт всем одинаково, независимо от просьб.'},
+          {who:'naya',expr:'smile',text:'Сью тут берёт только булку и утверждает, что это обед.'},
+        ]);
+      }},
+    { x:152,y:80,w:44,h:34, name:'tillCanteen', prompt:'Касса', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Ценник от руки. Кофе дешевле, чем у нас в кафе, и хуже ровно настолько же.'}]);
+      }},
+    { x:130,y:42,w:44,h:36, name:'menuCanteen', prompt:'Меню', action(){
+        Dialogue.start([{who:'naya',expr:'smile',text:'«Сегодня: борщ, котлета, компот». Мел не стирали месяц — просто дописывают поверх.'}]);
+      }},
+    { x:70,y:154,w:52,h:34, name:'tableTalk', prompt:'Стол у окна', action(){
+        if (F('cafeSceneComplete')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Сью занимает этот стол, потому что «отсюда видно, кто заходит».'},
+          {who:'naya',expr:'smile',text:'Ей важно видеть, кто заходит. Мне важно сидеть спиной к двери. Как-то уживаемся.'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Длинные столы, привинченные к полу. Как в школе, только потолки выше.'}]);
+      }},
+  ],
+  npcs: [
+    { x:200, y:220, sprite:'acolyte', name:'Студентка', speed:0.36,
+      path:[[200,220],[120,222],[120,270],[280,268],[280,220]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> Dialogue.start([
+        {who:'acolyte',expr:'normal',name:'Студентка',text:'Не бери сегодня рыбу. Просто не бери.'},
+      ]) },
+    { x:60, y:270, sprite:'customer', name:'Студент', speed:0.44, pause:0,
+      path:[[60,270],[300,268],[300,232],[60,234]],
+      when:()=> !F('sueDead') },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+uniOldWing: {
+  name:"Университет. Старое крыло", music:'tense', w:520, h:340,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.14, wind:0 },
+  light:{ tint:'#151220', dark:.40 },
+  lights:[{x:120,y:150,r:38,c:'#d8c8a0',i:.24},{x:340,y:150,r:38,c:'#d8c8a0',i:.24}],
+  bgPaint(ctx) {
+    paintCorridor(ctx, 520, 340, {
+      wallH:190, warm:'#4e4236', warm2:'#3f352c', floor:'#5f5040', floor2:'#4f4234',
+      windows:[104, 324],
+      doors:[[36,'—'],[176,'—'],[248,'—'],[404,'—'],[468,'—']],
+      skyTop:'#5a6270', skyBot:'#7a7668', leaf1:'#7a3626', leaf2:'#8a6a24',
+      ground:'#454a30', lightA:.09,
+    });
+    ctx.fillStyle = 'rgba(10,8,16,.28)'; ctx.fillRect(0, 190, 520, 150);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('ХОЛЛ →', 466, 210);
+    ctx.fillText('← АРХИВ', 12, 210);
+  },
+  objects: [
+    { t:'pillar_wood', x:200, y:244 }, { t:'pillar_wood', x:368, y:244 },
+    { t:'archive_box', x:70, y:248 }, { t:'archive_box', x:96, y:254 },
+    { t:'library_shelf', x:284, y:240 },
+    { t:'chest', x:436, y:252 },
+    { t:'bench_stone', x:150, y:236 },
+    { t:'lib_ladder', x:260, y:248 },
+    { t:'plant_pot', x:20, y:278 },
+    { t:'book_stack', x:110, y:268 },
+  ],
+  ambient() { if (Math.random() < 0.02) FX.spawn(Math.random()*520, 92, 1, {color:'#3a3448', rise:.1, life:120, spread:10}); },
+  walls: [
+    {x:0,y:0,w:520,h:190},{x:0,y:0,w:8,h:340},{x:512,y:0,w:8,h:340},{x:0,y:335,w:520,h:5},
+  ],
+  interactables: [
+    { x:472,y:210,w:40,h:52, name:'toHall', prompt:'Вниз, в холл',
+      action: async ()=> await changeRoom('uniHallMain', 190, 130) },
+    { x:56,y:224,w:60,h:40, name:'oldArchive', prompt:'Старый архив', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Коробки составлены до потолка. На боках — годы, дальше семидесятых уже не разобрать.'},
+          {who:'naya',expr:'talk',text:'(Если что-то и осталось про мать, то здесь.)'},
+        ]);
+      }},
+    { x:264,y:218,w:44,h:34, name:'oldShelf', prompt:'Стеллаж', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Книги без карточек. Их не выдают — их просто хранят.'}]);
+      }},
+    { x:418,y:230,w:40,h:34, name:'oldChest', prompt:'Сундук', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Театральный реквизит позапрошлого поколения. Корона из фольги, деревянный меч.'}]);
+      }},
+  ],
+  npcs: [],
 },
 
 /* ---------------------------------------------------------------- */
@@ -5968,7 +6857,7 @@ uniStage: {
     {x:0,y:192,w:92,h:8},{x:148,y:192,w:92,h:8},
   ],
   interactables: [
-    { x:100,y:264,w:40,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniHall', 250, 140) },
+    { x:100,y:264,w:40,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniCorridorTheatre', 340, 140) },
     { x:100,y:120,w:44,h:36, name:'stageSpot', prompt:'Центр сцены', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Её место на прогоне было вот здесь. Метка мелом ещё не стёрлась.'},
@@ -6034,7 +6923,7 @@ uniLibrary: {
     {x:0,y:0,w:280,h:56},{x:0,y:0,w:8,h:300},{x:272,y:0,w:8,h:300},{x:0,y:295,w:280,h:5},
   ],
   interactables: [
-    { x:96,y:264,w:44,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniHall', 56, 140) },
+    { x:96,y:264,w:44,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniCorridorLib', 398, 140) },
     { x:118,y:184,w:46,h:34, name:'deskRead', prompt:'Стол', action(){ Scene.play('libraryDesk'); }},
     { x:14,y:104,w:44,h:34, name:'shelfFolk', prompt:'Фольклор', action(){ Scene.play('libraryFolk'); }},
     { x:172,y:104,w:44,h:34, name:'shelfTheatre', prompt:'История театра', action(){ Scene.play('libraryTheatre'); }},
@@ -6092,6 +6981,10 @@ const Player = {
     // площадка существует только в прологе: кто бы там ни стоял, это Сью пяти лет
     if (gameState && gameState.currentRoom === 'playground') return 'sueChild';
     if (F('prologPlayground') && !F('prologueComplete')) return 'sueChild';
+    // дом отца — Нае семнадцать, до основной истории ещё три года
+    if (gameState && !F('backstoryDone') &&
+        (gameState.currentRoom === 'oldHouse' || gameState.currentRoom === 'oldHouseAttic')) return 'nayaTeen';
+    if (F('prologBackstoryStarted') && !F('backstoryDone')) return 'nayaTeen';
     // ветка «Ная выбрала силу» идёт тремя стадиями, а не одной сменой спрайта
     if (F('evilRecognised')) return 'nayaHell';
     if (F('chosenWitchPath')) return 'nayaDark';
@@ -6120,6 +7013,10 @@ function isBlocked(x, y) {
   for (const w of room.walls) if (rectHit(box, w)) return true;
   if (World.blockedByProps(room, box)) return true;
   for (const n of roomNPCs(room)) {
+    if (n.path) continue;                  // ходячие фоновые NPC не блокируют проход
+    if (rectHit(box, { x:n.x-6, y:n.y-6, w:12, h:8 })) return true;
+  }
+  for (const n of roomCast()) {
     if (rectHit(box, { x:n.x-6, y:n.y-6, w:12, h:8 })) return true;
   }
   return false;
@@ -6158,7 +7055,9 @@ async function changeRoom(roomKey, x, y) {
   unstickPlayer();
   gameState.playerX = Player.x; gameState.playerY = Player.y;
   FX.particles.length = 0; FX.fogA = 0; FX.magic = null;
+  Game.cast = [];
   const room = Rooms[roomKey];
+  Patrol.reset(room);
   Music.play(room.music || 'home');
   Weather.apply(room);
   Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
@@ -6217,7 +7116,9 @@ const Dialogue = {
       else p.style.display = 'none';
 
       const nameMap = {
-        naya:'Ная', nayaDark:'Ная', nayaHell:'Ная', sue:'Сью', sueGhost:'Сью',
+        naya:'Ная', nayaDark:'Ная', nayaHell:'Ная', nayaTeen:'Ная',
+        drizella:'Дризелла', stacy:'Стейси', frank:'Фрэнк',
+        sue:'Сью', sueGhost:'Сью',
         chris:'Крис', charlotte:'Шарлотта', lilith:'Лиллит', genevieve:'Женевьева',
         witch1:'Мадлен', witch2:'Роза', witch3:'Старшая', acolyte:'Ученица',
         neighbor:'Соседка', imp:'Житель ада', customer:'Посетитель',
@@ -6409,6 +7310,7 @@ const Scene = {
     UI.dimControls(true);
     this._runList(scr).then(() => {
       this.active = false;
+      Game.cast = [];
       if (Game.mode === 'cutscene') Game.mode = 'explore';
       if (!Dialogue.active) UI.dimControls(false);
       const f = document.getElementById('fade');
@@ -6420,10 +7322,16 @@ const Scene = {
     }).catch(e => {
       console.error('Scene error', e);
       this.active = false;
-      if (Game.mode === 'cutscene') Game.mode = 'explore';
-      UI.dimControls(false);
-      const f = document.getElementById('fade');
-      f.style.transition = 'opacity 400ms'; f.classList.remove('show');
+      const cardUp = document.getElementById('endingScreen').classList.contains('show');
+      if (!cardUp) {
+        if (Game.mode === 'cutscene' || Game.mode === 'menu') Game.mode = 'explore';
+        UI.dimControls(false);
+        const f = document.getElementById('fade');
+        f.style.transition = 'opacity 400ms'; f.classList.remove('show');
+        // концовка уже началась, но карточка не появилась — показываем её силой,
+        // иначе игрок остаётся один на один с чёрным экраном
+        if (Game.endingShown) Endings.forceCard();
+      }
     });
   },
   pending:null,
@@ -6467,6 +7375,9 @@ const Scene = {
     if (cmd.glitch) { await FX.glitch(cmd.glitch, cmd.strength||0.55); return; }
     if (cmd.magic)  { await FX.magicCircle(Player.x, Player.y - 4, cmd.magic, cmd.dur||2000); return; }
     if (cmd.fx)     { await FXScenes[cmd.fx](); return; }
+    if (cmd.chapter) { await Chapters.show(cmd.chapter, cmd.dur); return; }
+    if (cmd.cast)   { Game.cast = cmd.cast.slice(); return; }
+    if (cmd.uncast) { Game.cast = []; return; }
     if (cmd.star !== undefined) { Prologue.addStar(cmd.star); return; }
     if (cmd.crackStar !== undefined) { Prologue.crackStar(cmd.crackStar); return; }
     if (cmd.medea !== undefined)  { Prologue.showMedea = cmd.medea; return; }
@@ -6892,6 +7803,25 @@ const Memories = {
         g.strokeStyle='#ff4030';g.stroke();
         g.fillStyle='#8a0020';g.fillRect(92,86,16,30);
         g.fillStyle='#ff2a40';g.fillRect(95,92,3,3);g.fillRect(102,92,3,3); } },
+    { key:'motherCrystal', title:'Кристалл', text:'Мне было пять, когда мне его отдали. Я не помню, кто именно вложил его мне в руку.\n\nОн тёплый. Он всегда тёплый — и это единственное, что он умеет.\n\nДвенадцать лет он пролежал в нижнем ящике под тетрадями, в доме, где о моей матери говорили «та женщина».',
+      draw:(g)=>{ g.fillStyle='#1a1620';g.fillRect(0,0,200,120);
+        g.fillStyle='#3a2c1e';g.fillRect(40,64,120,44);
+        g.fillStyle='#4f3d2c';g.fillRect(44,68,112,36);
+        const r=g.createRadialGradient(100,58,2,100,58,34);
+        r.addColorStop(0,'#e8c0ff');r.addColorStop(.5,'#8a3ac0');r.addColorStop(1,'rgba(26,22,32,0)');
+        g.fillStyle=r;g.fillRect(56,24,88,68);
+        g.fillStyle='#c060ff';g.beginPath();
+        g.moveTo(100,44);g.lineTo(108,56);g.lineTo(100,72);g.lineTo(92,56);g.closePath();g.fill();
+        g.fillStyle='#e8b0ff';g.beginPath();g.moveTo(100,48);g.lineTo(104,56);g.lineTo(100,66);g.closePath();g.fill(); } },
+    { key:'leaving',  title:'Отъезд',   text:'Семнадцать лет. Сумка собрана со вчера, документы забраны, кристалл в кармане.\n\nЯ обошла весь дом и попрощалась с каждым. Никто не встал.\n\nСью ждала за оградой с рюкзаком и делала вид, что не мёрзнет. «Вторая половина — это ты», — сказала она про комнату у вокзала. И оказалась права на три года вперёд.',
+      draw:(g)=>{ g.fillStyle='#2a2d38';g.fillRect(0,0,200,120);
+        g.fillStyle='#1a1d26';for(let x=0;x<200;x+=12){const h=18+((x*7)%20);g.fillRect(x,54-h,12,h);}
+        g.fillStyle='#3a3740';g.fillRect(0,54,200,66);
+        g.fillStyle='#5f5a5c';g.fillRect(0,84,200,10);
+        g.fillStyle='#4a4658';g.fillRect(74,60,20,34);
+        g.fillStyle='#6b4a3a';g.fillRect(106,60,20,34);
+        g.fillStyle='#2a2832';g.fillRect(70,90,12,10);g.fillRect(118,90,12,10);
+        g.fillStyle='#c9992f';for(let i=0;i<14;i++)g.fillRect((i*29)%200,96+((i*11)%20),3,2); } },
     { key:'commune',  title:'Коммуна',         text:'Они собирались каждое полнолуние и варили обычный овощной суп.\n\nЯ ждала тайной силы. Там были женщины, которые знают друг друга сорок лет.\n\nЭто и была их сила. Я поняла это слишком поздно.',
       draw:(g)=>{ g.fillStyle='#1e2a22';g.fillRect(0,0,200,120); g.strokeStyle='#3a5a44';g.beginPath();g.arc(100,60,40,0,7);g.stroke(); g.fillStyle='#2a3a2e';for(let i=0;i<8;i++){const a=i*Math.PI/4;g.fillRect(100+Math.cos(a)*48-3,60+Math.sin(a)*48-5,6,10);} } },
   ],
@@ -6933,6 +7863,45 @@ const Memories = {
 };
 
 /* =====================================================================
+   ГЛАВЫ
+   Новая глава начинается только там, где действительно ломается ход
+   истории: меняется время, цель, масштаб или сама Ная. Обычный переход
+   между комнатами главой не считается.
+===================================================================== */
+const Chapters = {
+  DEFS: {
+    1:  ['ГЛАВА ПЕРВАЯ',      'ПРОБУЖДЕНИЕ'],
+    2:  ['ГЛАВА ВТОРАЯ',      'ДРУГАЯ ЖИЗНЬ'],
+    3:  ['ГЛАВА ТРЕТЬЯ',      'ЧУЖОЙ СЛЕД'],
+    4:  ['ГЛАВА ЧЕТВЁРТАЯ',   'ТО, ЧТО СКРЫТО'],
+    5:  ['ГЛАВА ПЯТАЯ',       'НАСЛЕДИЕ'],
+    6:  ['ГЛАВА ШЕСТАЯ',      'ТРИ АМУЛЕТА'],
+    7:  ['ГЛАВА СЕДЬМАЯ',     'ПО ТУ СТОРОНУ'],
+    8:  ['ГЛАВА ВОСЬМАЯ',     'ЦЕНА СИЛЫ'],
+    9:  ['ГЛАВА ДЕВЯТАЯ',     'ПОСЛЕДНИЙ РИТУАЛ'],
+    10: ['ГЛАВА ДЕСЯТАЯ',     'ПОСЛЕ СМЕРТИ'],
+    // одиннадцатая и дальше зависят от ветки
+    '11evil':  ['ГЛАВА ОДИННАДЦАТАЯ', 'ЖАЛОСТЬ — СЛАБОСТЬ'],
+    '12evil':  ['ГЛАВА ДВЕНАДЦАТАЯ',  'АДСКАЯ ВЕДЬМА'],
+    '11alive': ['ГЛАВА ОДИННАДЦАТАЯ', 'ВТОРОЙ ШАНС'],
+    '12alive': ['ГЛАВА ДВЕНАДЦАТАЯ',  'ПОСЛЕДНИЙ ВЫБОР'],
+    '13red':   ['ГЛАВА ТРИНАДЦАТАЯ',  'МЕСТЬ'],
+    '13earth': ['ГЛАВА ТРИНАДЦАТАЯ',  'ОСТАТЬСЯ'],
+    '7solo':   ['ГЛАВА СЕДЬМАЯ',      'ОДНА'],
+  },
+  async show(key, dur) {
+    const d = this.DEFS[key];
+    if (!d) return;
+    if (gameState) { gameState.chapter = key; saveGame(); }
+    await flashTitle(d[0] + '\n«' + d[1] + '»', dur || 2600);
+  },
+  label() {
+    const d = gameState && this.DEFS[gameState.chapter];
+    return d ? d[0].replace('ГЛАВА ', '') + ' — ' + d[1] : '—';
+  }
+};
+
+/* =====================================================================
    ENDINGS
 ===================================================================== */
 const Endings = {
@@ -6964,16 +7933,27 @@ const Endings = {
   },
   async show(id) {
     Game.endingShown = true;
-    Chase.stop();
+    try { Chase.stop(); } catch(e) {}
     setFlag('ending');
-    Music.stop();
-    const d = this.DEFS[id];
-    META.endings[id] = true;
-    META.endingStats[id] = { trustSue:S('trustSue'), witchAmbition:S('witchAmbition'), humanity:S('humanity'), hellAffinity:S('hellAffinity') };
-    saveMeta();
-    localStorage.removeItem(CONFIG.SAVE_KEY);
+    try { Music.stop(); } catch(e) {}
+    const d = this.DEFS[id] || { roman:'КОНЦОВКА', name:String(id), sub:'' };
+    try {
+      META.endings[id] = true;
+      META.endingStats[id] = { trustSue:S('trustSue'), witchAmbition:S('witchAmbition'), humanity:S('humanity'), hellAffinity:S('hellAffinity') };
+      saveMeta();
+      localStorage.removeItem(CONFIG.SAVE_KEY);
+    } catch(e) { console.warn('ending bookkeeping failed', e); }
 
     await fadeOut(700);
+    try { this._paint(d, id); } catch(e) { console.warn('ending card', e); }
+    document.getElementById('endingScreen').classList.add('show');
+    Game.mode = 'menu';
+    document.getElementById('dialogueBox').classList.remove('active');
+    document.getElementById('choiceBox').classList.remove('show');
+    UI.dimControls(true);
+    try { updateEndingCount(); } catch(e) {}
+  },
+  _paint(d, id) {
     document.getElementById('endingRoman').textContent = d.roman;
     document.getElementById('endingName').textContent = d.name;
     document.getElementById('endingSub').textContent = d.sub;
@@ -6992,13 +7972,18 @@ const Endings = {
       r.innerHTML = `<span>${k}</span><span>${Math.round(v)}%</span>`;
       st.appendChild(r);
     });
-    document.getElementById('btnRewind').style.display = hasCheckpoint() ? '' : 'none';
-    document.getElementById('endingScreen').classList.add('show');
+    try { document.getElementById('btnRewind').style.display = hasCheckpoint() ? '' : 'none'; }
+    catch(e) { document.getElementById('btnRewind').style.display = 'none'; }
+  },
+  /* аварийный показ: концовка засчитана, но карточка почему-то не открылась */
+  forceCard() {
+    const scr = document.getElementById('endingScreen');
+    if (scr.classList.contains('show')) return;
+    const id = ['I','II','III','IV'].find(k => META.endings[k]) || 'I';
+    try { this._paint(this.DEFS[id], id); } catch(e) {}
+    scr.classList.add('show');
     Game.mode = 'menu';
-    document.getElementById('dialogueBox').classList.remove('active');
-    document.getElementById('choiceBox').classList.remove('show');
     UI.dimControls(true);
-    updateEndingCount();
   },
   renderList() {
     const wrap = document.getElementById('endingsList');
@@ -7040,7 +8025,7 @@ function serializeState() {
   return {
     currentRoom:gameState.currentRoom,
     playerX:Player.x, playerY:Player.y,
-    act:gameState.act, eventStep:gameState.eventStep,
+    act:gameState.act, chapter:gameState.chapter, eventStep:gameState.eventStep,
     flags:gameState.flags, stats:gameState.stats, counters:gameState.counters,
     inventory:gameState.inventory, memories:gameState.memories,
     settings:gameState.settings,
@@ -7073,6 +8058,7 @@ function applyState(s) {
   gameState.currentRoom = s.currentRoom || 'nayaRoom';
   gameState.playerX = s.playerX; gameState.playerY = s.playerY;
   gameState.act = s.act || 0;
+  gameState.chapter = s.chapter || 1;
   gameState.eventStep = s.eventStep || 0;
   gameState.flags    = Object.assign(freshState().flags, s.flags || {});
   gameState.stats    = Object.assign(freshState().stats, s.stats || {});
@@ -7162,7 +8148,7 @@ prologue: [
   { memory:'medea' },
 
   /* ---- chapter card ---- */
-  { title:'ГЛАВА ПЕРВАЯ\nПРОБУЖДЕНИЕ', dur:2600 },
+  { chapter:1, dur:2600 },
   { title:'«Два самых важных дня в твоей жизни:\nдень, когда ты появился на свет,\nи день, когда понял, зачем.»\n— Марк Твен', dur:4200 },
 
   /* ---- the playground, twelve years ago ---- */
@@ -7251,13 +8237,216 @@ prologSwing: [
   { flag:'prologueComplete' },
   { memory:'meeting' },
   { stats:{ trustSue:+10 } },
+  { goto:'prologBackstory' },
+],
+
+/* =====================================================================
+   ПРОЛОГ, ЧАСТЬ ВТОРАЯ — ПРЕДЫСТОРИЯ НАИ
+   Двенадцать лет спустя после площадки. Дом отца, мачеха Дризелла,
+   сводная сестра Стейси и Фрэнк, который всё понимает и ничего не делает.
+   Отсюда растёт вся потребность Наи никогда больше не зависеть от чужой воли.
+===================================================================== */
+prologBackstory: [
+  { music:'none' },
+  { fadeOut:900 },
+  { title:'ДВЕНАДЦАТЬ ЛЕТ СПУСТЯ', dur:2200 },
+  { room:'oldHouse', x:160, y:270 },
+  { music:'sad' },
+  { fadeIn:1400 },
+  { flag:'prologBackstoryStarted' },
+  { checkpoint:'Дом отца' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'После смерти матери Наи её отец, Фрэнк, женился во второй раз.'},
+    {who:'narrator',expr:'normal',name:'',text:'Дризелла вошла в дом со своими правилами и своей дочерью. Через год родилась Стейси.'},
+    {who:'narrator',expr:'normal',name:'',text:'Обе — светловолосые, зеленоглазые и очень уверенные в том, что этот дом принадлежит им.'},
+  ]},
+  { dlg:[
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Семнадцать лет. Сумка собрана со вчера и стоит наверху под кроватью.)'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'(Сегодня я уезжаю. Осталось попрощаться — со всеми, кто этого не заметит.)'},
+    {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Поговорить с каждым и забрать кристалл с чердака.)'},
+  ]},
+],
+
+pastDrizella: [
+  { dlg:[
+    {who:'drizella',expr:'normal',text:'Ты в уличной обуви на ковре.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Я на паркете.'},
+    {who:'drizella',expr:'serious',text:'Ты в двух шагах от ковра. Это одно и то же.'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Она не поднимает глаз от журнала.', options:[
+      { text:'«Я сегодня уезжаю.»',
+        stats:{witchAmbition:+4},
+        then:[
+          {who:'drizella',expr:'normal',text:'Я знаю. Твой отец сказал ещё в среду.'},
+          {who:'nayaTeen',expr:'shocked',name:'Ная',text:'...и вы ничего не сказали.'},
+          {who:'drizella',expr:'smile',text:'А что тут говорить? Тебе восемнадцать через месяц. Так даже удобнее всем.'},
+        ]},
+      { text:'Промолчать и отойти.',
+        stats:{humanity:+2},
+        then:[
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Отхожу. Как обычно.)'},
+          {who:'drizella',expr:'normal',text:'Вот и правильно. Не устраивай сцен, ты не Стейси.'},
+        ]},
+      { text:'«Это был дом моей матери.»',
+        stats:{witchAmbition:+8, humanity:-3},
+        then:[
+          {who:'drizella',expr:'angry',text:'Это дом твоего отца. Твоя мать в нём просто жила. Недолго.'},
+          {who:'nayaTeen',expr:'angry',name:'Ная',text:'...'},
+          {who:'drizella',expr:'serious',text:'И, между нами, о ней тут вспоминают только соседи. И то не по-доброму.'},
+        ]},
+    ]}},
+  ]},
+  { dlg:[
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Она даже не встала.)'},
+  ]},
+  { flag:'pastDrizellaDone' },
+  { jump:()=> 'pastCheck' },
+],
+
+pastStacy: [
+  { dlg:[
+    {who:'stacy',expr:'smile',text:'Ой. Ты ещё здесь?'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'До вечера.'},
+    {who:'stacy',expr:'smile',text:'Мама сказала, что твою комнату наверху переделают под гардеробную. Там же всё равно ничего нет.'},
+  ]},
+  { dlg:[
+    {who:'stacy',expr:'normal',text:'Слушай, а можешь оставить мне свою куртку? Ту, серую. Тебе она всё равно велика.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Это мамина.'},
+    {who:'stacy',expr:'angry',text:'Ну и что? Она же не носит.'},
+  ]},
+  { dlg:[
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Ей шестнадцать. Она не злая. Ей просто никогда не объясняли, что чужое бывает чужим.)'},
+    {who:'nayaTeen',expr:'talk',name:'Ная',text:'Нет.'},
+    {who:'stacy',expr:'angry',text:'Фу. Ладно.'},
+  ]},
+  { flag:'pastStacyDone' },
+  { jump:()=> 'pastCheck' },
+],
+
+pastFrank: [
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Ная. Сядь на минуту.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Я стою.'},
+    {who:'frank',expr:'sad',text:'...ну стой.'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Я знаю, что тебе тут было... непросто.'},
+    {who:'frank',expr:'sad',text:'Дризелла — она не со зла. У неё характер. Ты повзрослеешь и поймёшь.'},
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'Мне семнадцать. Я уже поняла.'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Он смотрит в телевизор, а не на неё.', options:[
+      { text:'«Ты ни разу за меня не заступился.»',
+        stats:{witchAmbition:+8, humanity:-2},
+        then:[
+          {who:'frank',expr:'sad',text:'...'},
+          {who:'frank',expr:'worried',text:'Я пытался. По-своему.'},
+          {who:'nayaTeen',expr:'angry',name:'Ная',text:'По-своему — это молча?'},
+          {who:'frank',expr:'sad',text:'Ная.'},
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Вот и весь разговор. Он и сейчас не встал.)'},
+        ]},
+      { text:'«Всё нормально, пап.»',
+        stats:{humanity:+4, trustSue:+2},
+        then:[
+          {who:'frank',expr:'sad',text:'Правда?'},
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Нет. Но тебе так будет легче, а мне уже всё равно.'},
+          {who:'frank',expr:'worried',text:'...'},
+        ]},
+      { text:'«Расскажи про маму.»',
+        stats:{witchAmbition:+5},
+        then:[
+          {who:'frank',expr:'worried',text:'Ная, мы это уже...'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Мы это никогда. Ни разу за двенадцать лет.'},
+          {who:'frank',expr:'sad',text:'Её звали Мидея. Она была... не отсюда.'},
+          {who:'frank',expr:'sad',text:'Соседи её боялись. Потом стали говорить всякое. Потом её не стало.'},
+          {who:'nayaTeen',expr:'shocked',name:'Ная',text:'«Не стало» — это как?'},
+          {who:'frank',expr:'sad',text:'Ная. Не надо.'},
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(И он снова прибавил звук.)'},
+          {action(){ setFlag('motherMemory'); Memories.unlock('mother'); }},
+        ]},
+    ]}},
+  ]},
+  { flag:'pastFrankDone' },
+  { jump:()=> 'pastCheck' },
+],
+
+pastCrystalScene: [
+  { dlg:[
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'(Нижний ящик стола. Под тетрадями.)'},
+  ]},
+  { sfx:'item' },
+  { magic:'#c060ff', dur:1100 },
+  { dlg:[
+    {who:'nayaTeen',expr:'sad',name:'Ная',text:'Кристалл. Единственное, что осталось от матери, кроме фамилии.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'(Мне было пять, когда мне его отдали. Я не помню, кто именно.)'},
+    {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Он тёплый. Он всегда тёплый, и это единственное, что он умеет.)'},
+  ]},
+  { flag:'pastCrystal' },
+  { memory:'motherCrystal' },
+  { jump:()=> 'pastCheck' },
+],
+
+/* когда обойдены все четверо — открывается выход */
+pastCheck: [
+  async ()=>{
+    if (F('pastDrizellaDone') && F('pastStacyDone') && F('pastFrankDone') && F('pastCrystal')) {
+      setFlag('pastTalkedAll');
+      UI.toast('Сумка собрана. Сью ждёт за оградой.', 2600);
+    }
+  },
+],
+
+prologLeave: [
+  { music:'none' },
+  { dlg:[
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'(Никто не вышел в прихожую.)'},
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Из гостиной слышно телевизор. Дризелла говорит Стейси, что к четвергу привезут шкаф.)'},
+  ]},
+  { fadeOut:1200 },
+  { wait:600 },
+  { room:'street', x:120, y:200 },
+  { music:'warm' },
+  { fadeIn:1200 },
+  { cast:[{ x:150, y:206, sprite:'sue', name:'Сью' }] },
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Ну наконец-то. Я тут уже с местными собаками перезнакомилась.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Извини. Прощался только я, это заняло время.'},
+    {who:'sue',expr:'normal',text:'Кто-нибудь плакал?'},
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'Никто даже не встал.'},
+    {who:'sue',expr:'sad',text:'...'},
+    {who:'sue',expr:'smile',text:'Ну и хорошо. Значит, не будут звонить.'},
+  ]},
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Слушай. Я всё посчитала. Общага на первом курсе — только со второго семестра, а комната у вокзала стоит как половина моей стипендии.'},
+    {who:'nayaTeen',expr:'talk',name:'Ная',text:'А вторая половина?'},
+    {who:'sue',expr:'smile',text:'А вторая половина — это ты. Найдёшь работу. Ты умеешь работать, ты с двенадцати лет работаешь.'},
+    {who:'nayaTeen',expr:'shocked',name:'Ная',text:'Сью, это... ты понимаешь, что это на годы?'},
+    {who:'sue',expr:'smile',text:'Понимаю. Поэтому и говорю сейчас, а не через год.'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'nayaTeen',expr:'sad',name:'Ная',text:'(Двенадцать лет назад она первая заговорила со мной на площадке.)'},
+    {who:'nayaTeen',expr:'sad',name:'Ная',text:'(С тех пор она ни разу не отошла.)'},
+    {who:'nayaTeen',expr:'smile',name:'Ная',text:'Хорошо.'},
+    {who:'sue',expr:'smile',text:'«Хорошо»? Я тут речь готовила.'},
+    {who:'nayaTeen',expr:'smile',name:'Ная',text:'Расскажешь в автобусе.'},
+  ]},
+  { stats:{ trustSue:+12, humanity:+6 } },
+  { memory:'leaving' },
+  { uncast:true },
+  { music:'none' },
+  { fadeOut:1800 },
   { goto:'chapterOne' },
 ],
 
 /* ---- the present day: an ordinary morning, fifteen years later ---- */
 chapterOne: [
-  { title:'ПЯТНАДЦАТЬ ЛЕТ СПУСТЯ', dur:2400 },
+  { title:'ТРИ ГОДА СПУСТЯ', dur:2000 },
+  { chapter:2 },
   { room:'nayaRoom', x:186, y:190 },
+  { flag:'backstoryDone' },
   { music:'home' },
   { fadeIn:1400 },
   { flag:'mainStoryStarted' },
@@ -7300,6 +8489,7 @@ sueRehearsal: [
 ],
 
 meetGenevieveUni: [
+  { chapter:3 },
   { music:'tense' },
   { dlg:[
     {who:'naya',expr:'normal',text:'(Дверь четырнадцатой. Внутри кто-то говорит — ровно, негромко, будто читает вслух.)'},
@@ -7369,6 +8559,7 @@ meetGenevieveUni: [
 
 /* ---------- the investigation ---------- */
 libraryFolk: [
+  async ()=>{ if (gameState.chapter === 3) await Chapters.show(4); },
   { dlg:[
     {who:'naya',expr:'normal',text:'Полка с фольклором. Народные обряды, поверья, сборники быличек.'},
     {who:'naya',expr:'normal',text:'Половина книг подписана одной рукой на полях. Аккуратный мелкий почерк.'},
@@ -7465,6 +8656,7 @@ libraryBreak: [
 ],
 
 genevieveReveal: [
+  { chapter:5 },
   { music:'tense' },
   { dlg:[
     {who:'genevieve',expr:'normal',text:'Начнём с простого. Меня зовут Женевьева Морель, я преподаю историю театра.'},
@@ -7662,8 +8854,11 @@ homeTalkWithSue: [
   { memory:'portal' },
   { stats:{ hellAffinity:+15 } },
   { room:'hell', x:120, y:160 },
+  { cast:[{ x:158, y:196, sprite:'charlotte', name:'Шарлотта' }] },
+  { wait:600 },
   { dlg:[
     {who:'naya',expr:'shocked',text:'Где я? Это... правда?'},
+    {who:'naya',expr:'shocked',text:'(В десяти шагах кто-то стоит. Стоит и ждёт, пока я замечу.)'},
     {who:'charlotte',expr:'normal',text:'Ты пришла. Наконец-то.'},
     {who:'naya',expr:'shocked',text:'Ты кто?'},
     {who:'charlotte',expr:'smile',text:'Меня зовут Шарлотта. Я ждала тебя дольше, чем ты живёшь.'},
@@ -7712,6 +8907,7 @@ meetLilith: [
     {who:'naya',expr:'sad',text:'И что ты за это хочешь?'},
     {who:'charlotte',expr:'smile',text:'Посмотреть, чем это кончится. Мне давно не было любопытно.'},
   ]},
+  { chapter:6 },
   { flag:'metLilith' },
   { flag:'returnedFromHell1' },
   { memory:'charlotte' },
@@ -7816,6 +9012,7 @@ communeIntroScene: [
 
 /* ---------- CHOICE 1: can Sue be convinced? ---------- */
 persuadeSue: [
+  async ()=>{ if (gameState.chapter !== 7) await Chapters.show(7); },
   { checkpoint:'Разговор со Сью' },
   { jump:()=> ['persuade1','persuade2','persuade3'][C('persuadeStep')] || 'persuadeResolve' },
 ],
@@ -7974,11 +9171,12 @@ persuade3: [
 persuadeResolve: [
   { jump:()=> {
       const resolve = C('sueResolve'), respected = C('sueRespected'), trust = S('trustSue');
-      // She comes along either because Naya pushed hard enough (resolve),
-      // or because Naya never pushed at all and is trusted (respected + trust).
-      // The prologue gives everyone a shared childhood, so the trust bar sits
-      // higher than it did before that scene existed.
-      const agreed = resolve >= 3 || (respected >= 2 && trust >= 78);
+      // Three steps: each one adds either pressure (sueResolve) or an out (sueRespected).
+      // She comes along because Naya pushed hard enough, or because Naya pushed
+      // only a little and is trusted enough to be followed anyway.
+      // If Naya gave her an out all three times, Sue takes it - that is the loner path.
+      const gaveOutEveryTime = respected >= 3;
+      const agreed = !gaveOutEveryTime && (resolve >= 3 || trust >= 78);
       return agreed ? 'sueAgrees' : 'sueRefuses';
     }},
 ],
@@ -7987,6 +9185,7 @@ sueAgrees: [
   { flag:'persuasionDone' },
   { flag:'sueAgreed' },
   { flag:'invitationPlan' },
+  { chapter:8 },
   { dlg:[
     {if:()=> C('sueRespected') >= 2, then:[
       {who:'sue',expr:'normal',text:'Ты ни разу меня не заставила. Я это заметила.'},
@@ -8324,7 +9523,9 @@ genevieveWarded: [
 ],
 
 /* ---------- THIRD AMULET / SUE'S DEATH ---------- */
+/* ГЛАВА 9 — «Последний ритуал» */
 thirdAmuletScene: [
+  { chapter:9 },
   { checkpoint:'Дом за городом' },
   { music:'tense' },
   { dlg:[
@@ -8363,6 +9564,7 @@ thirdAmuletScene: [
 
 /* ---------- CHOICE 2: revive or not ---------- */
 reviveChoice: [
+  { chapter:10 },
   { checkpoint:'У тела Сью' },
   { music:'sad' },
   { dlg:[
@@ -8407,6 +9609,7 @@ reviveChoice: [
 ],
 
 reviveSue: [
+  { chapter:'11alive' },
   { fx:'revive' },
   { flag:'sueRevived' },
   { memory:'revival' },
@@ -8444,6 +9647,7 @@ reviveSue: [
 
 /* ---------- 1. ОТРИЦАНИЕ ---------- */
 leaveSueDead: [
+  { chapter:'11evil' },
   { flag:'sueLeftDead' },
   { flag:'truthRevealed' },
   { checkpoint:'Я не успела' },
@@ -8714,6 +9918,7 @@ evilToHell: [
 ],
 
 evilRecognition: [
+  { chapter:'12evil' },
   { sfx:'low' },
   { shake:3 },
   { dlg:[
@@ -8798,6 +10003,127 @@ evilFinale: [
   { fadeOut:1800 },
   { wait:700 },
   { ending:'II' },
+],
+
+/* ---------- ДОРОТИ ---------- */
+dorothy: [
+  async ()=>{ Audio.beep(720, .16, 'sine', .07); Audio.beep(540, .22, 'sine', .05); },
+  { jump:()=> (F('sueDead') && !F('sueRevived')) ? 'dorothyGrief' : 'dorothyNormal' },
+],
+
+dorothyNormal: [
+  { dlg:[
+    {who:'dorothy',expr:'normal',text:'Мяу.'},
+    {who:'naya',expr:'smile',text:'(Она разворачивается боком. Это не приглашение, это приказ.)'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Дороти ждёт.', options:[
+      { text:'Погладить по голове.',
+        stats:{humanity:+2},
+        then:[
+          {who:'naya',expr:'smile',text:'(Подставляет лоб под руку и жмурится.)'},
+          {who:'dorothy',expr:'normal',text:'Мур-р-р.'},
+          {who:'naya',expr:'smile',text:'Ну хоть кому-то в этом доме всё понятно.'},
+        ]},
+      { text:'Почесать пузико.',
+        stats:{humanity:+3},
+        then:[
+          {who:'naya',expr:'talk',text:'(Переворачивается на спину. Классическая ловушка.)'},
+          {who:'dorothy',expr:'normal',text:'Мяу!'},
+          {who:'naya',expr:'shocked',text:'Ай. Ай, ладно, поняла.'},
+          {who:'naya',expr:'smile',text:'(Три года, и я всё ещё каждый раз попадаюсь.)'},
+        ]},
+      { text:'Просто посидеть рядом.',
+        stats:{humanity:+2},
+        then:[
+          {who:'naya',expr:'normal',text:'(Сажусь на пол. Она перебирается ко мне на колени и устраивается так, будто это её колени.)'},
+          {who:'dorothy',expr:'normal',text:'Мур-р.'},
+          {who:'naya',expr:'sad',text:'(Так можно сидеть довольно долго. Я проверяла.)'},
+        ]},
+    ]}},
+  ]},
+  async ()=>{
+    addC('catPets');
+    if (C('catPets') === 4 && !Memories.has('dorothy')) Memories.unlock('dorothy');
+  },
+  { jump:()=> C('catPets') === 4 ? 'dorothyStory' : null },
+],
+
+dorothyStory: [
+  { dlg:[
+    {who:'naya',expr:'smile',text:'(Сью притащила её с помойки за университетом. Серая, круглая, вечно голодная.)'},
+    {who:'naya',expr:'normal',text:'(«Потому что она тоже далеко от дома», — сказала Сью, и вопрос был закрыт.)'},
+    {who:'naya',expr:'smile',text:'(Имя выбирали три дня. Победил вариант, который никому не нравился.)'},
+  ]},
+],
+
+dorothyGrief: [
+  { dlg:[
+    {who:'dorothy',expr:'normal',text:'Мяу?'},
+    {who:'naya',expr:'empty',text:'(Она смотрит мимо меня, на дверь.)'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Дороти ждёт не тебя.', options:[
+      { text:'Погладить.',
+        stats:{humanity:+3},
+        then:[
+          {who:'naya',expr:'sad',text:'(Подставляет лоб. И всё равно косится на дверь.)'},
+          {who:'dorothy',expr:'normal',text:'Мур...'},
+          {who:'naya',expr:'empty',text:'Она не придёт, Дороти.'},
+          {who:'naya',expr:'empty',text:'(Я говорю это вслух впервые.)'},
+        ]},
+      { text:'Взять на руки.',
+        stats:{humanity:+4, trustSue:+2},
+        then:[
+          {who:'naya',expr:'sad',text:'(Тяжёлая и тёплая. Не вырывается — это на неё не похоже.)'},
+          {who:'dorothy',expr:'normal',text:'Мяу.'},
+          {who:'naya',expr:'sad',text:'(Мы сидим так, пока у меня не затекают руки.)'},
+        ]},
+      { text:'Ничего не делать.',
+        stats:{humanity:-3},
+        then:[
+          {who:'naya',expr:'empty',text:'(Я прохожу мимо.)'},
+          {who:'dorothy',expr:'normal',text:'Мяу.'},
+          {who:'naya',expr:'empty',text:'(Она мяукает ещё раз, уже в спину. Я не оборачиваюсь.)'},
+        ]},
+    ]}},
+  ]},
+],
+
+dorothyHall: [
+  async ()=>{ Audio.beep(700, .18, 'sine', .07); },
+  { jump:()=> (F('sueDead') && !F('sueRevived')) ? 'dorothyHallGrief' : 'dorothyHallNormal' },
+],
+
+dorothyHallNormal: [
+  { dlg:[
+    {who:'dorothy',expr:'normal',text:'Мяу.'},
+    {who:'naya',expr:'normal',text:'(Сидит на своём пятне солнца. Оно тут бывает минут двадцать в день, и она знает, во сколько.)'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'', options:[
+      { text:'Почесать за ухом.',
+        stats:{humanity:+2},
+        then:[
+          {who:'dorothy',expr:'normal',text:'Мур-р-р.'},
+          {who:'naya',expr:'smile',text:'(Кажется, я мешаю. Но не настолько, чтобы она ушла.)'},
+        ]},
+      { text:'Не мешать.',
+        then:[
+          {who:'naya',expr:'smile',text:'(Обхожу по дуге. У неё двадцать минут, я не буду их портить.)'},
+        ]},
+    ]}},
+  ]},
+  async ()=>{ addC('catPets'); },
+],
+
+dorothyHallGrief: [
+  { dlg:[
+    {who:'naya',expr:'empty',text:'(Она сидит у самой двери. Носом к щели.)'},
+    {who:'dorothy',expr:'normal',text:'Мяу.'},
+    {who:'naya',expr:'empty',text:'(Третий день. Я не знаю, как объясняют такое кошкам.)'},
+  ]},
+  { stats:{ humanity:+2 } },
 ],
 
 /* ---------- POST-REVIVAL ARC ---------- */
@@ -8906,6 +10232,7 @@ sueFearScene: [
 
 /* ---------- CHOICE 3: the formed character ---------- */
 reflectionScene: [
+  { chapter:'12alive' },
   { checkpoint:'Последнее решение' },
   { music:'sad' },
   { dlg:[
@@ -8983,6 +10310,7 @@ reflectionScene: [
 
 /* ---------- ENDING III: RED ---------- */
 hellFinalScene: [
+  { chapter:'13red' },
   { dlg:[
     {who:'naya',expr:'talk',text:'Сью. Идём со мной. В ад. Пожалуйста. Один раз, просто посмотреть.'},
     {if:()=> S('trustSue') >= 55, then:[
@@ -9058,6 +10386,7 @@ hellFinalScene: [
 
 /* ---------- ENDING IV: EARTH ---------- */
 earthEnding: [
+  { chapter:'13earth' },
   { music:'sad' },
   { dlg:[
     {who:'charlotte',expr:'angry',text:'Ты пожалеешь. Не сегодня. Но пожалеешь.'},
@@ -9152,6 +10481,7 @@ lonerGenevieve: [
 ],
 
 lonerDoor: [
+  async ()=>{ if (gameState.chapter !== '7solo') await Chapters.show('7solo'); },
   { dlg:[
     {who:'naya',expr:'normal',text:'(Дом Мадлен. Свет горит. Она дома.)'},
     {who:'naya',expr:'talk',text:'(Просто постучу. Что тут сложного.)'},
@@ -9243,12 +10573,14 @@ lonerDiscovered: [
   { flag:'lonerSuspected' },
   { fx:'chaseStart' },
   { fadeOut:400 },
-  { room:'street', x:120, y:180 },
+  { room:'parkWalk', x:352, y:262 },
   { fadeIn:400 },
   { dlg:[
-    {who:'naya',expr:'shocked',text:'(БЕГИ. Дом. Просто добеги до дома.)'},
+    {who:'naya',expr:'shocked',text:'(Через сад, через ограду, в парк. Руки в крови, но это моя кровь.)'},
+    {who:'naya',expr:'shocked',text:'(Отсюда до дома — весь парк и вся Мейпл-стрит.)'},
+    {who:'naya',expr:'shocked',text:'(БЕГИ.)'},
   ]},
-  async ()=>{ Chase.start(17000); },
+  async ()=>{ Chase.start(30000); },
 ],
 
 lonerCaughtScene: [
@@ -9256,6 +10588,11 @@ lonerCaughtScene: [
   { music:'none' },
   { fadeOut:600 },
   { room:'nayaRoom', x:120, y:250 },
+  { cast:[
+    { x:70,  y:200, sprite:'genevieve', name:'Женевьева' },
+    { x:150, y:196, sprite:'witch3',    name:'Старшая' },
+    { x:196, y:214, sprite:'acolyte',   name:'Ученица' },
+  ]},
   { fadeIn:600 },
   { dlg:[
     {if:()=> F('lonerEscaped'), then:[
@@ -9416,6 +10753,7 @@ const Game = {
   mode:'menu', canvas:null, ctx:null, cam:{x:0,y:0}, scale:1,
   running:false, lastT:0, paused:false,
   chase:null, endingShown:false, montage:false, montageDraw:null, reviveGlow:null, motherShadow:null,
+  cast:[],
 };
 
 function resizeCanvas() {
@@ -9466,6 +10804,7 @@ function drawRoom() {
   const draws = [];
   for (const o of props) { const m = Art.meta(o.t); if (m && m.flat) continue; draws.push({ y:o.y, obj:o }); }
   for (const n of roomNPCs(room)) draws.push({ y:n.y, npc:n });
+  for (const n of roomCast()) draws.push({ y:n.y, npc:n });
   if (!room.cinematic) draws.push({ y:Player.y, player:true });
   draws.sort((a, b) => a.y - b.y);
   for (const d of draws) {
@@ -9533,13 +10872,25 @@ function drawRoom() {
   Lighting.draw(ctx, room, camX, camY);
   Weather.drawFog(ctx);
 
+  // 6a. таймер погони — поверх любой комнаты, а не только улицы
+  if (Game.chase && Game.chase.active) {
+    const left = Math.max(0, Math.ceil(Game.chase.t/1000));
+    ctx.fillStyle = 'rgba(12,4,8,.78)'; ctx.fillRect(CONFIG.VIEW_W/2 - 56, 10, 112, 18);
+    ctx.strokeStyle = '#c0304d'; ctx.lineWidth = 1;
+    ctx.strokeRect(CONFIG.VIEW_W/2 - 55.5, 10.5, 111, 17);
+    ctx.fillStyle = '#ff6070'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
+    ctx.fillText('БЕГИ ДОМОЙ  ' + left, CONFIG.VIEW_W/2, 23); ctx.textAlign = 'left';
+  }
+
   // 6. interaction hint
   const near = (Game.mode === 'explore' && !Dialogue.active) ? findNearestInteractable() : null;
   if (near) {
     const ref = near.ref;
     const hx = (near.type === 'obj') ? (ref.x + ref.w/2 - camX) : (ref.x - camX);
     const hy = (near.type === 'obj') ? (ref.y - camY - 6) : (ref.y - 22 - camY);
-    const label = (near.type === 'obj') ? (ref.prompt || 'A') : (ref.name || 'A');
+    const label = (near.type === 'obj')
+      ? ((typeof ref.prompt === 'function' ? ref.prompt() : ref.prompt) || 'A')
+      : (ref.name || 'A');
     ctx.font = '9px Courier New';
     const w = ctx.measureText(label).width + 10;
     ctx.fillStyle = 'rgba(12,10,16,.85)';
@@ -9582,7 +10933,7 @@ function tick(t) {
     Dialogue.update(dt);
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
-    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); }
+    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); }
     drawRoom();
   }
   requestAnimationFrame(tick);
@@ -9628,6 +10979,10 @@ function beginPlay() {
   World.invalidate();
   requestAnimationFrame(tick);
   if (!F('prologueComplete')) { Scene.play('prologue'); saveGame(); return; }
+  if (!F('backstoryDone')) {                 // пролог, часть вторая — дом отца
+    if (F('prologBackstoryStarted')) { if (room.onEnter) room.onEnter(); saveGame(); return; }
+    Scene.play('prologBackstory'); saveGame(); return;
+  }
   if (room.onEnter) room.onEnter();          // fixes "scene never replays after load"
   saveGame();
 }
@@ -9678,7 +11033,7 @@ function showStatus() {
     ['Сью', F('sueDead') && !F('sueRevived') ? '???' : (F('sueRefused') ? 'не рядом' : 'рядом')],
     ['Доверие Сью', '???'],
     ['Путь ведьмы', '???'],
-    ['Акт', String(gameState ? gameState.act : 0)],
+    ['Глава', Chapters.label()],
   ];
   data.forEach(([k,v]) => {
     const r = document.createElement('div');

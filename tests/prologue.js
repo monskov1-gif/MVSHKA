@@ -18,6 +18,7 @@ const H = require('./harness.js');
           room: gameState.currentRoom,
           drawn: !room.cinematic,             // игрок рисуется только вне кат-сцен
           sprite: Player.currentSprite(),
+          done: !!gameState.flags.backstoryDone,
         });
       }, 120);
     });
@@ -25,7 +26,15 @@ const H = require('./harness.js');
     // прогоняем пролог: адская нарратива, карточка главы, площадка
     await H.pump(page, [], 'prologue');
     const shot1 = await page.evaluate(() => ({ room: gameState.currentRoom, sprite: Player.currentSprite() }));
-    await H.step(page, 'obj', 'swing', [], 'PROLOGUE');       // первая магия -> глава 1
+    await H.step(page, 'obj', 'swing', [], 'PROLOGUE');       // первая магия -> дом отца
+    // пролог, часть вторая: обойти дом и забрать кристалл
+    await H.step(page, 'npc', 'Дризелла', [0], 'PROLOGUE');
+    await H.step(page, 'npc', 'Стейси', [], 'PROLOGUE');
+    await H.step(page, 'npc', 'Фрэнк', [2], 'PROLOGUE');
+    await H.step(page, 'obj', 'toAttic', [], 'PROLOGUE');
+    await H.step(page, 'obj', 'deskPast', [], 'PROLOGUE');    // кристалл
+    await H.step(page, 'obj', 'toLiving', [], 'PROLOGUE');
+    await H.step(page, 'obj', 'frontDoor', [], 'PROLOGUE');   // -> глава 2
     await page.evaluate(() => clearInterval(window.__t));
 
     const probe = await page.evaluate(() => window.__probe);
@@ -40,9 +49,13 @@ const H = require('./harness.js');
   Object.entries(seen).forEach(([k, n]) => console.log('  ' + k.padEnd(42) + n));
 
   if (!probe.length) { console.log('\nПРОВАЛ: замер не собрал ни одного кадра'); process.exit(1); }
-  const bad = probe.filter(p => p.drawn && p.sprite !== 'sueChild' && !p.room.startsWith('naya'));
+  // допустимо: маленькая Сью на площадке и семнадцатилетняя Ная в доме отца.
+  // взрослая модель в прологе появляться не должна нигде.
+  const OK = { playground:'sueChild', oldHouse:'nayaTeen', oldHouseAttic:'nayaTeen', street:'nayaTeen' };
+  const bad = probe.filter(p => !p.done && p.drawn && OK[p.room] && p.sprite !== OK[p.room]);
   console.log('\nперед качелями: room=%s sprite=%s', shot1.room, shot1.sprite);
-  console.log('после пролога:  room=%s prologueComplete=%s', after.room, after.flags.includes('prologueComplete'));
+  console.log('после пролога:  room=%s backstoryDone=%s глава=%s',
+    after.room, after.flags.includes('backstoryDone'), after.chapter);
 
   if (bad.length) {
     console.log('\nПРОВАЛ: взрослая модель видна в ' + bad.length + ' кадрах, например ' +

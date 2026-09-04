@@ -5,8 +5,10 @@ const ENTRY = {
   witch1House:[120,258], witch2House:[120,258], nightSpot:[120,268], witch3House:[120,262],
   backAlley:[120,280], hellFinal:[150,300], parkWalk:[120,290],
   kitchen:[120,258], bathroom:[120,240], balcony:[120,192], stairwell:[120,108], oldTown:[30,280],
-  prologueHell:[120,200], playground:[150,236], uniCourtyard:[170,200], uniHall:[120,250],
+  prologueHell:[120,200], playground:[150,236], uniCourtyard:[200,268],
   uniStage:[120,262], uniLibrary:[120,258],
+  uniHallMain:[190,300], uniCorridorTheatre:[340,140], uniCorridorLib:[398,140],
+  uniCanteen:[170,268], uniOldWing:[470,150],
   forestEdge:[196,140], communeRoad:[30,180], communeYard:[40,220], trialRoom:[130,230],
   hellStreet:[60,220],
 };

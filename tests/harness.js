@@ -52,7 +52,7 @@ const useNpc = (page, n) => page.evaluate(n => {
 }, n);
 
 const snap = page => page.evaluate(() => ({
-  room: gameState.currentRoom, act: gameState.act,
+  room: gameState.currentRoom, act: gameState.act, chapter: gameState.chapter,
   stats: gameState.stats, inv: gameState.inventory.slice(),
   mem: gameState.memories.length,
   flags: Object.entries(gameState.flags).filter(([k, v]) => v).map(([k]) => k),
@@ -78,20 +78,30 @@ async function newGame(page) {
 async function opening(page, picks, tag) {
   // prologue: hell narration, chapter card, then the playground as little Sue
   await pump(page, [], tag + ':prologue');
-  await step(page, 'obj', 'swing', [], tag);                       // first magic -> chapter one
+  await step(page, 'obj', 'swing', [], tag);                       // первая магия -> дом отца
+  // пролог, часть вторая: дом отца, прощание, кристалл
+  await step(page, 'npc', 'Дризелла', [0], tag);
+  await step(page, 'npc', 'Стейси', [], tag);
+  await step(page, 'npc', 'Фрэнк', [2], tag);
+  await step(page, 'obj', 'toAttic', [], tag);
+  await step(page, 'obj', 'deskPast', [], tag);
+  await step(page, 'obj', 'toLiving', [], tag);
+  await step(page, 'obj', 'frontDoor', [], tag);                  // -> глава 2
   // an ordinary morning, then out to work
   await step(page, 'obj', 'door', [], tag);                        // -> flat hallway
   await step(page, 'obj', 'toStairs', [], tag);                    // -> entry hall
   await step(page, 'obj', 'toStreet', [], tag);                    // -> street
   await step(page, 'obj', 'toCafe', [picks.cafe], tag);            // the shift, and Chris
   await step(page, 'obj', 'exit', [], tag);                        // -> street
-  await step(page, 'obj', 'toUni', [], tag);                       // -> university yard
-  await step(page, 'obj', 'toHall', [], tag);                      // -> corridor
-  await step(page, 'obj', 'toStage', [], tag);                     // -> stage
-  await step(page, 'npc', 'Сью', [], tag);                         // rehearsal
-  await step(page, 'obj', 'exit', [], tag);                        // -> corridor
-  await step(page, 'obj', 'aud14', [picks.gen], tag);              // Genevieve, the crystal reacts
-  await step(page, 'obj', 'toLib', [], tag);                       // -> library
+  await step(page, 'obj', 'toUni', [], tag);                       // автобус -> главный холл
+  await step(page, 'obj', 'toTheatre', [], tag);                   // -> театральное крыло
+  await step(page, 'obj', 'toStage', [], tag);                     // -> сцена
+  await step(page, 'npc', 'Сью', [], tag);                         // прогон
+  await step(page, 'obj', 'exit', [], tag);                        // -> коридор крыла
+  await step(page, 'obj', 'toHall', [], tag);                      // -> главный холл
+  await step(page, 'obj', 'toStudy', [], tag);                     // -> учебное крыло
+  await step(page, 'obj', 'aud14', [picks.gen], tag);              // Женевьева, кристалл отзывается
+  await step(page, 'obj', 'toLib', [], tag);                       // -> библиотека
   await step(page, 'obj', 'shelfFolk', [], tag);
   await step(page, 'obj', 'shelfTheatre', [], tag);
   await step(page, 'obj', 'archive', [], tag);                     // Medea
