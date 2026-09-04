@@ -39,8 +39,48 @@ async function endingII() {
     let s = await H.snap(page);
     if (!s.flags.includes('sueAgreed')) throw new Error('II: expected sueAgreed');
     await H.amuletArc(page, { amulet1:1, amulet2:2 }, 'II');
-    await H.step(page,'npc','Сью',[1],'II');     // leave her dead -> ending II
+    await H.step(page,'npc','Сью',[1],'II');      // не возрождать -> ветка «Ная выбрала силу»
     s = await H.snap(page);
+    if (!s.flags.includes('sueLeftDead')) throw new Error('II: expected sueLeftDead');
+    if (s.room !== 'forestEdge') throw new Error('II: expected forestEdge, got ' + s.room);
+    // 1. ночная лесная окраина
+    await H.step(page,'obj','branch',[],'II');
+    await H.step(page,'obj','ritual',[],'II');
+    await H.step(page,'obj','crystal',[],'II');
+    await H.step(page,'obj','leave',[],'II');     // -> пустой дом
+    s = await H.snap(page);
+    if (s.room !== 'nayaRoom') throw new Error('II: expected nayaRoom, got ' + s.room);
+    // 2. осмотр пустого дома -> первый перелом
+    await H.step(page,'obj','bedSue',[],'II');
+    await H.step(page,'obj','mirror',[],'II');
+    await H.step(page,'obj','lowTable',[],'II');
+    await H.step(page,'obj','table',[],'II');     // четвёртый -> evilFirstBreak
+    s = await H.snap(page);
+    if (!s.flags.includes('evilHomeDone')) throw new Error('II: first break did not fire');
+    // 3. дорога к коммуне
+    await H.step(page,'obj','door',[],'II');      // -> communeRoad
+    await H.step(page,'obj','stone',[],'II');
+    await H.step(page,'obj','onward',[],'II');    // -> communeYard
+    await H.step(page,'obj','inside',[],'II');    // -> communeHall
+    await H.step(page,'npc','Старшая',[],'II');   // испытание предложено
+    s = await H.snap(page);
+    if (!s.flags.includes('evilTrialOffered')) throw new Error('II: trial was not offered');
+    // 4. испытание
+    await H.step(page,'obj','toTrial',[],'II');   // -> trialRoom (+ intro)
+    await H.step(page,'obj','altar',[1],'II');    // забрать силу
+    s = await H.snap(page);
+    if (!s.flags.includes('evilTrialDone')) throw new Error('II: trial did not resolve');
+    await H.step(page,'obj','exit',[],'II');      // -> communeHall
+    // 5. монтаж, ад, признание
+    await H.step(page,'npc','Старшая',[],'II');
+    s = await H.snap(page);
+    if (!s.flags.includes('evilRecognised')) throw new Error('II: not recognised, room=' + s.room);
+    if (s.room !== 'hellStreet') throw new Error('II: expected hellStreet, got ' + s.room);
+    // 6. адская площадь и финал
+    await H.step(page,'npc','Житель',[],'II');
+    await H.step(page,'obj','greatPortal',[],'II');
+    s = await H.snap(page);
+    console.log('  II: humanity=%s witch=%s hell=%s', s.stats.humanity, s.stats.witchAmbition, s.stats.hellAffinity);
     return { card: await card(page), left: s.flags.includes('sueLeftDead'), stats: s.stats };
   });
 }
