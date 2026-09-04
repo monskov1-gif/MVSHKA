@@ -690,62 +690,134 @@ const Assets = {
   },
 
   /* 64x64 dialogue portrait: head, plus shoulders in the character's outfit. */
-  /* Dorothy — deliberately Pusheen-shaped: a small round grey tabby,
-     stubby legs, dot eyes, three stripes on the head and tail. */
-  makeCat(pose) {
-    const c = document.createElement('canvas');
-    c.width = 20; c.height = 14;
-    const g = c.getContext('2d');
-    const body = '#a9a49e', dark = '#8b8680', light = '#c3bfb8', pink = '#e6a8b0';
-    g.fillStyle = 'rgba(0,0,0,.22)';
-    g.beginPath(); g.ellipse(10, 13, 8, 1.6, 0, 0, Math.PI*2); g.fill();
-    if (pose === 'sit') {
-      g.fillStyle = body;                                   // one round blob
-      g.beginPath(); g.ellipse(10, 8, 7, 5.2, 0, 0, Math.PI*2); g.fill();
-      g.fillStyle = light; g.beginPath(); g.ellipse(9, 7, 5, 3.4, 0, 0, Math.PI*2); g.fill();
-      g.fillStyle = body; g.fillRect(2, 8, 3, 2); g.fillRect(3, 7, 2, 1);   // tail
-      g.fillStyle = dark; g.fillRect(2, 8, 1, 2);
-    } else {
-      g.fillStyle = body;
-      g.beginPath(); g.ellipse(11, 8, 7.5, 4.6, 0, 0, Math.PI*2); g.fill();
-      g.fillStyle = light; g.beginPath(); g.ellipse(11, 7, 5.5, 3, 0, 0, Math.PI*2); g.fill();
-      g.fillStyle = body; g.fillRect(2, 6, 4, 2); g.fillRect(1, 5, 2, 2);   // tail up
-      g.fillStyle = dark; g.fillRect(1, 5, 1, 2); g.fillRect(4, 6, 1, 2);
-      g.fillStyle = body; g.fillRect(7, 11, 2, 2); g.fillRect(13, 11, 2, 2);
+  /* Дороти. Круглый серый ком с коричневым контуром, огромными
+     блестящими глазами, тремя полосками на макушке и высунутым языком.
+     Сетка 24x18: лапы стоят на нижнем крае, усы выходят за силуэт. */
+  /* Дороти. Круглый серый ком с коричневым контуром, огромными
+     блестящими глазами, тремя полосками на макушке и высунутым языком.
+     Рисуется кривыми в четырёхкратном размере и уменьшается до 23x18 —
+     иначе на такой сетке яйцо силуэта вырождается в прямоугольник.
+     Всё симметрично относительно x=46 (центральная колонка спрайта). */
+  CAT_INK: {
+    line:  '#5c4433',
+    fur:   '#a89f97',
+    furHi: '#bdb6ae',
+    furLo: '#948c84',
+    strip: '#6d645c',
+    eye:   '#23201e',
+    tongue:'#e8627e',
+    tongueHi: '#f4909f',
+  },
+  CX: 46, CAT_W: 23, CAT_H: 18, CAT_S: 4,
+  SPR_W: 20, SPR_H: 16,   // размер в мире: кошка чуть ниже человека
+
+  /* Контур ставится один раз по объединению туловища и ушей: сначала
+     все три фигуры обводятся и заливаются коричневым (силуэт «толстеет»
+     на половину линии), затем те же фигуры заливаются шерстью — коричневое
+     остаётся только каймой, а швы между ухом и головой не видны. */
+  catShapes(g) {
+    const C = this.CX;
+    const body = new Path2D();
+    body.moveTo(C, 14);
+    body.bezierCurveTo(C + 18, 14, C + 28, 33, C + 28, 49);
+    body.bezierCurveTo(C + 28, 64, C + 17, 70, C, 70);
+    body.bezierCurveTo(C - 17, 70, C - 28, 64, C - 28, 49);
+    body.bezierCurveTo(C - 28, 33, C - 18, 14, C, 14);
+    const ear = (dir) => {
+      const p = new Path2D();
+      p.moveTo(C + dir * 16, 3);
+      p.lineTo(C + dir * 27, 30);
+      p.lineTo(C + dir * 5, 26);
+      p.closePath();
+      return p;
+    };
+    return [body, ear(-1), ear(1)];
+  },
+
+  catHiRes(pose) {
+    const ink = this.CAT_INK, S = this.CAT_S, C = this.CX;
+    const W = this.CAT_W * S, H = this.CAT_H * S;
+    const hi = document.createElement('canvas');
+    hi.width = W; hi.height = H;
+    const g = hi.getContext('2d');
+    const shapes = this.catShapes(g);
+
+    if (pose === 'stand') {                     // хвост торчит вбок, когда она на лапах
+      const tail = new Path2D();
+      tail.moveTo(C + 26, 52); tail.lineTo(C + 42, 48);
+      tail.lineTo(C + 42, 60); tail.lineTo(C + 26, 62);
+      tail.closePath();
+      shapes.push(tail);
     }
-    // ears
-    g.fillStyle = body; g.fillRect(7, 3, 2, 2); g.fillRect(13, 3, 2, 2);
-    g.fillStyle = pink; g.fillRect(8, 4, 1, 1); g.fillRect(13, 4, 1, 1);
-    // three stripes across the head
-    g.fillStyle = dark; g.fillRect(9, 4, 1, 2); g.fillRect(11, 4, 1, 2); g.fillRect(13, 5, 1, 1);
-    // face
-    g.fillStyle = '#2c2a28'; g.fillRect(8, 7, 1, 1); g.fillRect(13, 7, 1, 1);
-    g.fillStyle = pink; g.fillRect(10, 8, 2, 1);
-    g.fillStyle = '#2c2a28'; g.fillRect(10, 9, 1, 1); g.fillRect(11, 9, 1, 1);
-    g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(8, 7, 1, 1);
-    // whiskers
-    g.fillStyle = 'rgba(70,66,62,.7)';
-    g.fillRect(4, 8, 3, 1); g.fillRect(15, 8, 3, 1);
+
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.strokeStyle = ink.line; g.fillStyle = ink.line; g.lineWidth = 6;
+    for (const p of shapes) { g.stroke(p); g.fill(p); }
+    g.fillStyle = ink.fur;
+    for (const p of shapes) g.fill(p);
+
+    g.save();                                   // мягкий свет сверху вниз по шерсти
+    for (const p of shapes) g.clip(p);
+    const grad = g.createLinearGradient(0, 10, 0, H);
+    grad.addColorStop(0, ink.furHi); grad.addColorStop(.5, ink.fur); grad.addColorStop(1, ink.furLo);
+    g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    g.restore();
+
+    g.fillStyle = ink.strip;                    // три полоски на макушке
+    for (const dx of [-9, 0, 9]) { g.beginPath(); g.roundRect(C + dx - 2.5, 18, 5, 11, 2); g.fill(); }
+
+    for (const dx of [-12, 12]) {               // глаза: белая обводка, зрачок, два блика
+      g.fillStyle = '#fff';
+      g.beginPath(); g.ellipse(C + dx, 36, 11, 12, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = ink.eye;
+      g.beginPath(); g.ellipse(C + dx, 36, 9, 10, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fff';
+      g.beginPath(); g.ellipse(C + dx - 3, 32, 3.6, 4, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(C + dx + 4, 41, 1.8, 2, 0, 0, Math.PI * 2); g.fill();
+    }
+
+    g.strokeStyle = ink.line; g.lineWidth = 3;  // мордочка над языком
+    g.beginPath(); g.moveTo(C - 7, 48); g.quadraticCurveTo(C, 53, C + 7, 48); g.stroke();
+    g.fillStyle = ink.tongue;                   // язык
+    g.beginPath(); g.roundRect(C - 7, 50, 14, 13, [2, 2, 7, 7]); g.fill();
+    g.fillStyle = ink.tongueHi;
+    g.beginPath(); g.roundRect(C - 5, 52, 4, 8, 2); g.fill();
+    g.strokeStyle = 'rgba(150,40,60,.5)'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(C, 53); g.lineTo(C, 61); g.stroke();
+
+    g.strokeStyle = ink.line; g.lineWidth = 3;  // лапы — две зарубки по нижнему краю
+    for (const dx of [-9, 7]) { g.beginPath(); g.moveTo(C + dx, 63); g.lineTo(C + dx, 69); g.stroke(); }
+
+    g.lineWidth = 2.5;                          // усы, по три с каждой стороны
+    for (const dir of [-1, 1])
+      for (const [y0, y1] of [[30, 27], [38, 38], [46, 49]]) {
+        g.beginPath();
+        g.moveTo(C + dir * 27, y0); g.lineTo(C + dir * 45, y1); g.stroke();
+      }
+
+    return hi;
+  },
+
+  /* Спрайт для мира: та же морда, уменьшенная со сглаживанием. */
+  catPixels(pose) {
+    const c = document.createElement('canvas');
+    c.width = this.SPR_W; c.height = this.SPR_H;
+    const o = c.getContext('2d');
+    o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+    o.drawImage(this.catHiRes(pose), 0, 0, this.SPR_W, this.SPR_H);
     return c;
   },
+  makeCat(pose) { return this.catPixels(pose); },
+
+  /* Портрет 64x64: морда крупным планом, прямо из большой отрисовки. */
   makeCatPortrait() {
     const c = document.createElement('canvas');
     c.width = 64; c.height = 64;
     const g = c.getContext('2d');
-    g.fillStyle = '#2e2a30'; g.fillRect(0,0,64,64);
-    g.fillStyle = '#a9a49e'; g.beginPath(); g.ellipse(32, 36, 24, 20, 0, 0, Math.PI*2); g.fill();
-    g.fillStyle = '#c3bfb8'; g.beginPath(); g.ellipse(30, 33, 18, 14, 0, 0, Math.PI*2); g.fill();
-    g.fillStyle = '#a9a49e'; g.fillRect(14, 12, 9, 9); g.fillRect(41, 12, 9, 9);
-    g.fillStyle = '#e6a8b0'; g.fillRect(17, 15, 4, 4); g.fillRect(43, 15, 4, 4);
-    g.fillStyle = '#8b8680';
-    g.fillRect(24, 16, 3, 8); g.fillRect(32, 15, 3, 9); g.fillRect(40, 17, 3, 7);
-    g.fillStyle = '#2c2a28'; g.fillRect(22, 32, 4, 4); g.fillRect(40, 32, 4, 4);
-    g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(22, 32, 2, 2); g.fillRect(40, 32, 2, 2);
-    g.fillStyle = '#e6a8b0'; g.fillRect(30, 40, 5, 3);
-    g.fillStyle = '#2c2a28'; g.fillRect(29, 43, 3, 2); g.fillRect(34, 43, 3, 2);
-    g.fillStyle = 'rgba(70,66,62,.7)';
-    g.fillRect(6, 38, 14, 1); g.fillRect(46, 38, 14, 1); g.fillRect(8, 43, 12, 1); g.fillRect(46, 43, 12, 1);
-    g.strokeStyle = '#8b8680'; g.lineWidth = 1; g.strokeRect(0.5,0.5,63,63);
+    g.fillStyle = '#2e2a30'; g.fillRect(0, 0, 64, 64);
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.drawImage(this.catHiRes('sit'), this.CX - 31, 0, 62, 58, 1, 4, 62, 58);
+    g.strokeStyle = '#8b8680'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, 63, 63);
     return c;
   },
   makePortrait(bodyColor, hairColor, expression='normal', accent='#c0304d', opts={}) {
@@ -10823,8 +10895,10 @@ function drawRoom() {
     if (d.player) { Player.draw(ctx, camX, camY); continue; }
     const n = d.npc, img = Assets.images[n.sprite];
     if (!img) continue;
-    const px = Math.round(n.x - 8 - camX), py = Math.round(n.y - 16 - camY);
-    shadowEllipse(ctx, px + 8, py + 20, 6, 2, .3);
+    // спрайты бывают разной ширины (Дороти шире человека), поэтому
+    // ставим их по центру точки NPC и на общую линию пола, а не по углу
+    const px = Math.round(n.x - img.width / 2 - camX), py = Math.round(n.y + 4 - img.height - camY);
+    shadowEllipse(ctx, px + img.width / 2, Math.round(n.y + 4 - camY), Math.max(6, img.width * .38), 2, .3);
     ctx.drawImage(img, px, py);
   }
 
