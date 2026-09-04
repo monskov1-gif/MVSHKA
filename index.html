@@ -667,14 +667,25 @@ const Assets = {
     g.fillStyle = eyeColor; g.fillRect(6,6,1,2); g.fillRect(9,6,1,2);
     if (opts.glowEye) { g.fillStyle = opts.glowEye; g.fillRect(6,6,1,1); g.fillRect(9,6,1,1); }
     // torso, then a slightly wider skirt, then socks / boots
-    g.fillStyle = bodyColor; g.fillRect(4,10,8,4);
-    if (opts.accent) { g.fillStyle = opts.accent; g.fillRect(5,10,6,1); }
-    g.fillStyle = skirt;   g.fillRect(3,14,10,3);
-    g.fillStyle = opts.legs || '#222';
-    g.fillRect(4,17,3,3); g.fillRect(9,17,3,3);
-    if (opts.shoes) { g.fillStyle = opts.shoes; g.fillRect(4,19,3,1); g.fillRect(9,19,3,1); }
+    if (opts.child) {
+      g.fillStyle = bodyColor; g.fillRect(5,10,6,4);
+      if (opts.accent) { g.fillStyle = opts.accent; g.fillRect(6,10,4,1); }
+      g.fillStyle = skirt;   g.fillRect(4,13,8,3);
+      g.fillStyle = opts.legs || '#222';
+      g.fillRect(5,16,2,3); g.fillRect(9,16,2,3);
+      if (opts.shoes) { g.fillStyle = opts.shoes; g.fillRect(5,18,2,1); g.fillRect(9,18,2,1); }
+    } else {
+      g.fillStyle = bodyColor; g.fillRect(4,10,8,4);
+      if (opts.accent) { g.fillStyle = opts.accent; g.fillRect(5,10,6,1); }
+      g.fillStyle = skirt;   g.fillRect(3,14,10,3);
+      g.fillStyle = opts.legs || '#222';
+      g.fillRect(4,17,3,3); g.fillRect(9,17,3,3);
+      if (opts.shoes) { g.fillStyle = opts.shoes; g.fillRect(4,19,3,1); g.fillRect(9,19,3,1); }
+    }
     if (opts.cape) { g.fillStyle = opts.cape; g.fillRect(2,10,2,8); g.fillRect(12,10,2,8); }
-    g.fillStyle = bodyColor; g.fillRect(3,11,1,4); g.fillRect(12,11,1,4);
+    g.fillStyle = bodyColor;
+    if (opts.child) { g.fillRect(4,11,1,3); g.fillRect(11,11,1,3); }
+    else { g.fillRect(3,11,1,4); g.fillRect(12,11,1,4); }
     return c;
   },
 
@@ -879,6 +890,13 @@ const Assets = {
        aura:'#8a1810', skirt:'#4a0c14', legs:'#2a0810', shoes:'#160408'});
     this.images.mother    = this.makeChibi('#4a3040', '#2f2028',        // Медея, во флэшбеках
       {hair:'long', sheen:'#5a4450', accent:'#6a4a58', skirt:'#3a2632', legs:'#2a1e26'});
+    // the prologue: five-year-old Sue and four-year-old Naya
+    this.images.sueChild  = this.makeChibi('#d8a03c', '#2a2634',
+      {hair:'long', sheen:'#4c4660', child:true, accent:'#f0e0c0',
+       skirt:'#c07a48', legs:'#e8e2d4', shoes:'#c04a3a'});
+    this.images.nayaChild = this.makeChibi('#6a5a80', '#dcc09c',
+      {hair:'bob', child:true, accent:'#8a7aa0', skirt:'#4a4258',
+       legs:'#d8d2c8', shoes:'#3a3440'});
     this.images.dorothy    = this.makeCat('stand');
     this.images.dorothySit = this.makeCat('sit');
     this.images.charlotte = this.makeChibi('#16141a', '#eab8c0', CHAR);
@@ -913,6 +931,10 @@ const Assets = {
     P('acolyte',   '#38604a','#2a2018', ['normal','worried'], '#50a070');
     P('imp',       '#701020','#300810', ['normal','smile'], '#c04020', {glowEye:'#ffa020', bg:'#200408'});
     P('mother',    '#4a3040','#2a1a20', ['empty','angry'], '#6a4050', {bg:'#14101a'});
+    P('sueChild',  '#d8a03c','#2a2634', ['normal','smile','shocked'], '#e8b050',
+      {hair:'long', sheen:'#4c4660', collar:'#f0e0c0', bg:'#3a2c22'});
+    P('nayaChild', '#6a5a80','#dcc09c', ['normal','shocked','smile'], '#8a7aa0',
+      {hair:'bob', collar:'#8a7aa0', bg:'#2a2434'});
     P('narrator',  '#333',   '#111',    ['normal'], '#666');
     const catP = this.makeCatPortrait();
     this.portraits['dorothy_normal'] = catP;
@@ -935,7 +957,10 @@ function freshState() {
     act:0,
     eventStep:0,
     flags: {
-      prologueComplete:false, metSue:false, cafeSceneComplete:false,
+      prologueComplete:false, prologPlayground:false, prologNayaSeen:false, mainStoryStarted:false,
+      metSue:false, cafeSceneComplete:false,
+      waitingAtAud:false, metGenevieveUni:false, crystalReacted:false,
+      investigatedUniversity:false, learnedMedea:false, learnedWitches:false,
       homeTalkDone:false, portalOpened:false, metCharlotte:false, metLilith:false,
       returnedFromHell1:false, toldSueWitch:false, foundGenevieve:false,
       communeIntro:false,
@@ -961,7 +986,7 @@ function freshState() {
       ending:false,
     },
     stats: { trustSue:50, witchAmbition:20, humanity:70, hellAffinity:0 },
-    counters: { witch2Distract:0, mirrorLooks:0, impTalks:0, silenceLooks:0,
+    counters: { witch2Distract:0, mirrorLooks:0, impTalks:0, silenceLooks:0, libClues:0,
                 sueResolve:0, sueRespected:0, persuadeStep:0, postStep:0, catPets:0,
                 runesDisarmed:0, lonerFails:0 },
     inventory: [],
@@ -1791,6 +1816,157 @@ function woodGrain(g, x, y, w, h, col) {
 })();
 
 /* =====================================================================
+   ART LIBRARY — playground, university, prologue
+===================================================================== */
+(function definePrologueProps() {
+  const D = (k, m, f) => Art.def(k, m, f);
+
+  /* ---- playground ---- */
+  D('swings', {w:64,h:56,ax:32,ay:54,foot:{x:-32,y:-10,w:64,h:12}}, g => {
+    shadowEllipse(g, 32, 53, 26, 3, .2);
+    g.fillStyle = '#6a5a48';                                   // A-frame
+    g.fillRect(4, 10, 4, 44); g.fillRect(56, 10, 4, 44);
+    g.fillRect(10, 4, 4, 20); g.fillRect(50, 4, 4, 20);
+    g.fillStyle = '#7d6a54'; g.fillRect(2, 6, 60, 5);
+    g.fillStyle = '#5a4a3a'; g.fillRect(2, 6, 60, 1);
+    g.strokeStyle = '#8d949c'; g.lineWidth = 1;                // chains
+    [20, 44].forEach(x => { g.beginPath(); g.moveTo(x-5, 11); g.lineTo(x-5, 34);
+                            g.moveTo(x+5, 11); g.lineTo(x+5, 34); g.stroke(); });
+    g.fillStyle = '#3f5c8a'; g.fillRect(13, 34, 14, 4);        // seats
+    g.fillStyle = '#4e6d9c'; g.fillRect(13, 34, 14, 1);
+    g.fillStyle = '#8a4a52'; g.fillRect(37, 36, 14, 4);
+    g.fillStyle = '#9c5a60'; g.fillRect(37, 36, 14, 1);
+  });
+  D('slide', {w:44,h:52,ax:22,ay:50,foot:{x:-22,y:-14,w:44,h:16}}, g => {
+    shadowEllipse(g, 22, 49, 18, 3, .2);
+    g.fillStyle = '#4a7a6a'; g.fillRect(28, 6, 12, 30);
+    g.fillStyle = '#5d9484'; g.fillRect(29, 7, 10, 28);
+    g.fillStyle = '#8d949c';
+    g.beginPath(); g.moveTo(28, 12); g.lineTo(6, 44); g.lineTo(14, 46); g.lineTo(34, 16); g.closePath(); g.fill();
+    g.fillStyle = '#a8aeb6';
+    g.beginPath(); g.moveTo(28, 13); g.lineTo(8, 43); g.lineTo(11, 44); g.lineTo(31, 15); g.closePath(); g.fill();
+    g.fillStyle = '#3f5c5a'; g.fillRect(30, 34, 3, 14); g.fillRect(36, 34, 3, 14);
+  });
+  D('sandbox', {w:52,h:30,ax:26,ay:26,foot:null, flat:true}, g => {
+    g.fillStyle = '#6b5236'; g.fillRect(0, 0, 52, 26);
+    g.fillStyle = '#c9b389'; g.fillRect(3, 3, 46, 20);
+    g.fillStyle = '#b8a279'; for (let i=0;i<14;i++) g.fillRect(5+(i*7)%42, 5+((i*5)%16), 3, 2);
+    g.fillStyle = '#7d6242'; g.fillRect(0, 0, 52, 3); g.fillRect(0, 23, 52, 3);
+  });
+  D('seesaw', {w:52,h:20,ax:26,ay:18,foot:{x:-26,y:-8,w:52,h:10}}, g => {
+    shadowEllipse(g, 26, 18, 22, 2, .2);
+    g.fillStyle = '#8a4a52'; g.fillRect(2, 4, 48, 5);
+    g.fillStyle = '#9c5a60'; g.fillRect(2, 4, 48, 1);
+    g.fillStyle = '#4a4550'; g.fillRect(23, 8, 6, 9);
+    g.fillStyle = '#3f5c8a'; g.fillRect(0, 2, 8, 4); g.fillRect(44, 6, 8, 4);
+  });
+
+  /* ---- university ---- */
+  D('lecture_desk', {w:52,h:22,ax:26,ay:20,foot:{x:-26,y:-13,w:52,h:15}}, g => {
+    shadowEllipse(g, 26, 20, 22, 2, .2);
+    box34(g, 0, 0, 52, 8, 10, '#8a7050', '#5f4a32');
+    g.fillStyle = '#6f5940'; g.fillRect(0, 8, 52, 1);
+    legs(g, 3, 17, 46, 3, '#3b2a1c');
+  });
+  D('blackboard', {w:70,h:34,ax:35,ay:17,foot:null}, g => {
+    g.fillStyle = '#4a3524'; g.fillRect(0, 0, 70, 34);
+    g.fillStyle = '#2b3a30'; g.fillRect(3, 3, 64, 26);
+    g.fillStyle = '#3a4a3e'; g.fillRect(3, 3, 64, 6);
+    g.fillStyle = '#cfd8cc';
+    g.fillRect(8, 10, 26, 1); g.fillRect(8, 14, 34, 1); g.fillRect(8, 18, 18, 1);
+    g.fillRect(44, 11, 16, 1); g.fillRect(44, 15, 12, 1);
+    g.fillStyle = '#6b533c'; g.fillRect(3, 29, 64, 3);
+    g.fillStyle = '#e8e4dc'; g.fillRect(10, 29, 5, 2); g.fillRect(20, 29, 4, 2);
+  });
+  D('stage_curtain', {w:56,h:70,ax:28,ay:35,foot:null}, g => {
+    g.fillStyle = '#5a1024'; g.fillRect(0, 0, 56, 70);
+    g.fillStyle = '#7a1830';
+    for (let i=0;i<7;i++) g.fillRect(i*8, 0, 5, 70);
+    g.fillStyle = '#3f0a18'; for (let i=0;i<7;i++) g.fillRect(i*8+5, 0, 3, 70);
+    g.fillStyle = '#c9a05a'; g.fillRect(0, 0, 56, 4);
+    g.fillStyle = '#8a6a34'; g.fillRect(0, 4, 56, 2);
+  });
+  D('spotlight', {w:16,h:20,ax:8,ay:10,foot:null, light:{dy:34,r:56,c:'#ffe6b0',i:.7}}, g => {
+    g.fillStyle = '#2b2830'; g.fillRect(6, 0, 4, 6);
+    g.fillStyle = '#3d3a44'; g.fillRect(1, 5, 14, 10);
+    g.fillStyle = '#fff2c8'; g.fillRect(3, 13, 10, 4);
+    g.fillStyle = '#5a5666'; g.fillRect(1, 5, 14, 2);
+  });
+  D('library_shelf', {w:46,h:56,ax:23,ay:54,foot:{x:-23,y:-12,w:46,h:14}}, g => {
+    shadowEllipse(g, 23, 54, 19, 3);
+    g.fillStyle = '#3a2c1e'; g.fillRect(0, 0, 46, 52);
+    g.fillStyle = '#553f2a'; g.fillRect(2, 2, 42, 48);
+    const books = ['#7a3630','#33506e','#3f6b45','#8a7028','#5f4070','#8a4a30','#6b6b3a','#4a4a58'];
+    for (let r = 0; r < 5; r++) {
+      const y = 4 + r * 9.4;
+      g.fillStyle = '#3a2c1e'; g.fillRect(2, y + 7.4, 42, 2);
+      let x = 4;
+      while (x < 42) {
+        const w = 2 + ((x + r * 5) % 4);
+        g.fillStyle = books[(x + r * 3) % books.length];
+        g.fillRect(x, y + ((x % 3) ? 0 : 1), w, 7 - ((x % 3) ? 0 : 1));
+        x += w + 1;
+      }
+    }
+    g.fillStyle = '#2e2318'; g.fillRect(0, 50, 46, 3);
+  });
+  D('archive_box', {w:26,h:20,ax:13,ay:18,foot:{x:-13,y:-11,w:26,h:13}}, g => {
+    shadowEllipse(g, 13, 18, 11, 2);
+    box34(g, 1, 1, 24, 5, 10, '#9a8a70', '#7a6a52');
+    g.fillStyle = '#e0d8c4'; g.fillRect(5, 8, 14, 4);
+    g.fillStyle = '#6a5a44'; g.fillRect(6, 9, 12, 1);
+  });
+  D('notice_board', {w:44,h:32,ax:22,ay:16,foot:null}, g => {
+    g.fillStyle = '#4a3524'; g.fillRect(0, 0, 44, 32);
+    g.fillStyle = '#8a6a44'; g.fillRect(2, 2, 40, 28);
+    const cols = ['#e8e2d4','#dcd0b8','#e8d0c8','#d8dce4'];
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle = cols[i % 4];
+      g.fillRect(5 + (i % 3) * 13, 5 + ((i / 3) | 0) * 12, 10, 9);
+      g.fillStyle = '#a03a2c'; g.fillRect(9 + (i % 3) * 13, 5 + ((i / 3) | 0) * 12, 2, 2);
+    }
+  });
+  D('uni_door', {w:32,h:44,ax:16,ay:42,foot:null}, g => {
+    g.fillStyle = '#3a2c1e'; g.fillRect(0, 0, 32, 42);
+    g.fillStyle = '#5f4530'; g.fillRect(2, 2, 28, 38);
+    g.fillStyle = '#4a3524'; g.fillRect(4, 5, 24, 14); g.fillRect(4, 22, 24, 14);
+    g.fillStyle = '#a8c0d8'; g.fillRect(6, 7, 20, 10);
+    g.fillStyle = '#c8dcec'; g.fillRect(6, 7, 20, 3);
+    g.fillStyle = '#c9a05a'; g.fillRect(25, 24, 3, 4);
+  });
+  D('statue', {w:28,h:56,ax:14,ay:54,foot:{x:-11,y:-12,w:22,h:14}}, g => {
+    shadowEllipse(g, 14, 54, 11, 3);
+    g.fillStyle = '#6e6a62'; g.fillRect(4, 42, 20, 10);
+    g.fillStyle = '#7d7970'; g.fillRect(6, 40, 16, 3);
+    g.fillStyle = '#8a867c'; g.fillRect(9, 14, 10, 28);
+    g.fillStyle = '#9a968c'; g.fillRect(9, 14, 4, 28);
+    g.fillStyle = '#8a867c'; g.beginPath(); g.arc(14, 10, 5, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#6e6a62'; g.fillRect(5, 20, 5, 12); g.fillRect(18, 20, 5, 12);
+  });
+  D('bench_stone', {w:34,h:16,ax:17,ay:14,foot:{x:-17,y:-8,w:34,h:10}}, g => {
+    shadowEllipse(g, 17, 14, 14, 2, .2);
+    g.fillStyle = '#7d7970'; g.fillRect(0, 2, 34, 6);
+    g.fillStyle = '#8d8a80'; g.fillRect(0, 2, 34, 2);
+    g.fillStyle = '#5f5c56'; g.fillRect(3, 8, 5, 6); g.fillRect(26, 8, 5, 6);
+  });
+  D('piano', {w:46,h:30,ax:23,ay:28,foot:{x:-23,y:-18,w:46,h:20}}, g => {
+    shadowEllipse(g, 23, 28, 20, 3);
+    box34(g, 0, 0, 46, 10, 14, '#2e2a30', '#1e1a20');
+    g.fillStyle = '#e8e4dc'; g.fillRect(4, 10, 38, 5);
+    g.fillStyle = '#1a1820'; for (let i=0;i<12;i++) g.fillRect(6+i*3, 10, 1, 3);
+    g.fillStyle = '#3d3944'; g.fillRect(0, 0, 46, 2);
+  });
+  D('mask_pair', {w:24,h:18,ax:12,ay:9,foot:null}, g => {
+    g.fillStyle = '#d8cfae'; g.beginPath(); g.ellipse(7, 9, 6, 8, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#2a2420'; g.fillRect(4, 6, 2, 2); g.fillRect(9, 6, 2, 2);
+    g.fillRect(5, 12, 5, 1); g.fillRect(4, 11, 1, 1); g.fillRect(10, 11, 1, 1);
+    g.fillStyle = '#b8a88c'; g.beginPath(); g.ellipse(17, 9, 6, 8, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#2a2420'; g.fillRect(14, 6, 2, 2); g.fillRect(19, 6, 2, 2);
+    g.fillRect(15, 11, 5, 1); g.fillRect(14, 12, 1, 1); g.fillRect(20, 12, 1, 1);
+  });
+})();
+
+/* =====================================================================
    WORLD — the layer that turns rooms from "paint rectangles every frame"
    into a scene: a cached background, a sorted prop layer, weather and light.
 ===================================================================== */
@@ -2492,7 +2668,6 @@ nayaRoom: {
         Dialogue.start([{who:'naya',expr:'normal',text:'Мансардное окно. Отсюда видно половину улицы и краешек кафе.'}]);
       }},
     { x:100,y:258,w:40,h:32, name:'door', prompt:'Выйти', action: async () => {
-        if (!F('prologueComplete')) { Scene.play('prologue'); return; }
         if (F('sueDead') && !F('reviveChoiceMade')) { UI.toast('Не сейчас. Не так.'); return; }
         if (F('sueRevived') && !F('reflectionDone')) { UI.toast('Сью здесь. Уходить нельзя.'); return; }
         if (F('lonerCaught')) { UI.toast('Больше некуда идти.'); return; }
@@ -2504,7 +2679,7 @@ nayaRoom: {
       when:()=> !F('ending'),
       dialogue:()=> Scene.play('dorothy') },
     { x:64,y:186, sprite:'sue', name:'Сью',
-      when:()=> F('cafeSceneComplete') && !F('homeTalkDone'),
+      when:()=> F('learnedWitches') && !F('homeTalkDone'),
       dialogue:()=> Scene.play('homeTalkWithSue') },
     { x:64,y:186, sprite:'sue', name:'Сью',
       when:()=> F('returnedFromHell1') && !F('toldSueWitch'),
@@ -2526,14 +2701,6 @@ nayaRoom: {
       dialogue:()=> Scene.play('earthEnding') },
   ],
   onEnter() {
-    if (gameState.eventStep === 0 && !F('prologueComplete')) {
-      gameState.eventStep = 1;
-      setTimeout(()=> Dialogue.start([
-        {who:'narrator',expr:'normal',name:'',text:'...'},
-        {who:'naya',expr:'sad',text:'Ещё одно утро. Или вечер? Не важно.'},
-        {who:'naya',expr:'normal',text:'(Осмотрись. На столе — кристалл. Потом — к двери.)'},
-      ]), 420);
-    }
     if (F('lonerCaught') && !F('ending')) setTimeout(()=> Scene.play('endingLoner'), 500);
   }
 },
@@ -2659,6 +2826,7 @@ street: {
     // --- signage baked into the ground layer
     ctx.font = '7px Courier New';
     ctx.fillStyle = '#c0a8e0'; ctx.fillText('КВАРТАЛ', 8, 268);
+    ctx.fillStyle = '#a8c0e0'; ctx.fillText('УНИВЕРСИТЕТ', 190, 246);
     ctx.fillStyle = '#e0a0b0'; ctx.fillText('ДОМОЙ', 46, 130);
     ctx.fillStyle = '#fff'; ctx.font = '9px Courier New'; ctx.fillText('CAFE', 156, 40);
     if (F('foundGenevieve')) { ctx.fillStyle='#a0e0a0'; ctx.font='7px Courier New'; ctx.fillText('ЖЕНЕВЬЕВА', 350, 44); }
@@ -2728,6 +2896,11 @@ street: {
     { x:370,y:118,w:36,h:30, name:'toRightHouse', prompt:'Дом Женевьевы', action: async ()=> {
         if (!F('returnedFromHell1')) { UI.toast('Заколочено. Тут давно никто не живёт.'); return; }
         await changeRoom('genevieveHouse', 120, 258);
+      }},
+    { x:196,y:250,w:44,h:60, name:'toUni', prompt:'Университет', action: async ()=> {
+        if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
+        if (!F('mainStoryStarted')) { UI.toast('Мне там нечего делать.'); return; }
+        await changeRoom('uniCourtyard', 170, 200);
       }},
     { x:6,y:252,w:34,h:60, name:'toOldTown', prompt:'Старый квартал', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Туда нельзя. Только домой.'); return; }
@@ -2856,7 +3029,7 @@ cafe: {
         Dialogue.start([{who:'customer',expr:'normal',name:'Посетитель',text:lines}]);
       }},
   ],
-  onEnter() { if (F('metSue') && !F('cafeSceneComplete')) setTimeout(()=> Scene.play('cafeScene'), 520); }
+  onEnter() { if (F('mainStoryStarted') && !F('cafeSceneComplete')) setTimeout(()=> Scene.play('cafeScene'), 520); }
 },
 
 /* ---------------------------------------------------------------- */
@@ -3014,7 +3187,7 @@ genevieveHouse: {
   npcs: [
     { x:126,y:210, sprite:'genevieve', name:'Женевьева',
       dialogue:()=> {
-        if (!F('foundGenevieve')) return Scene.play('meetGenevieve');
+        if (!F('foundGenevieve')) return Dialogue.start([{who:'genevieve',expr:'normal',text:'Мы ещё не знакомы как следует. Найди меня в университете.'}]);
         if (F('sueRefused') && !F('lonerGenevieve')) return Scene.play('lonerGenevieve');
         if (F('sueRefused')) return Dialogue.start([{who:'genevieve',expr:'worried',text:'Ты опять одна. Ная, где твоя подруга? Почему ты всегда приходишь одна?'}]);
         if (F('communeWarded')) return Scene.play('genevieveWarded');
@@ -3763,10 +3936,8 @@ stairwell: {
   interactables: [
     { x:16,y:150,w:70,h:34, name:'toFlat', prompt:'Наверх, к нам',
       action: async ()=> await changeRoom('corridor1', 120, 232) },
-    { x:92,y:240,w:56,h:34, name:'toStreet', prompt:'На улицу', action: async ()=> {
-        if (!F('metSue')) { Scene.play('meetSue'); return; }
-        await changeRoom('street', 60, 160);
-      }},
+    { x:92,y:240,w:56,h:34, name:'toStreet', prompt:'На улицу',
+      action: async ()=> await changeRoom('street', 60, 160) },
     { x:100,y:100,w:44,h:34, name:'mail', prompt:'Тумбочка', action(){
         if (F('communePanic')) return Dialogue.start([
           {who:'naya',expr:'sad',text:'Счета и рекламная газета. В газете — заметка про пожилую женщину с той улицы.'},
@@ -3917,6 +4088,346 @@ oldTown: {
   ],
 },
 
+/* ---------------------------------------------------------------- */
+prologueHell: {
+  name:"Ад. Семнадцать лет назад", music:'hell', w:240, h:320, prologue:true, cinematic:true,
+  zone:'hell', weather:{ indoor:true, rain:0, fog:.5, wind:.1 },
+  light:{ tint:'#12000a', dark:.56 },
+  lights:[{x:120,y:250,r:70,c:'#ff4a2a',i:.5},{x:24,y:36,r:40,c:'#7a1830',i:.4},{x:216,y:36,r:40,c:'#7a1830',i:.4}],
+  bgPaint(ctx) {
+    const g = ctx.createRadialGradient(120,230,10,120,200,280);
+    g.addColorStop(0,'#4a0810'); g.addColorStop(.6,'#1a0208'); g.addColorStop(1,'#05000a');
+    ctx.fillStyle = g; ctx.fillRect(0,0,240,320);
+    // a vast hall implied by columns receding into the dark
+    for (let i=0;i<5;i++) {
+      const w = 26 - i*4, x1 = 6 + i*10, x2 = 234 - i*10 - w;
+      const a = .9 - i*.16;
+      ctx.fillStyle = `rgba(14,2,8,${a.toFixed(2)})`;
+      ctx.fillRect(x1, 40 + i*22, w, 260 - i*40);
+      ctx.fillRect(x2, 40 + i*22, w, 260 - i*40);
+      ctx.fillStyle = `rgba(60,10,24,${(a*.5).toFixed(2)})`;
+      ctx.fillRect(x1, 40 + i*22, w, 4); ctx.fillRect(x2, 40 + i*22, w, 4);
+    }
+    ctx.fillStyle = '#1a0206'; ctx.fillRect(0, 286, 240, 34);
+    ctx.fillStyle = '#2a0410'; ctx.fillRect(84, 250, 72, 40);
+    ctx.fillStyle = '#3a0614'; ctx.fillRect(88, 250, 64, 5);
+    ctx.fillStyle = '#7a1020';
+    for (let i=0;i<40;i++) ctx.fillRect((i*67)%240, 288+((i*13)%30), 1, 1);
+  },
+  ambient() {
+    FX.fogA = .2;
+    if (Math.random()<.4) FX.spawn(Math.random()*240, 320, 1, {color:'#c02020', rise:-.5, life:120});
+    if (Math.random()<.1) FX.spawn(Math.random()*240, 300, 1, {color:'#ff6030', rise:-.8, life:70});
+  },
+  walls: [{x:0,y:0,w:240,h:320}],
+  interactables: [], npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+playground: {
+  name:"Детская площадка", music:'warm', w:300, h:300,
+  zone:'town', weather:{ rain:0, fog:.06, wind:.3, leaves:.7 },
+  light:{ tint:'#2a2418', dark:.10 },
+  sun:{ x:236, y:20, w:60, len:190, tilt:-.34, a:.16 },
+  bgPaint(ctx) {
+    const W = 300;
+    const sky = ctx.createLinearGradient(0,0,0,110);
+    sky.addColorStop(0,'#8ea0b0'); sky.addColorStop(1,'#c0b294');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,110);
+    ctx.fillStyle = '#5a6448';
+    for (let x=0;x<W;x+=16) { const h=18+((x*5)%16); ctx.fillRect(x,110-h,16,h); }
+    ctx.fillStyle = PAL.grassDry; ctx.fillRect(0,106,W,194);
+    ctx.fillStyle = '#535a33';
+    for (let i=0;i<120;i++) ctx.fillRect((i*47)%W, 110+((i*29)%186), 2, 1);
+    // packed earth under the swings
+    ctx.fillStyle = '#6a5a42';
+    ctx.beginPath(); ctx.ellipse(150, 196, 84, 44, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#77684d';
+    ctx.beginPath(); ctx.ellipse(150, 192, 78, 39, 0, 0, Math.PI*2); ctx.fill();
+    // path
+    ctx.fillStyle = '#7d7266'; ctx.fillRect(0, 262, W, 22);
+    ctx.fillStyle = '#8d8276'; for (let x=0;x<W;x+=18) ctx.fillRect(x,262,1,22);
+    const cols = [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
+    for (let i=0;i<220;i++) { ctx.fillStyle = cols[i%4]; ctx.fillRect((i*79)%W, 112+((i*43)%184), 3, 2); }
+  },
+  objects: [
+    { t:'tree_gold',   x:40,  y:150 }, { t:'tree_red', x:262, y:146 },
+    { t:'tree_orange', x:110, y:126 }, { t:'tree_rust', x:206, y:124 },
+    { t:'swings',  x:150, y:186 },
+    { t:'slide',   x:246, y:214 },
+    { t:'sandbox', x:56,  y:224 },
+    { t:'seesaw',  x:96,  y:250 },
+    { t:'bench',   x:214, y:262 },
+    { t:'bin',     x:262, y:262 },
+    { t:'fence_wood', x:20, y:288 }, { t:'fence_wood', x:52, y:288 },
+    { t:'leaves_pile', x:186, y:238 }, { t:'leaves_pile', x:80, y:196 },
+    { t:'bush', x:284, y:180 },
+  ],
+  walls: [
+    {x:0,y:0,w:300,h:112},{x:0,y:0,w:8,h:300},{x:292,y:0,w:8,h:300},{x:0,y:295,w:300,h:5},
+  ],
+  interactables: [
+    { x:126,y:168,w:48,h:30, name:'swing', prompt:'Качели', action(){ Scene.play('prologSwing'); }},
+    { x:36,y:206,w:44,h:30, name:'sand', prompt:'Песочница', action(){
+        Dialogue.start([{who:'sueChild',expr:'smile',name:'Сью',text:'Мокрый песок. Из него ничего не лепится, только руки грязные.'}]);
+      }},
+    { x:78,y:232,w:40,h:28, name:'seesaw', prompt:'Качалка', action(){
+        Dialogue.start([{who:'sueChild',expr:'normal',name:'Сью',text:'На ней надо вдвоём. А я одна.'}]);
+      }},
+    { x:228,y:196,w:40,h:30, name:'slide', prompt:'Горка', action(){
+        Dialogue.start([{who:'sueChild',expr:'smile',name:'Сью',text:'Горка мокрая. Мама сказала — не лазить. Ну ладно.'}]);
+      }},
+    { x:196,y:244,w:38,h:26, name:'bench', prompt:'Скамейка', action(){
+        Dialogue.start([{who:'sueChild',expr:'normal',name:'Сью',text:'Мамина сумка лежит на скамейке. Значит, мама рядом.'}]);
+      }},
+  ],
+  npcs: [
+    { x:126, y:214, sprite:'nayaChild', name:'Девочка',
+      when:()=> F('prologNayaSeen') && !F('prologueComplete'),
+      dialogue:()=> Dialogue.start([{who:'nayaChild',expr:'shocked',name:'Девочка',text:'...'}]) },
+  ],
+  onEnter() { if (!F('prologueComplete')) UI.toast('Качайся на качелях (кнопка A)', 2600); }
+},
+
+/* ---------------------------------------------------------------- */
+uniCourtyard: {
+  name:"Университет. Двор", music:'street', w:340, h:300, wet:true, wetFrom:100,
+  zone:'town', weather:{ rain:.22, fog:.12, wind:.24, leaves:.45 },
+  light:{ tint:'#161c2a', dark:.30 },
+  lights:[{x:170,y:66,r:40,c:'#ffcf7a',i:.5},{x:96,y:70,r:30,c:'#f2c46a',i:.35},{x:250,y:70,r:30,c:'#f2c46a',i:.35}],
+  bgPaint(ctx) {
+    const W = 340;
+    const sky = ctx.createLinearGradient(0,0,0,100);
+    sky.addColorStop(0, PAL.skyDusk); sky.addColorStop(1,'#6a6d7e');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,100);
+    // the faculty building across the yard
+    ctx.fillStyle = '#4a4048'; ctx.fillRect(0, 8, W, 14);
+    ctx.fillStyle = '#8a8076'; ctx.fillRect(6, 20, W-12, 78);
+    ctx.fillStyle = '#736a62'; for (let y=24;y<98;y+=5) ctx.fillRect(6,y,W-12,1);
+    ctx.fillStyle = '#3a3038';
+    for (let i=0;i<8;i++) ctx.fillRect(20+i*40, 34, 18, 22);
+    ctx.fillStyle = PAL.windowLit;
+    for (let i=0;i<8;i++) if (i%3) ctx.fillRect(22+i*40, 36, 14, 18);
+    ctx.fillStyle = '#2f2a30'; ctx.fillRect(152, 62, 36, 38);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(155, 64, 30, 36);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(179, 82, 3, 4);
+    ctx.fillStyle = '#d8d0c0'; ctx.font = '7px Courier New'; ctx.fillText('ФАКУЛЬТЕТ', 148, 32);
+    // paving
+    ctx.fillStyle = '#5f5a5c'; ctx.fillRect(0,100,W,200);
+    ctx.strokeStyle = '#544f51';
+    for (let y=104;y<300;y+=14) for (let x=(y%28?0:9);x<W;x+=19) ctx.strokeRect(x+.5,y+.5,18,13);
+    ctx.fillStyle = '#4c5a3a'; ctx.fillRect(0, 262, W, 38);
+    const cols = [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
+    for (let i=0;i<180;i++) { ctx.fillStyle = cols[i%4]; ctx.fillRect((i*83)%W, 104+((i*37)%192), 3, 2); }
+    ctx.fillStyle = '#e0a0b0'; ctx.font = '7px Courier New'; ctx.fillText('В ГОРОД', 8, 292);
+  },
+  objects: [
+    { t:'statue', x:170, y:196 },
+    { t:'bench_stone', x:104, y:214 }, { t:'bench_stone', x:236, y:214 },
+    { t:'lamp_street', x:52, y:150 }, { t:'lamp_street', x:288, y:150 },
+    { t:'tree_gold', x:44, y:262 }, { t:'tree_rust', x:296, y:262 },
+    { t:'notice_board', x:250, y:120 },
+    { t:'bin', x:200, y:250 }, { t:'bush', x:130, y:270 }, { t:'bush', x:210, y:274 },
+    { t:'puddle', x:150, y:240 }, { t:'leaves_pile', x:90, y:250 },
+  ],
+  walls: [
+    {x:0,y:0,w:340,h:100},{x:0,y:0,w:8,h:300},{x:332,y:0,w:8,h:300},{x:0,y:295,w:340,h:5},
+  ],
+  interactables: [
+    { x:150,y:98,w:40,h:30, name:'toHall', prompt:'Войти', action: async ()=> await changeRoom('uniHall', 120, 250) },
+    { x:6,y:262,w:36,h:34, name:'toStreet', prompt:'В город', action: async ()=> await changeRoom('street', 210, 160) },
+    { x:150,y:172,w:40,h:34, name:'statue', prompt:'Статуя', action(){
+        if (F('learnedMedea')) return Dialogue.start([
+          {who:'naya',expr:'sad',text:'«Основательнице театрального отделения». Имя стёрлось, остался только год.'},
+          {who:'naya',expr:'shocked',text:'Тот же год, что в архивной папке. Совпадение, конечно.'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Женщина с маской в руке. Табличка стёрлась до нечитаемости.'},
+          {who:'naya',expr:'normal',text:'Студенты трут ей ботинок на удачу перед экзаменом. Ботинок блестит.'},
+        ]);
+      }},
+    { x:232,y:104,w:40,h:32, name:'board', prompt:'Доска объявлений', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«Показ второго курса — в четверг». «Ищу соседа». «Верните мой зонт, я знаю, кто вы».'},
+          {who:'naya',expr:'smile',text:'Внизу — расписание Ж. Морель. История театра, вторник и четверг.'},
+        ]);
+      }},
+    { x:86,y:196,w:38,h:30, name:'benchYard', prompt:'Скамейка', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Я жду её здесь третий раз за неделю. Уже знаю, какой камень тёплый от солнца.'}]);
+      }},
+  ],
+  npcs: [
+    { x:230,y:246, sprite:'friend', name:'Студентка',
+      when:()=> !F('sueDead'),
+      dialogue:()=> {
+        if (F('investigatedLibrary')) return Dialogue.start([{who:'sue',expr:'normal',name:'Студентка',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
+        return Dialogue.start([{who:'sue',expr:'smile',name:'Студентка',text:'Ты Сью ждёшь? Она ещё на сцене, у них прогон. Минут двадцать.'}]);
+      }},
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+uniHall: {
+  name:"Университет. Коридор", music:'home', w:300, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#1a1a22', dark:.24 },
+  lights:[{x:60,y:30,r:44,c:'#ffe6b0',i:.45},{x:150,y:30,r:44,c:'#ffe6b0',i:.45},{x:240,y:30,r:44,c:'#ffe6b0',i:.45}],
+  sun:{ x:284, y:60, w:38, len:120, tilt:-.3, a:.10 },
+  bgPaint(ctx) {
+    paintInterior(ctx, 300, 300, { wall:'#6d6455', wall2:'#5b5346', floor:'#8a8276', floor2:'#797167', wallH:58, tiles:true });
+    ctx.fillStyle = '#4e4739'; ctx.fillRect(0, 54, 300, 5);
+    ctx.fillStyle = '#3a3630'; ctx.fillRect(0, 58, 300, 3);
+    ctx.fillStyle = '#c8c0b0'; ctx.font = '6px Courier New';
+    ctx.fillText('АУД. 12', 44, 96); ctx.fillText('АУД. 14', 140, 96); ctx.fillText('СЦЕНА', 238, 96);
+    ctx.fillStyle = '#8a8276'; ctx.fillRect(0, 268, 300, 32);
+    ctx.fillStyle = '#e0a0b0'; ctx.font = '7px Courier New'; ctx.fillText('ВО ДВОР', 100, 292);
+  },
+  objects: [
+    { t:'uni_door', x:56,  y:100 },
+    { t:'uni_door', x:152, y:100 },
+    { t:'uni_door', x:250, y:100 },
+    { t:'notice_board', x:104, y:76 },
+    { t:'bench_stone', x:96, y:186 }, { t:'bench_stone', x:214, y:186 },
+    { t:'plant_pot', x:24, y:200 }, { t:'plant_pot', x:278, y:200 },
+    { t:'window_in', x:284, y:70 },
+    { t:'library_shelf', x:26, y:120 },
+  ],
+  walls: [
+    {x:0,y:0,w:300,h:58},{x:0,y:0,w:8,h:300},{x:292,y:0,w:8,h:300},{x:0,y:295,w:300,h:5},
+  ],
+  interactables: [
+    { x:100,y:264,w:44,h:32, name:'toYard', prompt:'Во двор', action: async ()=> await changeRoom('uniCourtyard', 170, 130) },
+    { x:38,y:100,w:38,h:34, name:'toLib', prompt:'Библиотека', action: async ()=> await changeRoom('uniLibrary', 120, 258) },
+    { x:134,y:100,w:38,h:34, name:'aud14', prompt:'Аудитория 14', action(){
+        if (!F('metGenevieveUni')) { Scene.play('meetGenevieveUni'); return; }
+        Dialogue.start([{who:'naya',expr:'normal',text:'Дверь закрыта. Расписание на ней: «История театра. Морель Ж.»'}]);
+      }},
+    { x:232,y:100,w:38,h:34, name:'toStage', prompt:'Сцена', action: async ()=> await changeRoom('uniStage', 120, 262) },
+    { x:86,y:60,w:38,h:32, name:'boardHall', prompt:'Объявления', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Расписание, объявление о наборе в мастерскую и выцветшая афиша прошлогоднего показа.'}]);
+      }},
+    { x:8,y:104,w:38,h:34, name:'shelfHall', prompt:'Стеллаж', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Списанные учебники, которые никто не забирает. Верхний том — «Обряд и представление».'}]);
+      }},
+  ],
+  npcs: [
+    { x:196,y:240, sprite:'acolyte', name:'Студент',
+      when:()=> !F('sueDead'),
+      dialogue:()=> {
+        if (F('learnedMedea')) return Dialogue.start([{who:'acolyte',expr:'worried',name:'Студент',text:'Ты вчера в архиве сидела? Морель потом туда заходила. Спрашивала, кто брал папки.'}]);
+        return Dialogue.start([{who:'acolyte',expr:'normal',name:'Студент',text:'Морель сегодня добрая. Значит, зачёт будет злой.'}]);
+      }},
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+uniStage: {
+  name:"Университет. Сцена", music:'warm', w:240, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.10, wind:0 },
+  light:{ tint:'#181420', dark:.36 },
+  lights:[{x:120,y:120,r:70,c:'#ffe6b0',i:.8},{x:52,y:96,r:38,c:'#ffd0a0',i:.4},{x:188,y:96,r:38,c:'#ffd0a0',i:.4}],
+  bgPaint(ctx) {
+    ctx.fillStyle = '#241c26'; ctx.fillRect(0,0,240,300);
+    ctx.fillStyle = '#2e2430'; ctx.fillRect(0,0,240,52);
+    ctx.fillStyle = '#8a6a44'; ctx.fillRect(0, 52, 240, 140);          // boards
+    ctx.fillStyle = '#775a38'; for (let y=56;y<192;y+=9) ctx.fillRect(0,y,240,1);
+    ctx.fillStyle = '#5f4830'; for (let x=0;x<240;x+=46) ctx.fillRect(x,52,1,140);
+    ctx.fillStyle = '#3a2e3c'; ctx.fillRect(0, 192, 240, 8);
+    ctx.fillStyle = '#6f5a38'; ctx.fillRect(92, 190, 56, 12);      // steps up to the stage
+    ctx.fillStyle = '#8a6a44'; ctx.fillRect(92, 190, 56, 3);
+    ctx.fillStyle = '#5f4830'; ctx.fillRect(92, 196, 56, 1);
+    ctx.fillStyle = '#2a2230'; ctx.fillRect(0, 200, 240, 100);          // auditorium
+    ctx.fillStyle = '#3a3040';
+    for (let r=0;r<3;r++) for (let c=0;c<7;c++) ctx.fillRect(10+c*32, 210+r*28, 24, 18);
+    ctx.fillStyle = '#463a4e'; for (let r=0;r<3;r++) for (let c=0;c<7;c++) ctx.fillRect(10+c*32, 210+r*28, 24, 4);
+    ctx.fillStyle = '#c8c0b0'; ctx.font = '6px Courier New'; ctx.fillText('в коридор', 100, 296);
+  },
+  objects: [
+    { t:'stage_curtain', x:28,  y:52 }, { t:'stage_curtain', x:212, y:52 },
+    { t:'spotlight', x:52, y:20 }, { t:'spotlight', x:120, y:16 }, { t:'spotlight', x:188, y:20 },
+    { t:'piano', x:196, y:180 },
+    { t:'chair_wood', x:74, y:150 }, { t:'chair_wood', x:96, y:154 },
+    { t:'mask_pair', x:120, y:34 },
+    { t:'archive_box', x:44, y:176 },
+  ],
+  walls: [
+    {x:0,y:0,w:240,h:52},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
+    {x:0,y:192,w:92,h:8},{x:148,y:192,w:92,h:8},
+  ],
+  interactables: [
+    { x:100,y:264,w:40,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniHall', 250, 140) },
+    { x:100,y:120,w:44,h:36, name:'stageSpot', prompt:'Центр сцены', action(){
+        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
+          {who:'naya',expr:'empty',text:'Её место на прогоне было вот здесь. Метка мелом ещё не стёрлась.'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'На полу метки мелом. Крестик, стрелка, чьё-то имя.'},
+          {who:'naya',expr:'smile',text:'Сью говорит, что на сцене не страшно, потому что там ты не совсем ты.'},
+          {who:'naya',expr:'sad',text:'(Я бы тоже хотела иногда не совсем быть собой.)'},
+        ]);
+      }},
+    { x:176,y:158,w:44,h:34, name:'piano', prompt:'Пианино', action(){
+        Audio.beep(392,.4,'sine',.12); setTimeout(()=>Audio.beep(330,.5,'sine',.10),260);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Расстроенное. Две клавиши западают. Их обводят карандашом, чтобы не нажимать.'}]);
+      }},
+    { x:100,y:22,w:44,h:30, name:'masks', prompt:'Маски', action(){
+        if (F('learnedWitches')) return Dialogue.start([
+          {who:'naya',expr:'sad',text:'Комедия и трагедия. Женевьева сказала: маску надевают не чтобы скрыться, а чтобы получить право говорить.'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Комедия и трагедия. Висят над сценой сколько стоит здание.'}]);
+      }},
+  ],
+  npcs: [
+    { x:150,y:150, sprite:'sue', name:'Сью',
+      when:()=> F('cafeSceneComplete') && !F('metGenevieveUni'),
+      dialogue:()=> Scene.play('sueRehearsal') },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+uniLibrary: {
+  name:"Университет. Библиотека", music:'tense', w:280, h:300,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
+  light:{ tint:'#1c1820', dark:.30 },
+  lights:[{x:60,y:210,r:40,c:'#ffd9a0',i:.55},{x:220,y:210,r:40,c:'#ffd9a0',i:.55},{x:140,y:44,r:52,c:'#9fc0e0',i:.3}],
+  sun:{ x:140, y:48, w:44, len:150, tilt:.18, a:.11 },
+  bgPaint(ctx) {
+    paintInterior(ctx, 280, 300, { wall:'#5a4a3c', wall2:'#4a3c30', floor:'#6f5a44', floor2:'#5f4c38', wallH:56 });
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(0, 52, 280, 5);
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(96, 150, 88, 100);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('АРХИВ', 210, 96);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(226, 60, 34, 40);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(229, 63, 28, 37);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(252, 80, 3, 4);
+    ctx.fillStyle = '#c8b8a0'; ctx.fillText('в коридор', 96, 296);
+  },
+  objects: [
+    { t:'window_in', x:140, y:38 },
+    { t:'library_shelf', x:36,  y:130 }, { t:'library_shelf', x:86, y:130 },
+    { t:'library_shelf', x:194, y:130 },
+    { t:'library_shelf', x:36,  y:250 }, { t:'library_shelf', x:244, y:250 },
+    { t:'desk', x:140, y:206 }, { t:'chair_wood', x:140, y:232 },
+    { t:'lamp_floor', x:112, y:212 },
+    { t:'archive_box', x:222, y:170 }, { t:'archive_box', x:250, y:176 },
+    { t:'plant_pot', x:16, y:186 },
+  ],
+  walls: [
+    {x:0,y:0,w:280,h:56},{x:0,y:0,w:8,h:300},{x:272,y:0,w:8,h:300},{x:0,y:295,w:280,h:5},
+  ],
+  interactables: [
+    { x:96,y:264,w:44,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniHall', 56, 140) },
+    { x:118,y:184,w:46,h:34, name:'deskRead', prompt:'Стол', action(){ Scene.play('libraryDesk'); }},
+    { x:14,y:104,w:44,h:34, name:'shelfFolk', prompt:'Фольклор', action(){ Scene.play('libraryFolk'); }},
+    { x:172,y:104,w:44,h:34, name:'shelfTheatre', prompt:'История театра', action(){ Scene.play('libraryTheatre'); }},
+    { x:208,y:60,w:44,h:40, name:'archive', prompt:'Архив', action(){ Scene.play('libraryArchive'); }},
+  ],
+  npcs: [
+    { x:60,y:236, sprite:'genevieve', name:'Женевьева',
+      when:()=> F('learnedMedea') && !F('learnedWitches'),
+      dialogue:()=> Scene.play('genevieveReveal') },
+  ],
+},
+
 };   /* ===== end Rooms ===== */
 
 /* Rune disarm helper for witch3House */
@@ -3945,6 +4456,8 @@ const Player = {
   x:120, y:210, w:10, h:8,
   sprite:'naya', dir:'down', moving:false, animFrame:0, animTimer:0,
   currentSprite() {
+    // in the prologue the player is little Sue, not Naya
+    if (F('prologPlayground') && !F('prologueComplete')) return 'sueChild';
     if (F('chosenWitchPath') || F('sueLeftDead')) return 'nayaDark';
     if (FX.corruption > 0.72) return 'nayaDark';
     return 'naya';
@@ -4317,6 +4830,14 @@ const Scene = {
     if (cmd.glitch) { await FX.glitch(cmd.glitch, cmd.strength||0.55); return; }
     if (cmd.magic)  { await FX.magicCircle(Player.x, Player.y - 4, cmd.magic, cmd.dur||2000); return; }
     if (cmd.fx)     { await FXScenes[cmd.fx](); return; }
+    if (cmd.star !== undefined) { Prologue.addStar(cmd.star); return; }
+    if (cmd.crackStar !== undefined) { Prologue.crackStar(cmd.crackStar); return; }
+    if (cmd.medea !== undefined)  { Prologue.showMedea = cmd.medea; return; }
+    if (cmd.lilithFig !== undefined) { Prologue.showLilith = cmd.lilithFig; return; }
+    if (cmd.crystalGlow !== undefined) { Prologue.crystalGlow = cmd.crystalGlow; return; }
+    if (cmd.stones) { Prologue.liftStones(cmd.stones[0], cmd.stones[1], cmd.stones[2] || 5); return; }
+    if (cmd.butterfly) { await Prologue.flyButterfly(cmd.butterfly.from, cmd.butterfly.to, cmd.butterfly.ms || 1400); return; }
+    if (cmd.resetProlog) { Prologue.reset(); return; }
     if (cmd.checkpoint) { saveCheckpoint(cmd.checkpoint); return; }
     if (cmd.montage){ await Montage.run(cmd.montage); return; }
     if (cmd.goto)   { return { goto: cmd.goto }; }
@@ -4324,6 +4845,132 @@ const Scene = {
     if (cmd.ending) { await Endings.show(cmd.ending); return; }
     return;
   }
+};
+
+/* =====================================================================
+   PROLOGUE STAGING — the four black stars, Naya's first magic, and the
+   butterfly. Drawn straight onto the room canvas so the prologue uses the
+   same renderer as the rest of the game.
+===================================================================== */
+const Prologue = {
+  stars: [], starWords: ['ВИДЬ СКВОЗЬ', 'ПОДЧИНЯЙ', 'РАЗРУШАЙ', 'ТВОРИ'],
+  showMedea:false, showLilith:false, crystalGlow:0,
+  stones: [], stonesT:0,
+  butterfly:null, glow:0, floatSue:0,
+
+  reset() {
+    this.stars = []; this.showMedea = false; this.showLilith = false;
+    this.crystalGlow = 0; this.stones = []; this.stonesT = 0;
+    this.butterfly = null; this.glow = 0; this.floatSue = 0;
+  },
+  addStar(i) { this.stars.push({ i, t:0 }); Audio.beep(140 + i*40, .5, 'sine', .1); },
+  crackStar(i) { const st = this.stars.find(s => s.i === i); if (st) st.cracked = true; },
+
+  /* four black stars hanging over the hall, each with its command */
+  drawStars(ctx) {
+    const t = Date.now();
+    this.stars.forEach(st => {
+      const x = 44 + st.i * 52, y = 62 + (st.i % 2) * 16;
+      const r = 15 + Math.sin(t/700 + st.i) * 1.5;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = st.cracked ? '#2a0810' : '#08060c';
+      ctx.beginPath();
+      for (let k = 0; k < 10; k++) {
+        const a = -Math.PI/2 + k * Math.PI/5, rr = k % 2 ? r * .42 : r;
+        k ? ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr) : ctx.moveTo(Math.cos(a)*rr, Math.sin(a)*rr);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = st.cracked ? '#ff4030' : '#5a2040';
+      ctx.lineWidth = 1; ctx.stroke();
+      if (st.cracked) {
+        ctx.strokeStyle = '#ff6040';
+        ctx.beginPath(); ctx.moveTo(-r*.5, -r*.3); ctx.lineTo(r*.2, r*.5); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.fillStyle = st.cracked ? '#ff8060' : '#8a6a80';
+      ctx.font = '6px Courier New'; ctx.textAlign = 'center';
+      ctx.fillText(this.starWords[st.i], x, y + r + 9);
+      ctx.textAlign = 'left';
+      if (Math.random() < .25) FX.spawn(x, y, 1, {color:'#5a2040', spread:r*2, rise:-.2, life:40});
+    });
+  },
+  drawFigures(ctx) {
+    const t = Date.now();
+    if (this.showLilith) {                       // a throne-high silhouette
+      ctx.fillStyle = 'rgba(10,0,6,.9)';
+      ctx.beginPath();
+      ctx.moveTo(120, 118); ctx.lineTo(96, 250); ctx.lineTo(144, 250); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#1a0208';
+      ctx.beginPath(); ctx.arc(120, 112, 14, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#2a0410';
+      ctx.beginPath(); ctx.moveTo(108,104); ctx.lineTo(100,84); ctx.lineTo(114,100); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(132,104); ctx.lineTo(140,84); ctx.lineTo(126,100); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff2a30';
+      ctx.fillRect(113, 110, 3, 2); ctx.fillRect(124, 110, 3, 2);
+    }
+    if (this.showMedea) {
+      const a = .55 + .2 * Math.sin(t/600);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#3a2a3e';
+      ctx.beginPath(); ctx.moveTo(70, 176); ctx.lineTo(54, 250); ctx.lineTo(86, 250); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(70, 170, 9, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+      if (this.crystalGlow > 0) {
+        const cg = this.crystalGlow * (.7 + .3 * Math.sin(t/220));
+        const gr = ctx.createRadialGradient(70, 190, 0, 70, 190, 34 * cg);
+        gr.addColorStop(0, `rgba(200,120,255,${(.7*cg).toFixed(2)})`);
+        gr.addColorStop(1, 'rgba(200,120,255,0)');
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(70, 190, 34*cg, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#e8c0ff'; ctx.fillRect(68, 188, 4, 5);
+        if (Math.random() < .5) FX.spawn(70, 190, 1, {color:'#c060ff', spread:12, rise:-.4, life:50});
+      }
+    }
+  },
+
+  /* pebbles lifting off the ground around little Naya */
+  liftStones(x, y, n) {
+    for (let i = 0; i < n; i++)
+      this.stones.push({ bx:x, by:y, a:(i/n)*6.28, r:10 + i*3, h:0, sp:.6 + i*.12 });
+  },
+  drawStones(ctx) {
+    if (!this.stones.length) return;
+    this.stonesT += .03;
+    this.stones.forEach(st => {
+      st.h = Math.min(18, st.h + .25);
+      const x = st.bx + Math.cos(st.a + this.stonesT * st.sp) * st.r;
+      const y = st.by - st.h + Math.sin(st.a + this.stonesT * st.sp) * 3;
+      ctx.fillStyle = '#6a625a'; ctx.fillRect(Math.round(x), Math.round(y), 3, 2);
+      ctx.fillStyle = '#8a827a'; ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      if (Math.random() < .06) FX.spawn(x, y, 1, {color:'#c060ff', spread:4, rise:-.3, life:30});
+    });
+  },
+
+  /* the butterfly: a short flight path, then it settles on Sue's hand */
+  flyButterfly(from, to, ms) {
+    this.butterfly = { x:from[0], y:from[1], fx:from[0], fy:from[1], tx:to[0], ty:to[1], t:0, dur:ms, landed:false };
+    return new Promise(r => setTimeout(() => { if (this.butterfly) this.butterfly.landed = true; r(); }, ms));
+  },
+  drawButterfly(ctx) {
+    const b = this.butterfly; if (!b) return;
+    if (!b.landed) {
+      b.t = Math.min(1, b.t + 16 / b.dur);
+      const e = b.t * b.t * (3 - 2 * b.t);
+      b.x = b.fx + (b.tx - b.fx) * e;
+      b.y = b.fy + (b.ty - b.fy) * e - Math.sin(e * Math.PI) * 22;
+    }
+    const t = Date.now();
+    const flap = Math.abs(Math.sin(t / (b.landed ? 420 : 110)));
+    const gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, 12);
+    gr.addColorStop(0, 'rgba(210,150,255,.55)'); gr.addColorStop(1, 'rgba(210,150,255,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, 12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#e8c8ff';
+    const w = 1 + flap * 3;
+    ctx.fillRect(b.x - 1 - w, b.y - 2, w, 4);
+    ctx.fillRect(b.x + 1,     b.y - 2, w, 4);
+    ctx.fillStyle = '#fff0ff'; ctx.fillRect(b.x - 0.5, b.y - 2, 1, 5);
+    if (Math.random() < .3) FX.spawn(b.x, b.y, 1, {color:'#c060ff', spread:5, rise:-.2, life:34});
+  },
 };
 
 /* =====================================================================
@@ -4508,6 +5155,27 @@ const Memories = {
       draw:(g)=>{ g.fillStyle='#1a1018';g.fillRect(0,0,200,120); g.fillStyle='#8090a0';g.fillRect(70,20,60,80); g.fillStyle='#c0304d';g.globalAlpha=.4;g.fillRect(70,20,60,80);g.globalAlpha=1; } },
     { key:'imp',      title:'Улыбки ада',      text:'«Ты ведь ещё не поняла, почему здесь все улыбаются?»\n\n«Потому что каждый из нас однажды получил ровно то, что просил.»',
       draw:(g)=>{ g.fillStyle='#200408';g.fillRect(0,0,200,120); g.fillStyle='#701020';[40,80,120,160].forEach(x=>g.fillRect(x-10,50,20,40)); g.fillStyle='#ffa020';[40,80,120,160].forEach(x=>g.fillRect(x-4,62,8,2)); } },
+    { key:'medea',    title:'Мидея',            text:'«Мидея дрожала перед словом "Разрушай".»\n\nЕй приказали сделать тварь из искалеченных душ. Она попробовала их исцелить и отпустить.\n\nСоздание вышло безвредным, почти добрым. Именно в этом и открылся обман.',
+      draw:(g)=>{ g.fillStyle='#0a0208';g.fillRect(0,0,200,120);
+        g.fillStyle='#08060c'; for(let i=0;i<4;i++){g.beginPath();g.arc(34+i*44,40,11,0,7);g.fill();}
+        g.strokeStyle='#5a2040'; for(let i=0;i<4;i++){g.beginPath();g.arc(34+i*44,40,11,0,7);g.stroke();}
+        g.fillStyle='#c060ff';g.beginPath();g.arc(100,86,7,0,7);g.fill(); } },
+    { key:'firstMeeting', title:'У четырнадцатой', text:'«Ты ведь не студентка.»\n\n«Нет.»\n\n«Тогда почему ты уже третий раз ждёшь кого-то у моей аудитории?»\n\nОна смотрела не на меня. Она смотрела на кристалл.',
+      draw:(g)=>{ g.fillStyle='#221c18';g.fillRect(0,0,200,120);
+        g.fillStyle='#5f4530';g.fillRect(80,24,40,72); g.fillStyle='#a8c0d8';g.fillRect(86,32,28,20);
+        g.fillStyle='#c9a05a';g.fillRect(112,60,4,5);
+        g.fillStyle='#c060ff';g.beginPath();g.arc(52,70,5,0,7);g.fill(); } },
+    { key:'medeaTruth', title:'Имя',              text:'Мидея. Так звали мою мать.\n\nЯ не слышала это имя пятнадцать лет — его никто не произносил вслух.\n\n«Перед казнью передала свою силу дочери, заключив её в кристалл.»\n\nДочери. Мне.',
+      draw:(g)=>{ g.fillStyle='#1a1610';g.fillRect(0,0,200,120);
+        g.fillStyle='#d8cfae';g.fillRect(58,22,84,76); g.fillStyle='#8a806a';
+        for(let i=0;i<8;i++) g.fillRect(66,32+i*8,60-((i*7)%22),2);
+        g.fillStyle='#c060ff';g.beginPath();g.arc(150,86,6,0,7);g.fill(); } },
+    { key:'reveal',   title:'Три сферы',          text:'«Мир расколот на три сферы: Рай, Ад и Земля. Между ними — преграды.»\n\n«Пройти можно только древними путями. Тех, кто их знает, и называют ведьмами.»\n\nЖеневьева сказала это ровным голосом преподавателя. Так и запомнилось.',
+      draw:(g)=>{ g.fillStyle='#0e1018';g.fillRect(0,0,200,120);
+        g.fillStyle='#c8d8f0';g.beginPath();g.arc(100,26,15,0,7);g.fill();
+        g.fillStyle='#6a8a5a';g.beginPath();g.arc(100,60,15,0,7);g.fill();
+        g.fillStyle='#8a1820';g.beginPath();g.arc(100,94,15,0,7);g.fill();
+        g.strokeStyle='#4a4a5a';g.beginPath();g.moveTo(100,41);g.lineTo(100,45);g.moveTo(100,75);g.lineTo(100,79);g.stroke(); } },
     { key:'dorothy',  title:'Дороти',           text:'Сью притащила её с помойки за университетом. Серая, круглая, вечно голодная.\n\n«Потому что она тоже далеко от дома», — сказала Сью, и вопрос был закрыт.\n\nТеперь Дороти сидит у двери и ждёт человека, который не придёт. Я не знаю, как объясняют такое кошкам.',
       draw:(g)=>{ g.fillStyle='#20202a';g.fillRect(0,0,200,120);
         g.fillStyle='#a9a49e';g.beginPath();g.ellipse(100,66,34,24,0,0,7);g.fill();
@@ -4731,126 +5399,447 @@ const Scripts = {
 
 /* ---------- PROLOGUE ---------- */
 prologue: [
-  { dlg:[{who:'naya',expr:'normal',text:'...Пора выходить. Сью, наверное, уже ждёт.'}] },
-  { fadeOut:400 },
-  { title:'ПРОЛОГ', dur:1500 },
+  { resetProlog:true },
+  { music:'hell' },
+  { room:'prologueHell', x:120, y:200 },
+  { wait:900 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'С давних времён мир был расколот на три великие сферы: светлый Рай, пылающий Ад и зыбкую Землю.'},
+    {who:'narrator',expr:'normal',name:'',text:'Между ними воздвиглись непреодолимые преграды, и никто не смел переступить их...'},
+    {who:'narrator',expr:'normal',name:'',text:'...кроме тех, кто владел тайной древних путей. Этих избранных существ называли ведьмами.'},
+    {who:'narrator',expr:'normal',name:'',text:'Их было несметное множество — сотни, тысячи. Но лишь немногие поднимались до вершин истинного могущества.'},
+  ]},
+  { lilithFig:true }, { sfx:'low' }, { shake:2 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Над всеми же властвовала одна — первая и сильнейшая, Лилит, жена самого Люцифера.'},
+    {who:'narrator',expr:'normal',name:'',text:'Её чёрная воля стремилась к тому, чтобы множить подобных себе.'},
+    {who:'narrator',expr:'normal',name:'',text:'И потому она избрала четверых особых ведьм: Агату, Беатрис, Руби... и Мидею.'},
+  ]},
+  { star:0 }, { wait:420 }, { star:1 }, { wait:420 }, { star:2 }, { wait:420 }, { star:3 }, { wait:500 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Им были даны четыре повеления, высеченные в чёрных звёздах: «Видь сквозь. Подчиняй. Разрушай. Твори.»'},
+    {who:'narrator',expr:'normal',name:'',text:'И каждая ведьма покорно следовала им — кроме одной.'},
+  ]},
+  { medea:true }, { wait:600 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Мидея дрожала перед словом «Разрушай». Она верила: творить можно иначе, не разрушая, а исцеляя и возрождая.'},
+  ]},
+  { crackStar:2 }, { sfx:'scare' }, { shake:4 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Она дерзнула ослушаться, солгала своей повелительнице.'},
+    {who:'narrator',expr:'normal',name:'',text:'Там, где должна была появиться чудовищная тварь из искалеченных душ, она попыталась соединить их, исцелить и отпустить.'},
+    {who:'narrator',expr:'normal',name:'',text:'Её создание оказалось безвредным, почти добрым. Но именно в этом и открылся её обман.'},
+  ]},
+  { sfx:'heart' }, { shake:6 }, { flash:'#ff2a30', dur:420, peak:.7 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Гнев Лилит был страшен. Она приговорила предательницу к смерти.'},
+  ]},
+  { crystalGlow:1 }, { sfx:'chime' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Но прежде чем кара настигла её, Мидея вложила всю свою силу в сверкающий кристалл и передала его в руки дочери.'},
+    {who:'narrator',expr:'normal',name:'',text:'Так девочка-ведьма стала хранительницей силы, равной божественной.'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Но эта история — не о ней.'},
+    {who:'narrator',expr:'normal',name:'',text:'Истинная история начинается с другой девочки — простой, земной, далёкой от величия.'},
+    {who:'narrator',expr:'normal',name:'',text:'И всё же её судьба окажется тесно переплетена с дочерью Мидеи, так, что от этой связи изменится весь мир...'},
+  ]},
+  { music:'none' },
+  { fadeOut:1600 },
+  { wait:900 },
+  { resetProlog:true },
+  { memory:'medea' },
+
+  /* ---- chapter card ---- */
+  { title:'ГЛАВА ПЕРВАЯ\nПРОБУЖДЕНИЕ', dur:2600 },
+  { title:'«Два самых важных дня в твоей жизни:\nдень, когда ты появился на свет,\nи день, когда понял, зачем.»\n— Марк Твен', dur:4200 },
+
+  /* ---- the playground, twelve years ago ---- */
+  { room:'playground', x:150, y:236 },
+  { music:'warm' },
+  { fadeIn:1500 },
+  { flag:'prologPlayground' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Двенадцать лет назад. Осень, окраина города, пустая площадка.'},
+    {who:'sueChild',expr:'smile',name:'Сью',text:'(Мне пять. Мама сказала — двадцать минут, и домой.)'},
+    {who:'sueChild',expr:'smile',name:'Сью',text:'(Значит, надо успеть накачаться на год вперёд.)'},
+  ]},
+  { dlg:[{who:'narrator',expr:'normal',name:'',text:'(Походи по площадке. Когда надоест — залезай на качели.)'}] },
+],
+
+/* the swing, and the first magic in the game */
+prologSwing: [
+  { dlg:[
+    {who:'sueChild',expr:'smile',name:'Сью',text:'Выше! Выше!'},
+  ]},
+  { wait:400 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Она отталкивается слишком сильно.'},
+  ]},
+  { sfx:'door' }, { shake:3 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Качели резко уходят вперёд. Сью выскальзывает из сиденья и летит.'},
+  ]},
+  { flash:'#ffffff', dur:260, peak:.55 },
+  { sfx:'low' },
+  async ()=>{ Prologue.showMedea = false; },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'И время... останавливается.'},
+  ]},
+  { magic:'#c060ff', dur:2000 },
+  { dlg:[
+    {who:'sueChild',expr:'shocked',name:'Сью',text:'...'},
+    {who:'narrator',expr:'normal',name:'',text:'Сью открывает глаза. Она висит в воздухе, в двух метрах над утоптанной землёй.'},
+    {who:'narrator',expr:'normal',name:'',text:'Вокруг неё мерцающее облако. В воздухе медленно кружатся фиолетовые искры.'},
+  ]},
+  { flag:'prologNayaSeen' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'В нескольких шагах стоит девочка. Года четыре, худенькая, с огромными глазами.'},
+    {who:'narrator',expr:'normal',name:'',text:'Она стоит с вытянутыми ладонями. Искры идут от неё.'},
+    {who:'narrator',expr:'normal',name:'',text:'Она очень сосредоточена — так сосредоточена, что забыла дышать.'},
+  ]},
+  { sfx:'chime' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Сью медленно опускается на землю и оказывается на ногах.'},
+    {who:'narrator',expr:'normal',name:'',text:'Девочки смотрят друг на друга.'},
+  ]},
+  { stones:[126, 214, 6] },
+  { sfx:'rune' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Камешек у ног Сью поднимается в воздух. Потом второй. Потом ещё несколько.'},
+    {who:'narrator',expr:'normal',name:'',text:'Камни медленно кружатся вокруг девочки вместе с искрами.'},
+  ]},
+  { crystalGlow:1 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Она делает резкое движение рукой. Кулон с кристаллом у неё на груди начинает светиться.'},
+    {who:'narrator',expr:'normal',name:'',text:'В её ладони появляется маленький огонёк.'},
+    {who:'sueChild',expr:'shocked',name:'Сью',text:'Ух ты!'},
+  ]},
+  { butterfly:{ from:[126,196], to:[150,214], ms:1800 } },
+  { sfx:'chime' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Огонёк расправляется в светящуюся бабочку.'},
+    {who:'narrator',expr:'normal',name:'',text:'Бабочка подлетает к Сью и садится ей на ладонь.'},
+    {who:'sueChild',expr:'smile',name:'Сью',text:'...'},
+    {who:'narrator',expr:'normal',name:'',text:'Сью смотрит на бабочку. Потом на девочку. Девочка нервничает и мешкается.'},
+  ]},
+  { dlg:[
+    {who:'sueChild',expr:'smile',name:'Сью',text:'А ты можешь сделать ещё?'},
+    {who:'narrator',expr:'normal',name:'',text:'Девочка улыбается и кивает. Подходит ближе.'},
+    {who:'sueChild',expr:'smile',name:'Сью',text:'Меня Сью зовут!'},
+    {who:'narrator',expr:'normal',name:'',text:'Она осторожно протягивает руку.'},
+    {who:'nayaChild',expr:'shocked',name:'Ная',text:'Я Ная...'},
+    {who:'narrator',expr:'normal',name:'',text:'Они смотрят друг на друга и улыбаются.'},
+    {who:'narrator',expr:'normal',name:'',text:'Дует ветер. На фоне слегка скрипят качели.'},
+  ]},
+  { butterfly:{ from:[150,214], to:[120,150], ms:1500 } },
+  { wait:600 },
+  { music:'none' },
+  { fadeOut:2000 },
+  { resetProlog:true },
+  { flag:'prologueComplete' },
+  { memory:'meeting' },
+  { stats:{ trustSue:+10 } },
+  { goto:'chapterOne' },
+],
+
+/* ---- the present day: an ordinary morning, fifteen years later ---- */
+chapterOne: [
+  { title:'ПЯТНАДЦАТЬ ЛЕТ СПУСТЯ', dur:2400 },
+  { room:'nayaRoom', x:186, y:190 },
+  { music:'home' },
+  { fadeIn:1400 },
+  { flag:'mainStoryStarted' },
+  { flag:'metSue' },
+  { dlg:[
+    {who:'naya',expr:'sad',text:'...'},
+    {who:'naya',expr:'normal',text:'Половина восьмого. Будильник ещё не звонил, но Сью уже гремит на кухне, значит, всё равно вставать.'},
+    {who:'sue',expr:'smile',text:'Ная! Ты не видела мой сценарий? Такой, зелёный, весь исписанный!'},
+    {who:'naya',expr:'normal',text:'Под твоей подушкой. Как всегда.'},
+    {who:'sue',expr:'smile',text:'...точно.'},
+  ]},
+  { dlg:[
+    {who:'sue',expr:'normal',text:'У меня сегодня прогон, потом Морель, потом опять прогон. Вернусь поздно.'},
+    {who:'naya',expr:'normal',text:'У меня смена до шести. Могу зайти за тобой.'},
+    {who:'sue',expr:'smile',text:'Зайди. Только не жди в коридоре с таким лицом, как в прошлый раз. Ты пугаешь первокурсников.'},
+    {who:'naya',expr:'normal',text:'У меня обычное лицо.'},
+    {who:'sue',expr:'smile',text:'У тебя лицо человека, который пришёл описывать имущество.'},
+  ]},
+  { dlg:[
+    {who:'dorothy',expr:'normal',text:'Мяу.'},
+    {who:'sue',expr:'smile',text:'И Дороти со мной согласна.'},
+    {who:'naya',expr:'smile',text:'Дороти согласна с тем, кто ближе к холодильнику.'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Осмотрюсь. Потом — на работу. Кафе на нашей же улице.)'},
+  ]},
+],
+
+/* ---------- ACT 1: the university ---------- */
+sueRehearsal: [
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Ная! Ты рано. У нас ещё прогон.'},
+    {who:'naya',expr:'normal',text:'Я подожду.'},
+    {who:'sue',expr:'normal',text:'Подожди у четырнадцатой, ладно? Мне после прогона к Морель, это две минуты.'},
+    {who:'sue',expr:'smile',text:'И не стой с этим лицом.'},
+    {who:'naya',expr:'smile',text:'У меня. Обычное. Лицо.'},
+  ]},
+  { flag:'waitingAtAud' },
+  { dlg:[{who:'naya',expr:'normal',text:'(Аудитория 14. Это в коридоре, посередине.)'}] },
+],
+
+meetGenevieveUni: [
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Дверь четырнадцатой. Внутри кто-то говорит — ровно, негромко, будто читает вслух.)'},
+    {who:'naya',expr:'normal',text:'(Стою третий раз за неделю на одном и том же месте. Уже знаю, где паркет скрипит.)'},
+  ]},
+  { wait:600 },
+  { sfx:'rune' }, { magic:'#c060ff', dur:1500 }, { shake:2 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'...'},
+    {who:'naya',expr:'shocked',text:'(Кристалл. Он дёрнулся под кофтой — коротко, как разряд.)'},
+    {who:'naya',expr:'shocked',text:'(И горячий. Он никогда не был горячим.)'},
+  ]},
+  { flash:'#c060ff', dur:280, peak:.5 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Вспышка. Секунда, не больше. Никто в коридоре не обернулся.)'},
+    {who:'naya',expr:'normal',text:'(...кроме одного человека.)'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'genevieve',expr:'normal',text:'Ты ведь не студентка.'},
+    {who:'naya',expr:'normal',text:'Нет.'},
+    {who:'genevieve',expr:'normal',text:'Тогда почему ты уже третий раз ждёшь кого-то у моей аудитории?'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Она не сердится. Она просто ждёт ответа.', options:[
+      { text:'«Я жду подругу. Сью. Она у вас учится.»',
+        stats:{trustSue:+4, humanity:+3},
+        then:[
+          {who:'naya',expr:'normal',text:'Я жду подругу. Сью. Она у вас учится.'},
+          {who:'genevieve',expr:'smile',text:'А. Громкая, рыжий шарф, вечно опаздывает и всегда знает текст.'},
+          {who:'naya',expr:'smile',text:'Это она.'},
+        ]},
+      { text:'«А это запрещено — стоять в коридоре?»',
+        stats:{witchAmbition:+4, humanity:-2},
+        then:[
+          {who:'naya',expr:'angry',text:'А это запрещено — стоять в коридоре?'},
+          {who:'genevieve',expr:'normal',text:'Нет. Стоять можно сколько угодно.'},
+          {who:'genevieve',expr:'serious',text:'Я просто отмечаю, что ты стоишь.'},
+        ]},
+      { text:'Промолчать.',
+        stats:{witchAmbition:+2},
+        then:[
+          {who:'naya',expr:'normal',text:'...'},
+          {who:'genevieve',expr:'normal',text:'Понятно.'},
+          {who:'genevieve',expr:'smile',text:'Ты не первая, кто мне не отвечает. Обычно у таких есть причина.'},
+        ]},
+    ]}},
+  ]},
+  { dlg:[
+    {who:'sue',expr:'smile',name:'Сью',text:'НАЯ!'},
+    {who:'naya',expr:'shocked',text:'(Сью машет с другого конца коридора и, конечно, роняет папку.)'},
+  ]},
+  { wait:400 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Женевьева смотрит на кристалл. Потом на Наю. Слегка улыбается.'},
+    {who:'genevieve',expr:'smile',text:'Хорошего вечера.'},
+    {who:'narrator',expr:'normal',name:'',text:'И уходит.'},
+  ]},
+  { flag:'metGenevieveUni' },
+  { flag:'crystalReacted' },
+  { memory:'firstMeeting' },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Она посмотрела не на меня. Она посмотрела на кристалл.)'},
+    {who:'naya',expr:'talk',text:'(В библиотеке есть архив. Надо посмотреть, кто она такая.)'},
+  ]},
+],
+
+/* ---------- the investigation ---------- */
+libraryFolk: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Полка с фольклором. Народные обряды, поверья, сборники быличек.'},
+    {who:'naya',expr:'normal',text:'Половина книг подписана одной рукой на полях. Аккуратный мелкий почерк.'},
+    {if:()=> C('libClues') >= 1, then:[
+      {who:'naya',expr:'talk',text:'«Порог — договор, а не доска.» И ниже: «Приглашать должен человек».'},
+      {who:'naya',expr:'normal',text:'(Кому вообще придёт в голову спорить с книжкой на полях?)'},
+    ], else:[
+      {who:'naya',expr:'normal',text:'«Три сферы» — тут кто-то подчеркнул дважды.'},
+    ]},
+    {action(){ addC('libClues'); }},
+  ]},
+  { jump:()=> C('libClues') >= 3 && !F('learnedMedea') ? 'libraryBreak' : null },
+],
+libraryTheatre: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'История театра. Ряды одинаковых корешков, между ними — тонкая папка без названия.'},
+    {who:'naya',expr:'normal',text:'Фотографии выпусков. Тридцатые, сороковые, пятидесятые.'},
+    {who:'naya',expr:'shocked',text:'(На фотографии сорок девятого года, в третьем ряду, стоит женщина.)'},
+    {who:'naya',expr:'shocked',text:'(Очень похожая на преподавательницу Сью. Совсем похожая.)'},
+    {who:'naya',expr:'normal',text:'(Ну да. Бабушка. Внучка. Такое бывает.)'},
+    {action(){ addC('libClues'); }},
+  ]},
+  { jump:()=> C('libClues') >= 3 && !F('learnedMedea') ? 'libraryBreak' : null },
+],
+libraryDesk: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Читальный стол под лампой. Кто-то оставил раскрытую книгу и не вернулся.'},
+    {if:()=> F('learnedMedea'), then:[
+      {who:'naya',expr:'sad',text:'Я сидела за этим столом четыре часа и узнала, как звали мою мать до того, как её начали звать гнилой.'},
+    ], else:[
+      {who:'naya',expr:'normal',text:'Закладка на главе «Обряд перехода». Я читаю первый абзац три раза и не понимаю ни слова.'},
+      {who:'naya',expr:'talk',text:'(Кристалл лежит на груди спокойно. Здесь он молчит.)'},
+    ]},
+  ]},
+],
+libraryArchive: [
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Дверь архива не заперта. Внутри пахнет бумагой и пылью, и очень тихо.'},
+    {who:'naya',expr:'normal',text:'Коробки по годам. Личные дела, программки, списки.'},
+  ]},
+  { sfx:'rune' }, { magic:'#c060ff', dur:1400 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Кристалл снова дёрнулся. Здесь. Именно на этой коробке.)'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Папка без года. Внутри — семь листов, отпечатанных на машинке.)'},
+    {who:'naya',expr:'normal',text:'«...в фольклорной традиции региона — четыре повеления, высеченные в чёрных звёздах...»'},
+    {who:'naya',expr:'normal',text:'«Видь сквозь. Подчиняй. Разрушай. Твори.»'},
+    {who:'naya',expr:'shocked',text:'(Я знаю эти слова. Я не знаю откуда, но я их знаю.)'},
+  ]},
+  { flag:'investigatedUniversity' },
+  { action:0 },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'«...из четверых одна отказалась исполнять третье повеление. В записях она названа Мидеей.»'},
+    {who:'naya',expr:'shocked',text:'...'},
+    {who:'naya',expr:'shocked',text:'(Мидея.)'},
+    {who:'naya',expr:'shocked',text:'(Так звали мою мать.)'},
+  ]},
+  { sfx:'heart' }, { shake:3 }, { glitch:400, strength:.4 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Не «мама». Не «эта женщина». Не «гнилая». Мидея.)'},
+    {who:'naya',expr:'sad',text:'(Я не слышала это имя пятнадцать лет. Его никто не произносил вслух.)'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'normal',text:'«...приговорена к смерти за неповиновение. Перед казнью передала свою силу дочери, заключив её в кристалл...»'},
+    {who:'naya',expr:'shocked',text:'(Я опускаю руку и трогаю его через кофту. Он тёплый — впервые не пугающе, а как-то... узнаваемо.)'},
+    {who:'naya',expr:'sad',text:'(Дочери.)'},
+    {who:'naya',expr:'sad',text:'(Мне.)'},
+  ]},
+  { flag:'learnedMedea' },
+  { memory:'medeaTruth' },
+  { stats:{ witchAmbition:+8 } },
   { music:'sad' },
   { dlg:[
-    {who:'narrator',expr:'normal',name:'',text:'Ная выросла в тени своей матери — женщины, которую вся улица звала "гнилой земной ведьмой".'},
-    {who:'narrator',expr:'normal',name:'',text:'Не за колдовство. За то, что она брала у людей деньги и оставляла им пустоту.'},
-    {who:'narrator',expr:'normal',name:'',text:'Мать умерла, когда Нае было двенадцать. Улица не изменила мнения — просто перенесла его на дочь.'},
-    {who:'naya',expr:'sad',text:'Меня не били. Со мной просто не разговаривали. Это тише и работает лучше.'},
-    {who:'naya',expr:'normal',text:'Школа, потом кафе, потом съёмная комната. Всё, что у меня есть, помещается в один шкаф.'},
-    {who:'narrator',expr:'normal',name:'',text:'Один-единственный свет в этой жизни появился, когда Нае было девять.'},
-    {who:'narrator',expr:'normal',name:'',text:'За гаражами. С двумя эскимо, одно из которых "начало таять".'},
-    {who:'sue',expr:'smile',text:'Эй. Второе тает, помоги.'},
-    {who:'naya',expr:'shocked',text:'(Она врала. Она специально купила два.)'},
-    {who:'narrator',expr:'normal',name:'',text:'Её звали Сью. У Сью была семья, друзья, йога по четвергам и лёгкость, которую невозможно подделать.'},
-    {who:'narrator',expr:'normal',name:'',text:'У Наи была Сью.'},
-    {who:'naya',expr:'sad',text:'И этого всегда было и слишком много, и катастрофически мало.'},
+    {who:'naya',expr:'sad',text:'(Всю жизнь мне говорили, что мать была плохой ведьмой.)'},
+    {who:'naya',expr:'angry',text:'(А она отказалась разрушать. Её убили именно за это.)'},
+    {who:'naya',expr:'shocked',text:'(И я ношу её силу на шее с четырёх лет.)'},
   ]},
-  { memory:'meeting' },
-  { flag:'prologueComplete' },
-  { fadeIn:500 },
-  { music:'home' },
-  { dlg:[{who:'naya',expr:'normal',text:'(Пора идти. Через коридор, потом подъезд — и на улицу.)'}] },
-  { room:'corridor1', x:120, y:150 },
+  { wait:600 },
+  { dlg:[
+    {who:'genevieve',expr:'normal',text:'Я так и думала, что ты дойдёшь до этой папки.'},
+    {who:'naya',expr:'shocked',text:'...сколько вы там стоите?'},
+    {who:'genevieve',expr:'smile',text:'Достаточно.'},
+    {who:'genevieve',expr:'serious',text:'Сядь. Разговор будет длинный, а ты стоишь так, будто сейчас упадёшь.'},
+  ]},
+  { dlg:[{who:'naya',expr:'normal',text:'(Она села за стол у окна. И ждёт.)'}] },
+],
+libraryBreak: [
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Слишком много совпадений для одного вечера.)'},
+    {who:'naya',expr:'normal',text:'(Архив. Он в глубине, за той дверью.)'},
+  ]},
 ],
 
-/* ---------- Дороти ---------- */
-dorothy: [
-  { jump:()=> {
-      if (F('sueDead') && !F('sueRevived')) return 'dorothyAlone';
-      if (F('sueRevived')) return 'dorothyAfter';
-      return 'dorothyNormal';
-    }},
-],
-dorothyNormal: [
+genevieveReveal: [
+  { music:'tense' },
   { dlg:[
-    {if:()=> C('catPets') === 0, then:[
-      {who:'dorothy',expr:'normal',text:'Мрр.'},
-      {who:'naya',expr:'smile',text:'Дороти. Серая, круглая и абсолютно уверенная, что эта квартира её.'},
-      {who:'naya',expr:'normal',text:'Сью притащила её с помойки за университетом на втором курсе. Назвала в честь девочки из «Волшебника».'},
-      {who:'naya',expr:'smile',text:'«Потому что она тоже далеко от дома», — сказала Сью. И всё, вопрос был закрыт.'},
-    ], else:[
-      {if:()=> C('catPets') === 1, then:[
-        {who:'dorothy',expr:'normal',text:'Мрррр.'},
-        {who:'naya',expr:'normal',text:'Она спит на моей подушке, а любит Сью. Я не в обиде — я бы тоже выбрала Сью.'},
-      ], else:[
-        {if:()=> C('catPets') === 2, then:[
-          {who:'dorothy',expr:'normal',text:'Мяу.'},
-          {who:'naya',expr:'smile',text:'Требует еду. Ей всегда пора есть — это единственная её последовательная черта.'},
-        ], else:[
-          {who:'dorothy',expr:'normal',text:'Мрр?'},
-          {who:'naya',expr:'normal',text:'Ладно, ладно. Иди сюда.'},
+    {who:'genevieve',expr:'normal',text:'Начнём с простого. Меня зовут Женевьева Морель, я преподаю историю театра.'},
+    {who:'genevieve',expr:'normal',text:'И, кроме того, я ведьма. Земная. Их ещё называют общинными — мы живём коммуной.'},
+    {who:'naya',expr:'shocked',text:'...вы это сейчас серьёзно сказали.'},
+    {who:'genevieve',expr:'smile',text:'Я преподаю мифологию двадцать лет. Я умею говорить такие вещи с ровным лицом.'},
+  ]},
+  { dlg:[
+    {who:'genevieve',expr:'serious',text:'Мир расколот на три сферы: Рай, Ад и Земля. Между ними — преграды.'},
+    {who:'genevieve',expr:'normal',text:'Пройти можно только древними путями. Тех, кто их знает, и называют ведьмами.'},
+    {who:'genevieve',expr:'normal',text:'Земные держатся Земли. Адские служат Лилит. Разница только в том, чем ты готова платить.'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'talk',text:'А кристалл?'},
+    {who:'genevieve',expr:'sad',text:'Кристалл — работа Мидеи. Я узнала его в первый же день, ещё в коридоре.'},
+    {who:'genevieve',expr:'sad',text:'Поэтому и заговорила с тобой. Я думала, ты знаешь, что носишь.'},
+    {who:'naya',expr:'angry',text:'Я не знала. Мне никто не сказал.'},
+    {who:'genevieve',expr:'sad',text:'Знаю. И это, пожалуй, самое некрасивое во всей истории.'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Она ждёт, что вы спросите дальше.', options:[
+      { text:'«Расскажите про неё. Про Мидею.»',
+        stats:{humanity:+8, trustSue:+2},
+        then:[
+          {who:'naya',expr:'sad',text:'Расскажите про неё. Про Мидею.'},
+          {who:'genevieve',expr:'sad',text:'Она отказалась делать тварь из чужих душ и попробовала их отпустить. За это её и убили.'},
+          {who:'genevieve',expr:'normal',text:'В коммуне о ней говорят шёпотом. Половина считает её дурой, половина — единственной, кто не струсил.'},
+          {who:'naya',expr:'sad',text:'А вы?'},
+          {who:'genevieve',expr:'smile',text:'А я преподаю историю. Я знаю, что этот спор идёт всегда и никогда не заканчивается.'},
         ]},
-      ]},
-    ]},
-    {action(){ addC('catPets'); }},
+      { text:'«Что я могу с этим сделать?»',
+        stats:{witchAmbition:+10, hellAffinity:+4},
+        then:[
+          {who:'naya',expr:'talk',text:'Что я могу с этим сделать?'},
+          {who:'genevieve',expr:'worried',text:'Вот это ты спросила очень быстро.'},
+          {who:'naya',expr:'angry',text:'Я всю жизнь ничего не могла. Простите, если тороплюсь.'},
+          {who:'genevieve',expr:'sad',text:'...справедливо. Ладно.'},
+        ]},
+      { text:'«Почему вы вообще мне это рассказываете?»',
+        stats:{humanity:+4, witchAmbition:+2},
+        then:[
+          {who:'naya',expr:'normal',text:'Почему вы вообще мне это рассказываете? Вы меня не знаете.'},
+          {who:'genevieve',expr:'serious',text:'Потому что ты и так дошла бы. А человек, который доходит один, обычно доходит криво.'},
+        ]},
+    ]}},
   ]},
-  { stats:{ humanity:+2 } },
-],
-dorothyAlone: [
-  { music:'none' },
   { dlg:[
-    {who:'dorothy',expr:'normal',text:'Мяу?'},
-    {who:'naya',expr:'empty',text:'...'},
-    {who:'dorothy',expr:'normal',text:'Мяу.'},
-    {who:'naya',expr:'sad',text:'Она смотрит на дверь. Потом на меня. Потом снова на дверь.'},
-    {who:'naya',expr:'empty',text:'Она ждёт её уже третий день.'},
-    {if:()=> S('humanity') > 45, then:[
-      {who:'naya',expr:'sad',text:'Я сажусь на пол и глажу её, потому что больше ничего не могу сделать.'},
-      {who:'naya',expr:'sad',text:'Она мурлычет. Это почему-то невыносимо.'},
-    ], else:[
-      {who:'naya',expr:'empty',text:'Я прохожу мимо. Кормить её я не забываю. Всё остальное — забываю.'},
-    ]},
+    {who:'genevieve',expr:'normal',text:'Есть коммуна. Есть амулеты — у каждой из нас свой. Мы называем их именами.'},
+    {who:'genevieve',expr:'serious',text:'И есть правило, которое тебе пригодится больше всех остальных.'},
+    {who:'genevieve',expr:'serious',text:'К ведьме нельзя войти без приглашения. Порог — это договор.'},
+    {who:'genevieve',expr:'normal',text:'И приглашать должен человек. Не ведьма. Так уж заведено.'},
+    {who:'naya',expr:'normal',text:'(Человек. Обычный человек.)'},
   ]},
-  { memory:'dorothy' },
-],
-dorothyAfter: [
+  { flag:'learnedWitches' },
+  { flag:'foundGenevieve' },
+  { act:2 },
+  { memory:'reveal' },
   { dlg:[
-    {who:'dorothy',expr:'normal',text:'Мрррр!'},
-    {who:'naya',expr:'sad',text:'Она не отходит от Сью с тех пор, как та вернулась. Спит у неё в ногах, ходит за ней в ванную.'},
-    {who:'sue',expr:'sad',text:'Она думает, что я снова уйду.'},
-    {who:'naya',expr:'sad',text:'...'},
-    {who:'sue',expr:'sad',text:'Не только она.'},
+    {who:'genevieve',expr:'smile',text:'Приходи ко мне домой. Правый дом на вашей улице, зелёная дверь. Познакомлю тебя с сёстрами.'},
+    {who:'genevieve',expr:'worried',text:'И, Ная. Не торопись. Ты сейчас очень похожа на человека, который уже всё решил.'},
+    {who:'naya',expr:'normal',text:'...'},
   ]},
-],
-dorothyHall: [
+  { fadeOut:900 },
+  { room:'nayaRoom', x:120, y:250 },
+  { music:'home' },
+  { fadeIn:900 },
   { dlg:[
-    {who:'dorothy',expr:'normal',text:'Мяу.'},
-    {if:()=> F('firstWitchDead'), then:[
-      {who:'naya',expr:'sad',text:'Она обнюхивает мои ботинки и отходит. Второй раз за неделю.'},
-      {who:'naya',expr:'empty',text:'Раньше она встречала меня у двери.'},
-    ], else:[
-      {who:'naya',expr:'smile',text:'Сидит в квадрате солнца на полу. Каждый день, минут двадцать, ровно в одно и то же время.'},
-      {who:'naya',expr:'normal',text:'Сью говорит, что это единственное существо в доме с режимом.'},
-    ]},
+    {who:'naya',expr:'shocked',text:'(Я шла домой пешком сорок минут и не помню ни одного шага.)'},
+    {who:'naya',expr:'talk',text:'(Мидея. Три сферы. Древние пути.)'},
+    {who:'naya',expr:'talk',text:'(И кристалл, который всё это время висел у меня на шее и ждал.)'},
+    {who:'naya',expr:'normal',text:'(Надо поговорить со Сью.)'},
   ]},
 ],
 
-/* ---------- ACT 1 ---------- */
 meetSue: [
-  { fadeOut:300 },
-  { room:'street', x:120, y:210 },
-  { fadeIn:300 },
-  { dlg:[
-    {who:'sue',expr:'smile',text:'Наконец-то! Я думала, ты снова не выйдешь.'},
-    {who:'naya',expr:'talk',text:'Извини. Долго собиралась.'},
-    {who:'sue',expr:'normal',text:'Ты всегда долго собираешься. Слушай, мне надо заглянуть в кафе. Пойдёшь?'},
-    {who:'naya',expr:'normal',text:'Я и так туда шла. У меня смена.'},
-    {who:'sue',expr:'smile',text:'Идеально. Только я не одна — со мной девочка с йоги. Ты её полюбишь.'},
-    {who:'naya',expr:'normal',text:'(...девочка с йоги.)'},
-  ]},
   { flag:'metSue' },
-  { dlg:[{who:'naya',expr:'normal',text:'(Кафе — прямо по улице.)'}] },
+  { dlg:[{who:'naya',expr:'normal',text:'(Кафе — прямо по улице. У меня смена.)'}] },
 ],
 
 cafeScene: [
   { dlg:[
-    {who:'sue',expr:'smile',text:'Ная, знакомься — это моя подруга. Мы вместе на йоге.'},
+    {who:'naya',expr:'normal',text:'(Смена. Полдень, пусто, кофемашина шипит громче посетителей.)'},
+    {who:'sue',expr:'smile',text:'Ная! Мы на двадцать минут между парами. Знакомься — это с моего курса.'},
     {who:'naya',expr:'normal',text:'...Привет.'},
-    {who:'naya',expr:'sad',text:'(Ещё одна подруга. Сколько их у неё вообще?)'},
+    {who:'naya',expr:'sad',text:'(Ещё одна с курса. Сколько их у неё вообще?)'},
     {who:'sue',expr:'talk',text:'Она мне про тебя все уши прожужжала, кстати. Говорит, ты страшная.'},
     {who:'naya',expr:'normal',text:'(Смешно. Правда смешно. Почему мне не смешно?)'},
     {who:'chris',expr:'normal',text:'Ная. Мы можем поговорить? Пять минут.'},
@@ -4884,15 +5873,17 @@ cafeScene: [
     ]}},
   ]},
   { dlg:[
-    {who:'naya',expr:'sad',text:'Всё нормально. Поговорим дома, ладно? Приходи ко мне вечером.'},
-    {who:'sue',expr:'normal',text:'Конечно приду. Куда я денусь.'},
+    {who:'naya',expr:'sad',text:'Всё нормально. Правда.'},
+    {who:'sue',expr:'normal',text:'Ага. Поговорим дома.'},
   ]},
   { flag:'cafeSceneComplete' },
   { memory:'cafe' },
-  { fadeOut:400 },
-  { room:'nayaRoom', x:130, y:255 },
-  { fadeIn:400 },
-  { dlg:[{who:'naya',expr:'sad',text:'(Сью пришла. Надо поговорить.)'}] },
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Всё, я побежала, у меня прогон. Зайдёшь за мной после смены?'},
+    {who:'naya',expr:'normal',text:'Зайду.'},
+    {who:'sue',expr:'smile',text:'Университет, коридор, четырнадцатая. Не пугай первокурсников.'},
+  ]},
+  { dlg:[{who:'naya',expr:'normal',text:'(Смена закончилась. Пора за Сью — университет в другом конце улицы.)'}] },
 ],
 
 chrisAfter: [
@@ -5029,13 +6020,13 @@ sueAfterHell: [
     {who:'sue',expr:'shocked',text:'Ная! Где ты была?! Ты исчезла. Прямо у меня на глазах.'},
     {who:'naya',expr:'sad',text:'Я знаю. Прости.'},
     {who:'sue',expr:'worried',text:'Ты понимаешь, что я тут два часа сидела и не знала, звонить в скорую или в церковь?'},
-    {who:'naya',expr:'talk',text:'Сью. Я хочу стать ведьмой. Земной. Настоящей.'},
+    {who:'naya',expr:'talk',text:'Сью. Я хочу стать ведьмой. По-настоящему, как Женевьева.'},
     {who:'sue',expr:'shocked',text:'Что.'},
-    {who:'naya',expr:'talk',text:'Мама была ведьмой. Плохой. Я хочу быть другой. Хорошей. Понимаешь?'},
-    {who:'sue',expr:'worried',text:'Я понимаю, что ты только что исчезла из комнаты и вернулась с этими глазами.'},
-    {who:'naya',expr:'sad',text:'Помоги мне найти настоящую ведьму. Кристалл покажет дорогу. Просто побудь со мной.'},
+    {who:'naya',expr:'talk',text:'Мидея отказалась разрушать, и её за это убили. Я не хочу, чтобы это было зря.'},
+    {who:'sue',expr:'worried',text:'Я понимаю только, что ты исчезла из комнаты и вернулась с этими глазами.'},
+    {who:'naya',expr:'sad',text:'Просто побудь рядом. Больше ничего не прошу.'},
     {who:'sue',expr:'sad',text:'...ладно. Раз тебе это правда нужно.'},
-    {who:'naya',expr:'normal',text:'(Кристалл тянет к правому дому на улице. Он светится зелёным.)'},
+    {who:'naya',expr:'normal',text:'(Женевьева звала к себе. Правый дом на улице, зелёная дверь.)'},
   ]},
   { flag:'toldSueWitch' },
 ],
@@ -5275,7 +6266,9 @@ persuadeResolve: [
       const resolve = C('sueResolve'), respected = C('sueRespected'), trust = S('trustSue');
       // She comes along either because Naya pushed hard enough (resolve),
       // or because Naya never pushed at all and is trusted (respected + trust).
-      const agreed = resolve >= 3 || (respected >= 2 && trust >= 70);
+      // The prologue gives everyone a shared childhood, so the trust bar sits
+      // higher than it did before that scene existed.
+      const agreed = resolve >= 3 || (respected >= 2 && trust >= 78);
       return agreed ? 'sueAgrees' : 'sueRefuses';
     }},
 ],
@@ -6487,6 +7480,12 @@ function drawRoom() {
 
   // 4. room-specific animated overlay (runes, glows, story markers)
   if (room.overPaint) { ctx.save(); ctx.translate(-camX, -camY); room.overPaint(ctx); ctx.restore(); }
+  if (room.prologue) {
+    ctx.save(); ctx.translate(-camX, -camY);
+    Prologue.drawStars(ctx); Prologue.drawFigures(ctx);
+    Prologue.drawStones(ctx); Prologue.drawButterfly(ctx);
+    ctx.restore();
+  }
 
   FX.drawMagic(ctx, camX, camY);
   FX.drawParticles(ctx, camX, camY);
@@ -6599,6 +7598,7 @@ function beginPlay() {
   Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
   World.invalidate();
   requestAnimationFrame(tick);
+  if (!F('prologueComplete')) { Scene.play('prologue'); saveGame(); return; }
   if (room.onEnter) room.onEnter();          // fixes "scene never replays after load"
   saveGame();
 }

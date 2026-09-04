@@ -7,12 +7,12 @@ const card = async page => { await page.waitForSelector('#endingScreen.show', {t
   rows: [...document.querySelectorAll('#endingStats .statRow')].map(r=>r.textContent),
 })); };
 
-const warm = { cafe:0, home:0, lilith:2, gen:0 };
+const warm = { cafe:0, home:0, lilith:2, gen:0, reveal:0 };
 
 async function endingIII() {
   return H.run('III', async page => {
     await H.newGame(page);
-    await H.opening(page, { cafe:1, home:1, lilith:0, gen:1 }, 'III');
+    await H.opening(page, { cafe:1, home:1, lilith:0, gen:1, reveal:1 }, 'III');
     // pushy persuasion
     await H.step(page,'npc','Сью',[0],'III');
     await H.step(page,'npc','Сью',[2],'III');
@@ -32,7 +32,7 @@ async function endingIII() {
 async function endingII() {
   return H.run('II', async page => {
     await H.newGame(page);
-    await H.opening(page, { cafe:1, home:2, lilith:0, gen:1 }, 'II');
+    await H.opening(page, { cafe:1, home:2, lilith:0, gen:1, reveal:1 }, 'II');
     await H.step(page,'npc','Сью',[0],'II');
     await H.step(page,'npc','Сью',[2],'II');
     await H.step(page,'npc','Сью',[2],'II');
@@ -47,7 +47,7 @@ async function endingII() {
 async function endingI() {
   return H.run('I', async page => {
     await H.newGame(page);
-    await H.opening(page, { cafe:2, home:2, lilith:0, gen:1 }, 'I');
+    await H.opening(page, { cafe:2, home:2, lilith:0, gen:1, reveal:1 }, 'I');
     let s = await H.snap(page);
     console.log('  I: trust before persuasion =', s.stats.trustSue);
     await H.step(page,'npc','Сью',[3],'I');      // respect
@@ -83,7 +83,7 @@ async function endingIV() {
   return await H.run('ENDING-IV', async page => {
     await H.newGame(page);
     // warm, honest playthrough
-    const picks = { cafe:0, home:0, lilith:2, gen:0 };
+    const picks = { cafe:0, home:0, lilith:2, gen:0, reveal:0 };
     await H.opening(page, picks, 'IV');
     let s = await H.snap(page);
     console.log('after opening: room=%s act=%s trust=%s flags=%s', s.room, s.act, s.stats.trustSue, s.flags.join(','));

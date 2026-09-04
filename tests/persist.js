@@ -2,7 +2,7 @@ const H = require('./harness.js');
 (async () => {
   await H.run('PERSIST', async page => {
     await H.newGame(page);
-    await H.opening(page, { cafe:0, home:0, lilith:2, gen:0 }, 'P');
+    await H.opening(page, { cafe:0, home:0, lilith:2, gen:0, reveal:0 }, 'P');
     const before = await H.snap(page);
     console.log('before reload: room=%s flags=%d trust=%s mem=%d',
       before.room, before.flags.length, before.stats.trustSue, before.mem);

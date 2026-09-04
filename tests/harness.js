@@ -76,28 +76,41 @@ async function newGame(page) {
 
 /* --- shared opening: prologue .. commune intro --- */
 async function opening(page, picks, tag) {
-  await step(page, 'obj', 'table', [], tag);                       // crystal
-  await step(page, 'obj', 'door', [], tag);                        // prologue -> corridor
-  await step(page, 'obj', 'toStairs', [], tag);                    // hallway -> stairwell
-  await step(page, 'obj', 'toStreet', [], tag);                    // meetSue -> street
-  await step(page, 'obj', 'toCafe', [picks.cafe], tag);            // cafe scene -> naya room
+  // prologue: hell narration, chapter card, then the playground as little Sue
+  await pump(page, [], tag + ':prologue');
+  await step(page, 'obj', 'swing', [], tag);                       // first magic -> chapter one
+  // an ordinary morning, then out to work
+  await step(page, 'obj', 'door', [], tag);                        // -> flat hallway
+  await step(page, 'obj', 'toStairs', [], tag);                    // -> entry hall
+  await step(page, 'obj', 'toStreet', [], tag);                    // -> street
+  await step(page, 'obj', 'toCafe', [picks.cafe], tag);            // the shift, and Chris
+  await step(page, 'obj', 'exit', [], tag);                        // -> street
+  await step(page, 'obj', 'toUni', [], tag);                       // -> university yard
+  await step(page, 'obj', 'toHall', [], tag);                      // -> corridor
+  await step(page, 'obj', 'toStage', [], tag);                     // -> stage
+  await step(page, 'npc', 'Сью', [], tag);                         // rehearsal
+  await step(page, 'obj', 'exit', [], tag);                        // -> corridor
+  await step(page, 'obj', 'aud14', [picks.gen], tag);              // Genevieve, the crystal reacts
+  await step(page, 'obj', 'toLib', [], tag);                       // -> library
+  await step(page, 'obj', 'shelfFolk', [], tag);
+  await step(page, 'obj', 'shelfTheatre', [], tag);
+  await step(page, 'obj', 'archive', [], tag);                     // Medea
+  await step(page, 'npc', 'Женевьева', [picks.reveal], tag);       // the world explained -> home
   await step(page, 'npc', 'Сью', [picks.home], tag);               // home talk -> hell
-  await step(page, 'obj', 'toLilith', [picks.lilith], tag);        // lilith -> naya room
+  await step(page, 'obj', 'toLilith', [picks.lilith], tag);        // Lilith -> home
   await step(page, 'npc', 'Сью', [], tag);                         // sueAfterHell
   await step(page, 'obj', 'door', [], tag);
   await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
-  await step(page, 'obj', 'toRightHouse', [], tag);                // genevieve house
-  await step(page, 'npc', 'Женевьева', [picks.gen], tag);          // meetGenevieve
+  await step(page, 'obj', 'toRightHouse', [], tag);                // Genevieve at home
   await step(page, 'obj', 'toCommune', [], tag);                   // commune intro
   await step(page, 'obj', 'exit', [], tag);
   await step(page, 'obj', 'exit', [], tag);                        // -> street
-  await step(page, 'obj', 'toHome', [], tag);                      // -> stairwell
+  await step(page, 'obj', 'toHome', [], tag);                      // -> entry hall
   await step(page, 'obj', 'toFlat', [], tag);                      // -> hallway
-  await step(page, 'obj', 'toRoom', [], tag);                      // -> naya room
+  await step(page, 'obj', 'toRoom', [], tag);                      // -> the room
 }
 
-/* --- shared amulet arc (requires sueAgreed) --- */
 async function amuletArc(page, picks, tag) {
   await step(page, 'obj', 'door', [], tag);
   await step(page, 'obj', 'toStairs', [], tag);
