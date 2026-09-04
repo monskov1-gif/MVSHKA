@@ -162,7 +162,9 @@ async function endingIV() {
 
 (async () => {
   const results = [];
-  for (const [n, f] of [['I', endingI], ['II', endingII], ['III', endingIII], ['IV', endingIV]]) {
+  const only = process.argv.slice(2).map(function (a) { return a.toUpperCase(); });
+  const all = [['I', endingI], ['II', endingII], ['III', endingIII], ['IV', endingIV]];
+  for (const [n, f] of (only.length ? all.filter(function (p) { return only.includes(p[0]); }) : all)) {
     try {
       const r = await f();
       const label = r && r.card ? r.card.roman + ' ' + r.card.name : '';
