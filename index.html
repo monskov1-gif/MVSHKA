@@ -953,8 +953,10 @@ let gameState = null;
 
 function freshState() {
   return {
-    currentRoom:'nayaRoom',
-    playerX:120, playerY:210,
+    // игра открывается прологом, поэтому и стартовая комната — адский зал:
+    // иначе первый кадр успевает показать комнату Наи
+    currentRoom:'prologueHell',
+    playerX:120, playerY:200,
     playerDir:'down',
     act:0,
     eventStep:0,
@@ -5771,6 +5773,8 @@ const Player = {
   sprite:'naya', dir:'down', moving:false, animFrame:0, animTimer:0,
   currentSprite() {
     // in the prologue the player is little Sue, not Naya
+    // площадка существует только в прологе: кто бы там ни стоял, это Сью пяти лет
+    if (gameState && gameState.currentRoom === 'playground') return 'sueChild';
     if (F('prologPlayground') && !F('prologueComplete')) return 'sueChild';
     // ветка «Ная выбрала силу» идёт тремя стадиями, а не одной сменой спрайта
     if (F('evilRecognised')) return 'nayaHell';
@@ -6846,10 +6850,10 @@ prologue: [
   { title:'«Два самых важных дня в твоей жизни:\nдень, когда ты появился на свет,\nи день, когда понял, зачем.»\n— Марк Твен', dur:4200 },
 
   /* ---- the playground, twelve years ago ---- */
+  { flag:'prologPlayground' },          // сначала подменяем героя, потом показываем
   { room:'playground', x:150, y:236 },
   { music:'warm' },
   { fadeIn:1500 },
-  { flag:'prologPlayground' },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Двенадцать лет назад. Осень, окраина города, пустая площадка.'},
     {who:'sueChild',expr:'smile',name:'Сью',text:'(Мне пять. Мама сказала — двадцать минут, и домой.)'},
@@ -9146,7 +9150,7 @@ function drawRoom() {
   const draws = [];
   for (const o of props) { const m = Art.meta(o.t); if (m && m.flat) continue; draws.push({ y:o.y, obj:o }); }
   for (const n of roomNPCs(room)) draws.push({ y:n.y, npc:n });
-  draws.push({ y:Player.y, player:true });
+  if (!room.cinematic) draws.push({ y:Player.y, player:true });
   draws.sort((a, b) => a.y - b.y);
   for (const d of draws) {
     if (d.obj) {
