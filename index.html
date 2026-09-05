@@ -220,6 +220,15 @@
   }
   #inventoryPanel.show { display:block; }
 
+  /* Текущая цель: одна строка под инвентарём, читается не отрываясь от игры */
+  #questPanel {
+    position:absolute; top:calc(30px + env(safe-area-inset-top)); left:8px;
+    background:rgba(14,10,20,.82); border-left:2px solid #c0a040; border-radius:0 3px 3px 0;
+    padding:3px 8px; z-index:26; color:#e8d8a0; font-size:10px; letter-spacing:.02em;
+    max-width:64%; display:none; pointer-events:none;
+  }
+  #questPanel.show { display:block; }
+
   /* ==================== OVERLAYS ==================== */
   #fade { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:40; transition:opacity .5s; }
   #fade.show { opacity:1; }
@@ -287,6 +296,7 @@
 
   <div id="vignette"></div>
   <div id="inventoryPanel"></div>
+  <div id="questPanel"></div>
   <button class="topBtn" id="statusBtnGame" title="Состояние">✦</button>
   <button class="topBtn" id="menuBtnGame" title="Меню">☰</button>
 
@@ -3570,6 +3580,73 @@ function roomNPCs(room) { return (room.npcs || []).filter(n => !n.when || n.when
    Не компас: он не говорит «ведьма рядом» и не показывает направление.
    Просто изредка вздрагивает искрой и коротко звенит, когда в комнате
    есть та, на кого он отзывается. Вывод делает игрок, а не подсказка. */
+/* ЗАДАНИЯ.
+
+   Цель не хранится в состоянии и не выставляется вручную по ходу сцен —
+   она выводится из тех же сюжетных флагов, что и всё остальное. Список
+   идёт от позднего к раннему, побеждает первое совпадение: значит, после
+   загрузки сохранения цель всегда та же, что была, и рассинхрону взяться
+   неоткуда.
+
+   Формулировки говорят, что делать, но не куда идти по координатам, и не
+   называют того, чего Ная ещё не знает. */
+const Quests = {
+  GOALS: [
+    { w:()=> F('ending'),            t:'История закончена.' },
+    { w:()=> F('evilRecognised'),    t:'Дойти до великого портала.' },
+    { w:()=> F('evilTrialDone'),     t:'Вернуться к Старшей.' },
+    { w:()=> F('evilTrialOffered'),  t:'Пройти испытание.' },
+    { w:()=> F('sueLeftDead'),       t:'Идти в коммуну. Одной.' },
+    { w:()=> F('pathChosen'),        t:'Дойти до конца.' },
+    { w:()=> F('reflectionDone'),    t:'Решить, что делать дальше.' },
+    { w:()=> F('sueRevived'),        t:'Поговорить со Сью.', s:'Она вернулась не совсем такой.' },
+    { w:()=> F('sueDead'),           t:'Решить, что делать с телом Сью.' },
+    { w:()=> F('thirdAmulet'),       t:'Три имени собраны. Провести ритуал.' },
+    { w:()=> F('secondAmulet'),      t:'Забрать третье имя.', s:'Третий дом стоит за городом.' },
+    { w:()=> F('firstAmulet'),       t:'Забрать второе имя.', s:'Роза живёт в коммуне.' },
+    { w:()=> F('sueAgreed'),         t:'Идти к Мадлен вместе со Сью.' },
+    { w:()=> F('sueRefused'),        t:'Попасть в дом ведьмы без приглашения.' },
+    { w:()=> F('communeIntro'),      t:'Уговорить Сью пойти с тобой.', s:'Без человека в дом к ведьме не войти.' },
+    { w:()=> F('foundGenevieve'),    t:'Пойти с Женевьевой в коммуну.' },
+    { w:()=> F('toldSueWitch'),      t:'Найти Женевьеву.' },
+    { w:()=> F('returnedFromHell1'), t:'Рассказать Сью, где ты была.' },
+    { w:()=> F('metLilith'),         t:'Вернуться на Землю.' },
+    { w:()=> F('metCharlotte'),      t:'Добраться до Лиллит.' },
+    { w:()=> F('portalOpened'),      t:'Шагнуть в портал.' },
+    { w:()=> F('learnedWitches'),    t:'Поговорить со Сью дома.' },
+    { w:()=> F('learnedMedea'),      t:'Расспросить Женевьеву о ведьмах.' },
+    { w:()=> F('investigatedUniversity'), t:'Узнать больше о Женевьеве.', s:'В университете есть архив.' },
+    { w:()=> F('metGenevieveUni'),   t:'Понять, кто такая Женевьева.' },
+    { w:()=> F('waitingAtAud'),      t:'Дождаться Сью у четырнадцатой аудитории.' },
+    { w:()=> F('cafeSceneComplete'), t:'Зайти за Сью в университет.' },
+    { w:()=> F('metSue'),            t:'Доработать смену в кафе.' },
+    { w:()=> F('backstoryDone'),     t:'Начать день.' },
+    { w:()=> F('prologueComplete'),  t:'Собраться и уехать из дома отца.' },
+    { w:()=> true,                   t:'...' },
+  ],
+  cur:'', curSub:'',
+  goal() {
+    if (!gameState) return null;
+    for (const g of this.GOALS) { try { if (g.w()) return g; } catch (e) {} }
+    return null;
+  },
+  /* Дёргается каждый кадр, но перерисовывает панель только когда цель
+     действительно сменилась — иначе тост всплывал бы без конца. */
+  refresh(announce) {
+    const g = this.goal();
+    if (!g) return;
+    const changed = g.t !== this.cur;
+    this.cur = g.t; this.curSub = g.s || '';
+    const el = document.getElementById('questPanel');
+    if (!el) return;
+    const shown = (Game.mode === 'explore' || Game.mode === 'dialogue');
+    if (!shown || g.t === '...') { el.classList.remove('show'); return; }
+    el.textContent = 'ЦЕЛЬ: ' + g.t;
+    el.classList.add('show');
+    if (changed && announce) { UI.toast('Новая цель: ' + g.t, 2600); Audio.beep(660, .10, 'sine', .04); }
+  },
+};
+
 const CrystalSense = {
   t:0, next:0,
   WITCHES:['genevieve','witch1','witch2','witch3','acolyte','charlotte','lilith'],
@@ -11549,7 +11626,7 @@ function tick(t) {
     Dialogue.update(dt);
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
-    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); }
+    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true); }
     drawRoom();
   }
   requestAnimationFrame(tick);
@@ -11565,6 +11642,7 @@ function showMenu() {
   document.getElementById('actionBtn').style.display = 'none';
   document.getElementById('menuBtnGame').style.display = 'none';
   document.getElementById('statusBtnGame').style.display = 'none';
+  document.getElementById('questPanel').classList.remove('show');
   document.getElementById('inventoryPanel').classList.remove('show');
   Game.mode = 'menu';
   updateEndingCount();
@@ -11643,6 +11721,24 @@ function togglePause() {
 function showStatus() {
   const rows = document.getElementById('statusRows');
   rows.innerHTML = '';
+  const g = Quests.goal();
+  if (g && g.t !== '...') {
+    const head = document.createElement('div');
+    head.className = 'statRow';
+    head.innerHTML = '<span style="color:#e8d8a0">ЗАДАНИЕ</span><span></span>';
+    rows.appendChild(head);
+    const main = document.createElement('div');
+    main.className = 'statRow';
+    main.innerHTML = `<span style="color:#f0e4c0">${g.t}</span><span></span>`;
+    rows.appendChild(main);
+    if (g.s) {
+      const sub = document.createElement('div');
+      sub.className = 'statRow';
+      sub.innerHTML = `<span style="opacity:.7">${g.s}</span><span></span>`;
+      rows.appendChild(sub);
+    }
+    rows.appendChild(document.createElement('hr'));
+  }
   const data = [
     ['Амулеты', amuletCount() + ' / 3'],
     ['Кристалл', F('crystalTaken') ? 'отнят' : (F('gaveCrystalAway') ? 'у Сью' : (hasItem('Кристалл') ? 'есть' : '—'))],
