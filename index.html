@@ -1620,19 +1620,27 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#b8735a'; g.fillRect(11, 11, 30, 14);
     g.fillStyle = '#7d3a38'; g.fillRect(16, 15, 20, 6);
   });
-  D('rug_warm', {w:52,h:34,ax:26,ay:17,foot:null, flat:true}, g => {
-    g.fillStyle = '#8a6a3a';                                   // бахрома по краям
-    for (let x=2;x<50;x+=3) { g.fillRect(x, 1, 2, 3); g.fillRect(x, 30, 2, 3); }
-    g.fillStyle = '#7d5f34'; g.fillRect(0, 4, 52, 26);
-    g.fillStyle = '#a08248'; g.fillRect(2, 6, 48, 22);
-    g.fillStyle = '#8a6a3a'; g.fillRect(5, 8, 42, 18);
-    g.fillStyle = '#b8945a'; g.fillRect(8, 10, 36, 14);
-    g.fillStyle = '#7d5f34';                                   // ромбовидный узор
-    for (let i=0;i<4;i++) {
-      const cx = 12 + i*10;
-      g.fillRect(cx, 16, 5, 2); g.fillRect(cx+1, 14, 3, 6); g.fillRect(cx+2, 12, 1, 10);
-    }
-    g.fillStyle = '#6f5330'; g.fillRect(0, 4, 52, 1); g.fillRect(0, 29, 52, 1);
+  /* Ковёр, а не картина на полу: скруглённый контур, приглушённый контраст
+     и бахрома только по коротким сторонам. Концентрические прямоугольники
+     прежней версии читались как рама. */
+  D('rug_warm', {w:56,h:34,ax:28,ay:17,foot:null, flat:true}, g => {
+    const round = (x, y, w, h, r) => {
+      g.beginPath();
+      g.moveTo(x+r, y); g.lineTo(x+w-r, y); g.quadraticCurveTo(x+w, y, x+w, y+r);
+      g.lineTo(x+w, y+h-r); g.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+      g.lineTo(x+r, y+h); g.quadraticCurveTo(x, y+h, x, y+h-r);
+      g.lineTo(x, y+r); g.quadraticCurveTo(x, y, x+r, y); g.closePath(); g.fill();
+    };
+    g.fillStyle = 'rgba(0,0,0,.14)'; round(3, 7, 50, 22, 6);       // мягкая тень под краем
+    g.fillStyle = '#8a6a44'; round(2, 5, 52, 24, 6);
+    g.fillStyle = '#9a7a50'; round(4, 7, 48, 20, 5);
+    g.fillStyle = '#8f6f48';                                        // ворс полосами
+    for (let y = 8; y < 26; y += 3) g.fillRect(5, y, 46, 1);
+    g.fillStyle = '#a98a5c'; round(9, 10, 38, 14, 4);               // центральное поле
+    g.fillStyle = '#96784e';
+    for (let i = 0; i < 5; i++) { const cx = 13 + i * 8; g.fillRect(cx, 16, 4, 2); g.fillRect(cx + 1, 14, 2, 6); }
+    g.fillStyle = '#7d6040';                                        // бахрома по коротким сторонам
+    for (let y = 8; y < 27; y += 3) { g.fillRect(0, y, 3, 2); g.fillRect(53, y, 3, 2); }
   });
   D('lamp_floor', {w:16,h:40,ax:8,ay:38,foot:{x:-5,y:-6,w:10,h:8}, light:{dy:-30,r:44,c:'#ffcf7a',i:.75}}, g => {
     shadowEllipse(g, 8, 38, 6, 2);
@@ -4492,9 +4500,9 @@ corridor1: {
     { x:118,y:44,w:44,h:32, name:'toRoom', prompt:'Комната Наи',
       action: async ()=> await changeRoom('nayaRoom', 120, 258) },
     { x:14,y:90,w:36,h:52, name:'toKitchen', prompt:'Кухня',
-      action: async ()=> await changeRoom('kitchen', 140, 268) },
+      action: async ()=> await changeRoom('kitchen', 118, 226) },
     { x:14,y:178,w:36,h:52, name:'toBath', prompt:'Ванная',
-      action: async ()=> await changeRoom('bathroom', 120, 250) },
+      action: async ()=> await changeRoom('bathroom', 94, 186) },
     { x:232,y:114,w:38,h:52, name:'toBalcony', prompt:'Балкон',
       action: async ()=> await changeRoom('balcony', 140, 196) },
     { x:118,y:222,w:44,h:32, name:'toStairs', prompt:'В прихожую',
@@ -6499,51 +6507,51 @@ parkWalk: {
 
 /* ---------------------------------------------------------------- */
 kitchen: {
-  name:"Кухня", music:'home', w:280, h:300,
+  name:"Кухня", music:'home', w:246, h:268,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 }, light:{ tint:'#1c1820', dark:.22 },
   lights:[{x:140,y:150,r:60,c:'#ffdca0',i:.4},{x:52,y:70,r:36,c:'#9ab4cc',i:.2}],
   sun:{ x:52, y:56, w:34, len:110, tilt:.24, a:.10 },
   bgPaint(ctx) {
-    paintInterior(ctx, 280, 300, { wall:'#4c4048', wall2:'#413740', floor:'#7d7a76', floor2:'#6e6b68', wallH:58, tiles:true });
+    paintInterior(ctx, 246, 268, { wall:'#4c4048', wall2:'#413740', floor:'#7d7a76', floor2:'#6e6b68', wallH:54, tiles:true });
     // фартук над рабочей поверхностью
-    ctx.fillStyle = '#5f6a75'; ctx.fillRect(66, 26, 150, 32);
+    ctx.fillStyle = '#5f6a75'; ctx.fillRect(56, 22, 138, 32);
     ctx.fillStyle = '#6c7883';
-    for (let y=26;y<58;y+=8) for (let x=66;x<216;x+=8) ctx.fillRect(x+1, y+1, 6, 6);
-    ctx.fillStyle = '#4c555e'; ctx.fillRect(66, 26, 150, 2);
+    for (let y=22;y<54;y+=8) for (let x=56;x<194;x+=8) ctx.fillRect(x+1, y+1, 6, 6);
+    ctx.fillStyle = '#4c555e'; ctx.fillRect(56, 22, 138, 2);
     // мойка стоит в разрыве между тумбами и читается как часть ряда
-    ctx.fillStyle = '#4f4c48'; ctx.fillRect(111, 74, 46, 24);
-    ctx.fillStyle = '#5f5c56'; ctx.fillRect(111, 74, 46, 8);
-    ctx.fillStyle = '#6e6a62'; ctx.fillRect(111, 74, 46, 1);
-    ctx.fillStyle = '#3a3835'; ctx.fillRect(111, 96, 46, 2);
-    ctx.fillStyle = '#8d949c'; ctx.fillRect(118, 76, 32, 5);
-    ctx.fillStyle = '#6a7078'; ctx.fillRect(120, 77, 28, 3);
-    ctx.fillStyle = '#a8aeb6'; ctx.fillRect(132, 68, 3, 8);
-    ctx.fillRect(132, 68, 9, 3); ctx.fillRect(139, 70, 2, 4);
-    ctx.fillStyle = '#3a3835'; ctx.fillRect(116, 84, 16, 1); ctx.fillRect(136, 84, 16, 1);
-    paintDoor(ctx, 125, 285);
+    ctx.fillStyle = '#4f4c48'; ctx.fillRect(98, 70, 44, 22);
+    ctx.fillStyle = '#5f5c56'; ctx.fillRect(98, 70, 44, 8);
+    ctx.fillStyle = '#6e6a62'; ctx.fillRect(98, 70, 44, 1);
+    ctx.fillStyle = '#3a3835'; ctx.fillRect(98, 90, 44, 2);
+    ctx.fillStyle = '#8d949c'; ctx.fillRect(105, 72, 30, 5);
+    ctx.fillStyle = '#6a7078'; ctx.fillRect(107, 73, 26, 3);
+    ctx.fillStyle = '#a8aeb6'; ctx.fillRect(118, 64, 3, 8);
+    ctx.fillRect(118, 64, 9, 3); ctx.fillRect(125, 66, 2, 4);
+    ctx.fillStyle = '#3a3835'; ctx.fillRect(103, 80, 15, 1); ctx.fillRect(122, 80, 15, 1);
+    paintDoor(ctx, 108, 254);
   },
   objects: [
-    { t:'window_in', x:52, y:38 },
-    { t:'counter', x:88, y:96 }, { t:'counter', x:180, y:96 },
-    { t:'stove', x:216, y:98 },
-    { t:'fridge', x:250, y:112 },
-    { t:'coffee_machine', x:192, y:99 },
-    { t:'cabinet', x:22, y:120 },
-    { t:'table_wood', x:132, y:194 },
-    { t:'chair_wood', x:96, y:200 }, { t:'chair_wood', x:170, y:200 },
-    { t:'rug_warm', x:132, y:214 },
-    { t:'cat_bed', x:44, y:250 },
-    { t:'bin', x:250, y:250 },
-    { t:'plant_pot', x:24, y:196 },
-    { t:'clock', x:224, y:30 },
+    { t:'window_in', x:46, y:34 },
+    { t:'counter', x:78, y:90 }, { t:'counter', x:158, y:90 },
+    { t:'stove', x:190, y:92 },
+    { t:'fridge', x:220, y:104 },
+    { t:'coffee_machine', x:170, y:93 },
+    { t:'cabinet', x:22, y:110 },
+    { t:'table_wood', x:118, y:172 },
+    { t:'chair_wood', x:84, y:178 }, { t:'chair_wood', x:152, y:178 },
+    { t:'rug_warm', x:118, y:190 },
+    { t:'cat_bed', x:40, y:224 },
+    { t:'bin', x:222, y:224 },
+    { t:'plant_pot', x:24, y:176 },
+    { t:'clock', x:200, y:26 },
   ],
-  ambient() { if (Math.random() < 0.02) FX.spawn(146,78,1,{color:'#8a8a90', rise:-0.3, life:60, spread:6}); },
+  ambient() { if (Math.random() < 0.02) FX.spawn(130,74,1,{color:'#8a8a90', rise:-0.3, life:60, spread:6}); },
   walls: [
-    {x:0,y:0,w:280,h:58},{x:0,y:0,w:8,h:300},{x:272,y:0,w:8,h:300},{x:0,y:295,w:280,h:5},
+    {x:0,y:0,w:246,h:54},{x:0,y:0,w:8,h:268},{x:238,y:0,w:8,h:268},{x:0,y:263,w:246,h:5},
   ],
   interactables: [
-    { x:120,y:256,w:44,h:36, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('corridor1', 34, 116) },
-    { x:228,y:96,w:48,h:34, name:'fridge', prompt:'Холодильник', action(){
+    { x:100,y:226,w:42,h:34, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('corridor1', 34, 116) },
+    { x:200,y:88,w:44,h:32, name:'fridge', prompt:'Холодильник', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Её йогурты. Срок годности — через неделю.'},
           {who:'naya',expr:'empty',text:'Они переживут её. Об этом почему-то невозможно перестать думать.'},
@@ -6554,20 +6562,20 @@ kitchen: {
           {who:'naya',expr:'smile',text:'Всякий случай наступает примерно каждый вечер.'},
         ]);
       }},
-    { x:194,y:76,w:44,h:34, name:'hob', prompt:'Плита', action(){
+    { x:170,y:72,w:42,h:32, name:'hob', prompt:'Плита', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Одна конфорка не работает с зимы. Я привыкла и уже не считаю это поломкой.'}]);
       }},
-    { x:126,y:62,w:44,h:34, name:'kettle', prompt:'Кофеварка', action(){
+    { x:150,y:62,w:42,h:32, name:'kettle', prompt:'Кофеварка', action(){
         if (F('silenceDone') && !F('reflectionDone')) return Dialogue.start([
           {who:'naya',expr:'sad',text:'Поставить кофе. Просто поставить кофе, как будто это что-то решает.'},
           {who:'naya',expr:'sad',text:'Я ставлю. Она шумит. В комнате всё ещё тихо.'},
         ]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Гудит так, что соседка стучит. Мы со Сью специально доводили её до свиста. Один раз.'}]);
       }},
-    { x:112,y:70,w:44,h:34, name:'sink', prompt:'Мойка', action(){
+    { x:98,y:66,w:44,h:32, name:'sink', prompt:'Мойка', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Посуда за два дня. Раньше было за неделю — это, наверное, прогресс.'}]);
       }},
-    { x:110,y:172,w:48,h:30, name:'mugs', prompt:'Кружки', action(){
+    { x:96,y:152,w:46,h:28, name:'mugs', prompt:'Кружки', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Жёлтая. Она сама её купила и сама подписала маркером, чтобы я «не перепутала».'},
           {who:'naya',expr:'sad',text:'Я ни разу не перепутала.'},
@@ -6578,14 +6586,14 @@ kitchen: {
           {who:'naya',expr:'talk',text:'Формально это моя квартира. Фактически — у неё тут своя кружка, свои тапки и своё мнение о шторах.'},
         ]);
       }},
-    { x:30,y:104,w:40,h:34, name:'cupboard', prompt:'Буфет', action(){
+    { x:26,y:96,w:38,h:32, name:'cupboard', prompt:'Буфет', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Сервиз, доставшийся от хозяйки. Мы им ни разу не пользовались — боимся.'}]);
       }},
-    { x:34,y:16,w:40,h:36, name:'kwindow', prompt:'Окно', action(){
+    { x:28,y:14,w:38,h:34, name:'kwindow', prompt:'Окно', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Во дворе кто-то выгуливает собаку. Половина восьмого. Всё как всегда.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Окно во двор. Утром сюда попадает солнце ровно на двадцать минут.'}]);
       }},
-    { x:26,y:230,w:40,h:34, name:'catSpot', prompt:'Миска Дороти', action(){
+    { x:22,y:204,w:38,h:32, name:'catSpot', prompt:'Миска Дороти', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Миска полная. Дороти не ест третий день.'}]);
         Dialogue.start([{who:'naya',expr:'smile',text:'Миска Дороти. Пустая. Как всегда через десять минут после того, как я её наполнила.'}]);
       }},
@@ -6595,43 +6603,45 @@ kitchen: {
 
 /* ---------------------------------------------------------------- */
 bathroom: {
-  name:"Ванная", music:'home', w:240, h:280,
+  /* Ванная — самое маленькое помещение в доме: ванна вдоль левой стены,
+     раковина с зеркалом на дальней, унитаз в углу, шкафчик у двери. */
+  name:"Ванная", music:'home', w:190, h:210,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 }, light:{ tint:'#141a22', dark:.24 },
-  lights:[{x:186,y:52,r:38,c:'#dfe8f0',i:.4}],
+  lights:[{x:120,y:40,r:34,c:'#dfe8f0',i:.42}],
   bgPaint(ctx) {
-    paintInterior(ctx, 240, 280, { wall:'#3f4a52', wall2:'#374149', floor:'#8d949c', floor2:'#7d848c', wallH:54, tiles:true });
-    // кафель на стене
+    paintInterior(ctx, 190, 210, { wall:'#3f4a52', wall2:'#374149', floor:'#8d949c', floor2:'#7d848c', wallH:48, tiles:true });
     ctx.fillStyle = '#4d5a63';
-    for (let y=0;y<54;y+=9) for (let x=0;x<240;x+=9) ctx.fillRect(x+1, y+1, 7, 7);
-    ctx.fillStyle = '#5c6a74'; ctx.fillRect(0, 0, 240, 2);
-    ctx.fillStyle = '#333c43'; ctx.fillRect(0, 50, 240, 4);
-    // мокрый след от ванны
+    for (let y=0;y<48;y+=9) for (let x=0;x<190;x+=9) ctx.fillRect(x+1, y+1, 7, 7);
+    ctx.fillStyle = '#5c6a74'; ctx.fillRect(0, 0, 190, 2);
+    ctx.fillStyle = '#333c43'; ctx.fillRect(0, 44, 190, 4);
+    // мокрый след у ванны
     ctx.fillStyle = 'rgba(150,180,200,.10)';
-    ctx.beginPath(); ctx.ellipse(46, 186, 36, 14, 0, 0, Math.PI*2); ctx.fill();
-    // кафель за ванной и полотенце на крючке
-    ctx.fillStyle = '#48545e'; ctx.fillRect(8, 54, 60, 116);
+    ctx.beginPath(); ctx.ellipse(40, 150, 30, 12, 0, 0, Math.PI*2); ctx.fill();
+    // кафель за ванной
+    ctx.fillStyle = '#48545e'; ctx.fillRect(8, 48, 54, 84);
     ctx.fillStyle = '#525f6a';
-    for (let y=54;y<170;y+=9) for (let x=8;x<68;x+=9) ctx.fillRect(x+1, y+1, 7, 7);
-    ctx.fillStyle = '#3b4650'; ctx.fillRect(8, 166, 60, 4);
-    ctx.fillStyle = '#8d949c'; ctx.fillRect(186, 58, 3, 3);
-    ctx.fillStyle = '#c8d0d8'; ctx.fillRect(180, 60, 16, 26);
-    ctx.fillStyle = '#dde3e9'; ctx.fillRect(182, 62, 12, 22);
-    paintDoor(ctx, 105, 265, 30, 15);
+    for (let y=48;y<132;y+=9) for (let x=8;x<62;x+=9) ctx.fillRect(x+1, y+1, 7, 7);
+    ctx.fillStyle = '#3b4650'; ctx.fillRect(8, 128, 54, 4);
+    // полотенце на крючке рядом с раковиной
+    ctx.fillStyle = '#8d949c'; ctx.fillRect(156, 52, 3, 3);
+    ctx.fillStyle = '#c8d0d8'; ctx.fillRect(150, 54, 14, 22);
+    ctx.fillStyle = '#dde3e9'; ctx.fillRect(152, 56, 10, 18);
+    paintDoor(ctx, 80, 196, 28, 14);
   },
   objects: [
-    { t:'bathtub', x:32, y:158 },
-    { t:'sink', x:150, y:84 },
-    { t:'mirror_tall', x:150, y:64 },
-    { t:'toilet', x:212, y:98 },
-    { t:'cabinet', x:32, y:238 },
-    { t:'plant_pot', x:210, y:246 },
+    { t:'bathtub',     x:34,  y:126 },   // вдоль левой стены
+    { t:'sink',        x:112, y:74  },   // на дальней стене
+    { t:'mirror_tall', x:112, y:64  },   // над раковиной
+    { t:'toilet',      x:164, y:92  },   // в углу
+    { t:'cabinet',     x:34,  y:186 },   // у двери
+    { t:'plant_pot',   x:166, y:180 },
   ],
   walls: [
-    {x:0,y:0,w:240,h:54},{x:0,y:0,w:8,h:280},{x:232,y:0,w:8,h:280},{x:0,y:275,w:240,h:5},
+    {x:0,y:0,w:190,h:48},{x:0,y:0,w:8,h:210},{x:182,y:0,w:8,h:210},{x:0,y:205,w:190,h:5},
   ],
   interactables: [
-    { x:100,y:238,w:40,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('corridor1', 34, 204) },
-    { x:130,y:26,w:44,h:34, name:'mirror2', prompt:'Зеркало', action(){
+    { x:76,y:176,w:38,h:30, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('corridor1', 34, 204) },
+    { x:94,y:36,w:40,h:30, name:'mirror2', prompt:'Зеркало', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'У меня кровь под ногтями. Не моя.'},
           {who:'naya',expr:'shocked',text:'Я мою руки уже двадцать минут и всё ещё не начала.'},
@@ -6642,22 +6652,22 @@ bathroom: {
         ]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Утреннее лицо. Ничего нового, к сожалению.'}]);
       }},
-    { x:14,y:126,w:44,h:38, name:'tub', prompt:'Ванна', action(){
+    { x:16,y:96,w:40,h:34, name:'tub', prompt:'Ванна', action(){
         if (F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'sad',text:'Она сказала, что там, где она была, было очень тихо.'},
           {who:'naya',expr:'sad',text:'Я лежала тут вчера в холодной воде. Тише не стало.'},
         ]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Кран капает. Хозяйка обещала прислать мастера в марте. Какого года — не уточнила.'}]);
       }},
-    { x:130,y:62,w:44,h:32, name:'basin', prompt:'Раковина', action(){
+    { x:94,y:64,w:40,h:28, name:'basin', prompt:'Раковина', action(){
         if (F('firstWitchDead')) return Dialogue.start([{who:'naya',expr:'empty',text:'Я мою руки чаще, чем раньше. Заметно чаще.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Две зубные щётки в одном стакане. Мы про это тоже никогда не говорили.'}]);
       }},
-    { x:192,y:76,w:40,h:32, name:'washer', prompt:'Корзина для белья', action(){
+    { x:148,y:74,w:36,h:30, name:'washer', prompt:'Корзина для белья', action(){
         if (F('firstWitchDead')) return Dialogue.start([{who:'naya',expr:'empty',text:'Куртка отстиралась. Полностью. Я почему-то надеялась, что нет.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Корзина переполнена. Обе виноваты, обе делают вид, что не замечают.'}]);
       }},
-    { x:16,y:218,w:38,h:34, name:'shelfB', prompt:'Шкафчик', action(){
+    { x:16,y:162,w:38,h:30, name:'shelfB', prompt:'Шкафчик', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Полка Сью снизу, потому что она ниже. Это её объяснение, не моё.'}]);
       }},
   ],
