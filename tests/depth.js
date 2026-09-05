@@ -64,7 +64,16 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
       else if (j.x < 4 || j.y < 4 || j.x > room.w - 4 || j.y > room.h - 4)
         spawns.push({ ...j, why:'за пределами комнаты' });
     }
-    return { anchors, inside, spawns };
+    // §14: на стене коридора ничто не должно налезать на соседа
+    const walls = [];
+    for (const [name, L] of Object.entries({ UNI_LIB_WALL, UNI_F2_WALL, UNI_THEATRE_WALL })) {
+      const it = L.items;
+      for (let i = 1; i < it.length; i++) {
+        const gap = it[i].x - (it[i-1].x + it[i-1].w);
+        if (gap < 10) walls.push({ name, a:it[i-1].label || it[i-1].k, b:it[i].label || it[i].k, gap });
+      }
+    }
+    return { anchors, inside, spawns, walls };
   }, jumps);
 
   let bad = 0;
@@ -82,6 +91,11 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
     bad += out.spawns.length;
     console.log('плохие точки входа:');
     out.spawns.forEach(v => console.log(`  changeRoom('${v.room}', ${v.x}, ${v.y}) — ${v.why}`));
+  }
+  if (out.walls.length) {
+    bad += out.walls.length;
+    console.log('на стене нет простенка:');
+    out.walls.forEach(w => console.log(`  ${w.name}: «${w.a}» и «${w.b}» — зазор ${w.gap}px`));
   }
   console.log(`проверено переходов: ${jumps.length}`);
   errs.forEach(e => console.log(e));
