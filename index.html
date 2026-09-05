@@ -8452,18 +8452,7 @@ const Prologue = {
   },
   drawFigures(ctx) {
     const t = Date.now();
-    if (this.showLilith) {                       // a throne-high silhouette
-      ctx.fillStyle = 'rgba(10,0,6,.9)';
-      ctx.beginPath();
-      ctx.moveTo(120, 118); ctx.lineTo(96, 250); ctx.lineTo(144, 250); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#1a0208';
-      ctx.beginPath(); ctx.arc(120, 112, 14, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#2a0410';
-      ctx.beginPath(); ctx.moveTo(108,104); ctx.lineTo(100,84); ctx.lineTo(114,100); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(132,104); ctx.lineTo(140,84); ctx.lineTo(126,100); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#ff2a30';
-      ctx.fillRect(113, 110, 3, 2); ctx.fillRect(124, 110, 3, 2);
-    }
+    if (this.showLilith) this.drawLilith(ctx, t);
     if (this.showMedea) {
       const a = .92 + .06 * Math.sin(t/600);
       ctx.save();
@@ -8484,6 +8473,91 @@ const Prologue = {
         if (Math.random() < .5) FX.spawn(70, 228, 1, {color:'#c060ff', spread:12, rise:-.4, life:50});
       }
     }
+  },
+
+  /* ЛИЛИТ В ПРОЛОГЕ.
+
+     Раньше на её месте стоял треугольник с кружком — читалось как пирамида.
+     Теперь это человеческая фигура: голова, плечи, разведённые руки, корпус
+     и подол, расходящийся книзу. Силуэт остаётся чёрным, но контровой свет
+     сзади обводит его по краю, поэтому в темноте видно именно человека, а
+     не геометрию. Она заметно выше всех: это и есть её главная реплика.    */
+  drawLilith(ctx, t) {
+    const CX = 120, FOOT = 252, HEAD = 84;      // от макушки до пола — 168 px
+    const br = 1 + Math.sin(t / 900) * .06;
+
+    ctx.save();
+    // контровой свет и дым из-за спины
+    const back = ctx.createRadialGradient(CX, 150, 10, CX, 150, 96);
+    back.addColorStop(0, `rgba(190,30,44,${(.30 * br).toFixed(2)})`);
+    back.addColorStop(1, 'rgba(120,10,26,0)');
+    ctx.fillStyle = back; ctx.beginPath(); ctx.arc(CX, 150, 96, 0, 6.3); ctx.fill();
+
+    const ink = '#0a0206';
+    // подол: расходится книзу, а не сходится в остриё
+    ctx.fillStyle = ink;
+    ctx.beginPath();
+    ctx.moveTo(CX - 13, 150); ctx.lineTo(CX + 13, 150);
+    ctx.bezierCurveTo(CX + 26, 196, CX + 38, 232, CX + 44, FOOT);
+    ctx.lineTo(CX - 44, FOOT);
+    ctx.bezierCurveTo(CX - 38, 232, CX - 26, 196, CX - 13, 150);
+    ctx.closePath(); ctx.fill();
+    // корпус и плечи
+    ctx.beginPath();
+    ctx.moveTo(CX - 10, 112); ctx.lineTo(CX + 10, 112);
+    ctx.lineTo(CX + 15, 152); ctx.lineTo(CX - 15, 152);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(CX, 112, 21, 8, 0, 0, 6.3); ctx.fill();
+    // руки разведены в стороны — поза царицы, показывающей власть
+    [-1, 1].forEach(d => {
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 16, 110);
+      ctx.quadraticCurveTo(CX + d * 44, 116, CX + d * 60, 100);
+      ctx.lineTo(CX + d * 60, 107);
+      ctx.quadraticCurveTo(CX + d * 44, 126, CX + d * 16, 120);
+      ctx.closePath(); ctx.fill();
+      // рукав, свисающий с разведённой руки
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 30, 120); ctx.lineTo(CX + d * 52, 112);
+      ctx.lineTo(CX + d * 48, 150); ctx.lineTo(CX + d * 28, 142);
+      ctx.closePath(); ctx.fill();
+    });
+    // шея и голова
+    ctx.fillRect(CX - 4, 100, 8, 12);
+    ctx.beginPath(); ctx.ellipse(CX, HEAD + 10, 11, 13, 0, 0, 6.3); ctx.fill();
+    // рогатая корона: крупные рога, иначе на общем плане их просто не видно
+    [-1, 1].forEach(d => {
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 4, HEAD + 4);
+      ctx.quadraticCurveTo(CX + d * 24, HEAD - 6, CX + d * 21, HEAD - 26);
+      ctx.quadraticCurveTo(CX + d * 15, HEAD - 12, CX + d * 2, HEAD - 2);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = `rgba(220,70,70,${(.42 * br).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 4, HEAD + 4);
+      ctx.quadraticCurveTo(CX + d * 24, HEAD - 6, CX + d * 21, HEAD - 26);
+      ctx.stroke();
+    });
+
+    // обводка контровым светом: в темноте читается именно фигура
+    ctx.strokeStyle = `rgba(220,70,70,${(.34 * br).toFixed(2)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CX - 44, FOOT);
+    ctx.bezierCurveTo(CX - 38, 232, CX - 26, 196, CX - 13, 150);
+    ctx.lineTo(CX - 15, 152); ctx.lineTo(CX - 10, 112);
+    ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(CX, HEAD + 10, 11, 13, 0, 0, 6.3); ctx.stroke();
+    [-1, 1].forEach(d => {
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 16, 110);
+      ctx.quadraticCurveTo(CX + d * 44, 116, CX + d * 60, 100);
+      ctx.stroke();
+    });
+
+    ctx.fillStyle = `rgba(255,42,48,${(.85 * br).toFixed(2)})`;
+    ctx.fillRect(CX - 6, HEAD + 8, 3, 2); ctx.fillRect(CX + 3, HEAD + 8, 3, 2);
+    ctx.restore();
   },
 
   /* КАЧЕЛИ.
