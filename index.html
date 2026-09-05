@@ -3823,12 +3823,15 @@ const Shift = {
 
   /* ---------------- состояние ---------------- */
   queue:[], tray:[], served:0, spawned:0, brewing:null, hit:[], raf:0, flash:0, resolve:null,
+  left:0, _st:null,
+  SHIFT_MS: 150000,               // смена всё равно кончится через две с половиной минуты
 
   run() {
     return new Promise(res => {
       this.resolve = res;
       this.queue = []; this.tray = []; this.served = 0; this.spawned = 0;
-      this.brewing = null; this.flash = 0;
+      this.brewing = null; this.flash = 0; this.left = this.SHIFT_MS;
+      this.plan();
       setFlag('cafeShiftStarted');
       const scr = document.getElementById('shiftScreen');
       scr.classList.add('show');
@@ -3853,6 +3856,7 @@ const Shift = {
     });
   },
   finish() {
+    if (!this.resolve) return;
     cancelAnimationFrame(this.raf);
     document.getElementById('shiftScreen').classList.remove('show');
     Game.mode = 'cutscene';
@@ -3863,13 +3867,30 @@ const Shift = {
   },
   say(t) { document.getElementById('shiftSay').textContent = t; },
 
+  /* Смена набирается заранее: список блюд на всю смену известен с самого
+     начала, поэтому и набор станций считается один раз и больше никогда не
+     меняется. Стойка, которая переставляет ингредиенты после каждого
+     выданного заказа, уводит кнопку из-под уже занесённого пальца. */
+  plan() {
+    const hot  = this.MENU.filter(m => m.wait).sort(() => Math.random() - .5).slice(0, 3);
+    const cold = this.MENU.filter(m => !m.wait).sort(() => Math.random() - .5).slice(0, 3);
+    this.deck = hot.concat(cold).sort(() => Math.random() - .5);
+    const need = [];
+    this.deck.forEach(r => r.steps.forEach(t => { if (!need.includes(t)) need.push(t); }));
+    if (!need.includes('brew')) need.push('brew');
+    const rest = Object.keys(this.T).filter(t => !need.includes(t));
+    while (need.length < 8 && rest.length) need.push(rest.splice((Math.random() * rest.length) | 0, 1)[0]);
+    this._st = need.slice(0, 8);
+  },
+
   /* Очередь: держим до трёх гостей, пока не выдано всё, что положено. */
   fill() {
-    while (this.queue.length < this.QUEUE && this.spawned < this.TOTAL + 1) {
-      const pool = this.MENU.filter(m => !this.queue.some(q => q.r === m));
-      const r = pool[(Math.random() * pool.length) | 0] || this.MENU[0];
-      this.queue.push({ r, face: this.FACES[(Math.random() * this.FACES.length) | 0],
-                        pat: 1, max: 22000 + r.steps.length * 4000, mood:0 });
+    // гости подходят, пока идёт смена: иначе после пары ушедших у стойки
+    // некому подавать, и остаётся только досиживать таймер
+    while (this.queue.length < this.QUEUE) {
+      const r = this.deck[this.spawned % this.deck.length];
+      this.queue.push({ r, face: this.FACES[(this.spawned * 2 + 1) % this.FACES.length],
+                        pat: 1, max: 26000 + r.steps.length * 5000, mood:0 });
       this.spawned++;
     }
     const ph = this.PHASES[Math.min(this.served, this.PHASES.length - 1)];
@@ -3880,18 +3901,18 @@ const Shift = {
       ph[0] + '  ·  ВЫДАНО ' + this.served + ' ИЗ ' + this.TOTAL;
   },
 
-  /* Станции: всё, что нужно очереди, плюс машина; добиваем до восьми. */
-  stations() {
-    const need = [];
-    this.queue.forEach(q => q.r.steps.forEach(t => { if (!need.includes(t)) need.push(t); }));
-    if (!need.includes('brew')) need.push('brew');
-    const rest = Object.keys(this.T).filter(t => !need.includes(t));
-    while (need.length < 8 && rest.length) need.push(rest.splice((Math.random() * rest.length) | 0, 1)[0]);
-    return need.slice(0, 8);
-  },
+  /* Станции: всё, что нужно очереди, плюс машина; добиваем до восьми.
+
+     Набор считается один раз на состав очереди и запоминается. Раньше он
+     пересобирался каждый кадр со случайными «лишними» позициями — кнопки
+     мигали и переставлялись местами шестьдесят раз в секунду, палец попадал
+     не в тот ингредиент, и правильный заказ отменялся сам собой. */
+  stations() { return this._st || []; },
 
   update(dt) {
     if (this.flash > 0) this.flash -= dt;
+    this.left -= dt;
+    if (this.left <= 0) return this.finish();   // время вышло — смена закончена в любом случае
     if (this.brewing) {
       this.brewing.t += dt;
       if (this.brewing.t >= this.brewing.ms) { this.tray.push('brew'); this.brewing = null; Audio.beep(720,.12,'sine',.05); }
@@ -3903,6 +3924,7 @@ const Shift = {
         this.queue.splice(i, 1);
         this.say('Крис: «Ушёл. Бывает, не убивайся.»');
         Audio.beep(160, .2, 'sawtooth', .04);
+        if (!this.valid()) { this.tray = []; this.brewing = null; }   // поднос собирали для него
         this.fill();
       }
     }
@@ -4038,6 +4060,11 @@ const Shift = {
       g.fillRect(bx, by - 7, Math.max(0, bw * q.pat), 4);
       this.hit.push({ kind:'guest', i, x:gx-26, y:46, w:52, h:74 });
     });
+
+    // полоса смены: видно, сколько её осталось, и что она точно закончится
+    const k = Math.max(0, this.left / this.SHIFT_MS);
+    g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, 0, W, 4);
+    g.fillStyle = k > .25 ? '#c8a05a' : '#c05a3a'; g.fillRect(0, 0, W * k, 4);
 
     // стойка
     g.fillStyle = '#7a5432'; g.fillRect(0,118,W,14);
