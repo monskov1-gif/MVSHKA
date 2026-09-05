@@ -1216,6 +1216,8 @@ function freshState() {
       universityWindowRouteUnlocked:false,
       metSue:false, cafeSceneComplete:false,
       cafeShiftStarted:false, cafeShiftFinished:false,
+      // площадка в настоящем
+      presentPlaygroundVisited:false, playgroundMemoryTriggered:false,
       waitingAtAud:false, metGenevieveUni:false, crystalReacted:false, oldWingOpen:false,
       investigatedUniversity:false, learnedMedea:false, learnedWitches:false,
       homeTalkDone:false, portalOpened:false, metCharlotte:false, metLilith:false,
@@ -2119,16 +2121,54 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#8a4a52'; g.fillRect(37, 36, 14, 4);
     g.fillStyle = '#9c5a60'; g.fillRect(37, 36, 14, 1);
   });
-  D('slide', {w:44,h:52,ax:22,ay:50,foot:{x:-22,y:-14,w:44,h:16}}, g => {
-    shadowEllipse(g, 22, 49, 18, 3, .2);
-    g.fillStyle = '#4a7a6a'; g.fillRect(28, 6, 12, 30);
-    g.fillStyle = '#5d9484'; g.fillRect(29, 7, 10, 28);
-    g.fillStyle = '#8d949c';
-    g.beginPath(); g.moveTo(28, 12); g.lineTo(6, 44); g.lineTo(14, 46); g.lineTo(34, 16); g.closePath(); g.fill();
-    g.fillStyle = '#a8aeb6';
-    g.beginPath(); g.moveTo(28, 13); g.lineTo(8, 43); g.lineTo(11, 44); g.lineTo(31, 15); g.closePath(); g.fill();
-    g.fillStyle = '#3f5c5a'; g.fillRect(30, 34, 3, 14); g.fillRect(36, 34, 3, 14);
-  });
+  /* Горка — полноценная конструкция, а не наклонная плоскость: лестница со
+     ступенями, поручни, верхняя площадка с бортиком, скат с боковыми
+     стенками, опоры и тень. Параметр worn делает вторую, изношенную версию:
+     облупившаяся краска, ржавчина, потёртый скат. */
+  const drawSlide = (g, worn) => {
+    const green  = worn ? '#4e6a5e' : '#4a7a6a';
+    const green2 = worn ? '#5f7d70' : '#5d9484';
+    const metal  = worn ? '#7e8288' : '#8d949c';
+    const metal2 = worn ? '#969aa0' : '#a8aeb6';
+    const post   = worn ? '#455a52' : '#3f5c5a';
+    shadowEllipse(g, 26, 55, 22, 4, .22);
+    // опоры под площадкой
+    g.fillStyle = post; g.fillRect(31, 36, 4, 18); g.fillRect(43, 36, 4, 18);
+    // лестница: тетива и ступени
+    g.fillStyle = post; g.fillRect(30, 10, 3, 30); g.fillRect(47, 10, 3, 30);
+    g.fillStyle = green;
+    for (let i = 0; i < 6; i++) g.fillRect(32, 36 - i * 5, 17, 3);
+    g.fillStyle = green2;
+    for (let i = 0; i < 6; i++) g.fillRect(32, 36 - i * 5, 17, 1);
+    // поручни лестницы
+    g.strokeStyle = post; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(30, 30); g.lineTo(30, 4); g.lineTo(49, 4); g.lineTo(49, 30); g.stroke();
+    g.lineWidth = 1;
+    // верхняя площадка с бортиком
+    g.fillStyle = green;  g.fillRect(26, 8, 26, 6);
+    g.fillStyle = green2; g.fillRect(26, 8, 26, 2);
+    g.fillStyle = post;   g.fillRect(26, 4, 3, 8); g.fillRect(49, 4, 3, 8);
+    // скат с боковыми стенками
+    g.fillStyle = metal;
+    g.beginPath(); g.moveTo(28, 12); g.lineTo(4, 46); g.lineTo(15, 49); g.lineTo(36, 15); g.closePath(); g.fill();
+    g.fillStyle = metal2;
+    g.beginPath(); g.moveTo(29, 14); g.lineTo(8, 45); g.lineTo(12, 46); g.lineTo(33, 16); g.closePath(); g.fill();
+    g.fillStyle = post;                                   // бортики ската
+    g.beginPath(); g.moveTo(27, 11); g.lineTo(3, 45); g.lineTo(5, 47); g.lineTo(29, 13); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(35, 14); g.lineTo(14, 48); g.lineTo(17, 50); g.lineTo(37, 16); g.closePath(); g.fill();
+    g.fillStyle = worn ? '#6a6a70' : '#c0c6ce';           // выкат внизу
+    g.fillRect(3, 46, 15, 4);
+    if (worn) {                                           // ржавчина и облупившаяся краска
+      g.fillStyle = 'rgba(140,70,30,.55)';
+      g.fillRect(31, 24, 3, 5); g.fillRect(46, 14, 3, 6); g.fillRect(33, 41, 4, 3);
+      g.fillRect(9, 42, 4, 3); g.fillRect(20, 30, 3, 3);
+      g.fillStyle = 'rgba(0,0,0,.22)';
+      g.fillRect(26, 8, 26, 1); g.fillRect(32, 21, 17, 1);
+    }
+  };
+  D('slide',      {w:56,h:58,ax:28,ay:56,foot:{x:-26,y:-16,w:52,h:18}}, g => drawSlide(g, false));
+  D('slide_worn', {w:56,h:58,ax:28,ay:56,foot:{x:-26,y:-16,w:52,h:18}}, g => drawSlide(g, true));
+
   D('sandbox', {w:52,h:30,ax:26,ay:26,foot:null, flat:true}, g => {
     g.fillStyle = '#6b5236'; g.fillRect(0, 0, 52, 26);
     g.fillStyle = '#c9b389'; g.fillRect(3, 3, 46, 20);
@@ -4082,6 +4122,76 @@ const Patrol = {
    но не интерактивны и живут только до конца сцены или смены комнаты. */
 function roomCast() { return Game.cast || []; }
 function roomObjs(room) { return (room.interactables || []).filter(o => !o.when || o.when()); }
+
+/* Детская площадка. Одна планировка, две эпохи: playground — детство,
+   playgroundNow — та же площадка сегодня, на окраине города. Ключевые
+   объекты стоят там же, чтобы место узнавалось, но всё заметно старее. */
+function paintPlayground(ctx, worn) {
+  const W = 300;
+  // небо занимает узкую полосу: за площадкой должен быть жилой квартал
+  const sky = ctx.createLinearGradient(0,0,0,52);
+  if (worn) { sky.addColorStop(0,'#6f7480'); sky.addColorStop(1,'#98917f'); }
+  else      { sky.addColorStop(0,'#8ea0b0'); sky.addColorStop(1,'#c0b294'); }
+  ctx.fillStyle = sky; ctx.fillRect(0,0,W,52);
+  // дальние крыши
+  ctx.fillStyle = worn ? '#4a4650' : '#59606a';
+  for (let x=-6;x<W;x+=34) ctx.fillRect(x, 30 + ((x*7)%10), 30, 24);
+  // жилые дома: стены, крыши, окна
+  const houses = [[-4,44,72],[74,38,64],[144,46,58],[208,36,68],[280,44,40]];
+  houses.forEach(([hx,hy,hw], i) => {
+    const body = worn ? ['#6a6058','#5f5a52','#6f6258'][i%3] : ['#7d7268','#877a68','#6f665e'][i%3];
+    ctx.fillStyle = worn ? '#3f3a3c' : '#4a4248';                 // крыша
+    ctx.beginPath(); ctx.moveTo(hx-4, hy); ctx.lineTo(hx+hw/2, hy-14); ctx.lineTo(hx+hw+4, hy); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = body; ctx.fillRect(hx, hy, hw, 100 - hy + 12);
+    ctx.fillStyle = worn ? 'rgba(0,0,0,.20)' : 'rgba(0,0,0,.14)';
+    ctx.fillRect(hx, hy, hw, 3);
+    for (let r=0;r<2;r++) for (let c=0;c<Math.floor(hw/20);c++) {
+      const wx = hx + 6 + c*20, wy = hy + 10 + r*22;
+      const lit = !worn && ((i+c+r) % 4 === 0);
+      ctx.fillStyle = lit ? '#e8c880' : (worn ? '#3a3a40' : '#48505c');
+      ctx.fillRect(wx, wy, 11, 13);
+      ctx.fillStyle = worn ? '#565056' : '#5f5a58';
+      ctx.fillRect(wx, wy, 11, 1); ctx.fillRect(wx+5, wy, 1, 13);
+    }
+  });
+  // деревья вдоль домов
+  ctx.fillStyle = worn ? '#4a4032' : '#5a4a34';
+  [30, 118, 196, 268].forEach(tx => ctx.fillRect(tx, 78, 4, 26));
+  [30, 118, 196, 268].forEach((tx, i) => {
+    ctx.fillStyle = worn ? ['#5a5236','#6a5c34','#4e4a30'][i%3] : ['#a8622c','#c08a2c','#8a5a26'][i%3];
+    ctx.beginPath(); ctx.arc(tx+2, 70, 15 - (i%2)*3, 0, 6.3); ctx.fill();
+  });
+  // дорога и тротуар перед кварталом
+  ctx.fillStyle = worn ? '#4e4a4c' : '#585458'; ctx.fillRect(0, 96, W, 12);
+  ctx.fillStyle = worn ? '#6a6660' : '#7a746c'; ctx.fillRect(0, 92, W, 4);
+  ctx.fillStyle = worn ? '#8a8878' : '#9a9484';
+  for (let x=6;x<W;x+=26) ctx.fillRect(x, 101, 12, 2);
+  // забор между кварталом и площадкой
+  ctx.fillStyle = worn ? '#5a5244' : '#6f6250';
+  ctx.fillRect(0, 108, W, 3);
+  for (let x=2;x<W;x+=14) ctx.fillRect(x, 106, 3, 12);
+
+  // сама площадка
+  ctx.fillStyle = worn ? '#5f6448' : PAL.grassDry; ctx.fillRect(0,112,W,188);
+  ctx.fillStyle = worn ? '#525a3a' : '#535a33';
+  for (let i=0;i<120;i++) ctx.fillRect((i*47)%W, 116+((i*29)%180), 2, 1);
+  ctx.fillStyle = worn ? '#5e5340' : '#6a5a42';
+  ctx.beginPath(); ctx.ellipse(150, 196, 84, 44, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = worn ? '#6a5f48' : '#77684d';
+  ctx.beginPath(); ctx.ellipse(150, 192, 78, 39, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = worn ? '#6e6a62' : '#7d7266'; ctx.fillRect(0, 262, W, 22);
+  ctx.fillStyle = worn ? '#7c7870' : '#8d8276'; for (let x=0;x<W;x+=18) ctx.fillRect(x,262,1,22);
+  const cols = worn ? ['#6a4a2c','#7a5a30','#5f4a2a','#4e3a24']
+                    : [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
+  for (let i=0;i<220;i++) { ctx.fillStyle = cols[i%4]; ctx.fillRect((i*79)%W, 118+((i*43)%178), 3, 2); }
+  if (worn) {                                            // трещины в асфальте и проплешины
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.fillRect(64, 262, 2, 22); ctx.fillRect(198, 262, 2, 22);
+    ctx.beginPath(); ctx.ellipse(96, 226, 16, 7, 0, 0, 6.3); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(214, 178, 12, 6, 0, 0, 6.3); ctx.fill();
+  }
+}
+
 
 /* Раскладки стен университетских коридоров: считаются один раз, из них
    берут координаты и художник фона, и точки взаимодействия — поэтому
@@ -6795,6 +6905,14 @@ oldTown: {
   ],
   interactables: [
     { x:6,y:262,w:38,h:52, name:'toStreet', prompt:'Назад', action: async ()=> await changeRoom('street', 40, 270) },
+    /* Площадка стоит на самой окраине: дойти можно, но специально —
+       через старый квартал и пустырь за ним. */
+    { x:126,y:284,w:80,h:30, name:'toPlayground', prompt:'Пустырь и старая площадка',
+      when:()=> F('backstoryDone'),
+      action: async ()=> {
+        UI.toast('Пятнадцать минут пешком', 1600);
+        await changeRoom('playgroundNow', 150, 268);
+      }},
     { x:44,y:150,w:72,h:32, name:'toRose', prompt:'Дом Розы', action: async ()=> {
         if (!F('firstAmulet')) { UI.toast('Сначала — Мадлен. Иначе нас тут не ждут.'); return; }
         if (F('secondAmulet')) return Dialogue.start([{who:'naya',expr:'sad',text:'Здесь больше делать нечего.'}]);
@@ -7063,30 +7181,10 @@ playground: {
   zone:'town', weather:{ rain:0, fog:.06, wind:.3, leaves:.7 },
   light:{ tint:'#2a2418', dark:.10 },
   sun:{ x:236, y:20, w:60, len:190, tilt:-.34, a:.16 },
-  bgPaint(ctx) {
-    const W = 300;
-    const sky = ctx.createLinearGradient(0,0,0,110);
-    sky.addColorStop(0,'#8ea0b0'); sky.addColorStop(1,'#c0b294');
-    ctx.fillStyle = sky; ctx.fillRect(0,0,W,110);
-    ctx.fillStyle = '#5a6448';
-    for (let x=0;x<W;x+=16) { const h=18+((x*5)%16); ctx.fillRect(x,110-h,16,h); }
-    ctx.fillStyle = PAL.grassDry; ctx.fillRect(0,106,W,194);
-    ctx.fillStyle = '#535a33';
-    for (let i=0;i<120;i++) ctx.fillRect((i*47)%W, 110+((i*29)%186), 2, 1);
-    // packed earth under the swings
-    ctx.fillStyle = '#6a5a42';
-    ctx.beginPath(); ctx.ellipse(150, 196, 84, 44, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#77684d';
-    ctx.beginPath(); ctx.ellipse(150, 192, 78, 39, 0, 0, Math.PI*2); ctx.fill();
-    // path
-    ctx.fillStyle = '#7d7266'; ctx.fillRect(0, 262, W, 22);
-    ctx.fillStyle = '#8d8276'; for (let x=0;x<W;x+=18) ctx.fillRect(x,262,1,22);
-    const cols = [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
-    for (let i=0;i<220;i++) { ctx.fillStyle = cols[i%4]; ctx.fillRect((i*79)%W, 112+((i*43)%184), 3, 2); }
-  },
+  bgPaint(ctx) { paintPlayground(ctx, false); },
   objects: [
-    { t:'tree_gold',   x:40,  y:150 }, { t:'tree_red', x:262, y:146 },
-    { t:'tree_orange', x:110, y:126 }, { t:'tree_rust', x:206, y:124 },
+    { t:'tree_gold',   x:40,  y:158 }, { t:'tree_red', x:262, y:154 },
+    { t:'tree_orange', x:110, y:140 }, { t:'tree_rust', x:206, y:138 },
     { t:'swings',  x:150, y:186 },
     { t:'slide',   x:246, y:214 },
     { t:'sandbox', x:56,  y:224 },
@@ -7098,7 +7196,7 @@ playground: {
     { t:'bush', x:284, y:180 },
   ],
   walls: [
-    {x:0,y:0,w:300,h:112},{x:0,y:0,w:8,h:300},{x:292,y:0,w:8,h:300},{x:0,y:295,w:300,h:5},
+    {x:0,y:0,w:300,h:118},{x:0,y:0,w:8,h:300},{x:292,y:0,w:8,h:300},{x:0,y:295,w:300,h:5},
   ],
   interactables: [
     { x:126,y:168,w:48,h:30, name:'swing', prompt:'Качели', action(){ Scene.play('prologSwing'); }},
@@ -7108,7 +7206,7 @@ playground: {
     { x:78,y:232,w:40,h:28, name:'seesaw', prompt:'Качалка', action(){
         Dialogue.start([{who:'sueChild',expr:'normal',name:'Сью',text:'На ней надо вдвоём. А я одна.'}]);
       }},
-    { x:228,y:196,w:40,h:30, name:'slide', prompt:'Горка', action(){
+    { x:222,y:198,w:48,h:32, name:'slide', prompt:'Горка', action(){
         Dialogue.start([{who:'sueChild',expr:'smile',name:'Сью',text:'Горка мокрая. Мама сказала — не лазить. Ну ладно.'}]);
       }},
     { x:196,y:244,w:38,h:26, name:'bench', prompt:'Скамейка', action(){
@@ -7121,6 +7219,64 @@ playground: {
       dialogue:()=> Dialogue.start([{who:'nayaChild',expr:'shocked',name:'Девочка',text:'...'}]) },
   ],
   onEnter() { if (!F('prologueComplete')) UI.toast('Качайся на качелях (кнопка A)', 2600); }
+},
+
+/* ---------------------------------------------------------------- */
+/* Та же площадка сегодня. Планировка узнаётся, но краска облупилась,
+   качели висят на одной цепи, а горка проржавела. Стоит на окраине:
+   дойти можно, но специально. */
+playgroundNow: {
+  name:"Площадка на окраине", music:'sad', w:300, h:300, wet:true, wetFrom:112,
+  zone:'town', weather:{ rain:.18, fog:.16, wind:.35, leaves:.5 },
+  light:{ tint:'#1c1e24', dark:.24 },
+  lights:[{x:150,y:150,r:52,c:'#9fb0c8',i:.20}],
+  bgPaint(ctx) { paintPlayground(ctx, true); },
+  objects: [
+    { t:'tree_bare',  x:40,  y:158 }, { t:'tree_bare', x:262, y:154 },
+    { t:'tree_rust',  x:110, y:140 }, { t:'tree_bare', x:206, y:138 },
+    { t:'swings',  x:150, y:186 },
+    { t:'slide_worn', x:246, y:214 },
+    { t:'sandbox', x:56,  y:224 },
+    { t:'seesaw',  x:96,  y:250 },
+    { t:'bench',   x:214, y:262 },
+    { t:'bin',     x:262, y:262 },
+    { t:'fence_wood', x:20, y:288 }, { t:'fence_wood', x:52, y:288 },
+    { t:'leaves_pile', x:186, y:238 }, { t:'leaves_pile', x:80, y:196 },
+    { t:'bush', x:284, y:180 },
+    { t:'puddle', x:120, y:242 }, { t:'puddle', x:206, y:206 },
+  ],
+  walls: [
+    {x:0,y:0,w:300,h:118},{x:0,y:0,w:8,h:300},{x:292,y:0,w:8,h:300},{x:0,y:295,w:300,h:5},
+  ],
+  interactables: [
+    { x:126,y:168,w:48,h:30, name:'swingNow', prompt:'Качели', action(){
+        if (!F('playgroundMemoryTriggered')) { Scene.play('playgroundMemory'); return; }
+        Dialogue.start([
+          {who:'naya',expr:'sad',text:'Одна цепь короче другой. Сиденье висит криво.'},
+          {who:'naya',expr:'normal',text:'(Всё то же самое. Просто меньше, чем я помню.)'},
+        ]);
+      }},
+    { x:222,y:198,w:48,h:32, name:'slideNow', prompt:'Горка', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Краска сошла до металла, металл пошёл ржавчиной.'},
+          {who:'naya',expr:'sad',text:'Сью на неё не пускали. Она всё равно лазила.'},
+        ]);
+      }},
+    { x:36,y:206,w:44,h:30, name:'sandNow', prompt:'Песочница', action(){
+        Dialogue.start([{who:'naya',expr:'empty',text:'Песка почти не осталось. Одна рама и мокрая земля.'}]);
+      }},
+    { x:196,y:244,w:38,h:26, name:'benchNow', prompt:'Скамейка', action(){
+        if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
+          {who:'naya',expr:'empty',text:'Тут сидела её мама и следила, чтобы мы не убились.'},
+          {who:'naya',expr:'empty',text:'Никто больше не следит.'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Две доски выломаны. На третьей кто-то вырезал год — не наш.'}]);
+      }},
+    { x:8,y:262,w:36,h:34, name:'leaveNow', prompt:'Обратно в город',
+      action: async ()=> await changeRoom('oldTown', 30, 280) },
+  ],
+  npcs: [],
+  onEnter() { if (!F('presentPlaygroundVisited')) { setFlag('presentPlaygroundVisited'); UI.toast('Ты здесь уже была', 2600); } }
 },
 
 /* ---------------------------------------------------------------- */
@@ -10334,6 +10490,48 @@ uniWindowEntry: [
     {who:'naya',expr:'talk',text:'(Отсюда до учебного коридора — два поворота. И мимо охраны.)'},
   ]},
   { flag:'oldWingOpen' },
+],
+
+/* Ная возвращается на ту самую площадку. Эмоция должна возникнуть из
+   узнавания места, поэтому никакого монолога — пара реплик и всё. */
+playgroundMemory: [
+  { music:'warm' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Качели. Те же самые. Кто-то поменял одну цепь и не стал менять вторую.)'},
+  ]},
+  { wait:700 },
+  { magic:'#c8a0ff', dur:900 },
+  { dlg:[
+    {who:'sueChild',expr:'smile',name:'Сью',text:'Выше! Выше!'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'naya',expr:'sad',text:'(Ей было пять. Мне четыре. Я даже не знала, что так можно.)'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Сиденье качается само по себе. От ветра.', options:[
+      { text:'Сесть на качели.',
+        stats:{humanity:+6, trustSue:+4},
+        then:[
+          {who:'naya',expr:'sad',text:'(Ноги достают до земли. Раньше не доставали.)'},
+          {who:'naya',expr:'normal',text:'(Ладно. Посижу минуту.)'},
+        ]},
+      { text:'Просто постоять.',
+        stats:{humanity:+3},
+        then:[
+          {who:'naya',expr:'empty',text:'(Постою. Не буду ничего трогать.)'},
+        ]},
+      { text:'Уйти.',
+        stats:{witchAmbition:+4, humanity:-2},
+        then:[
+          {who:'naya',expr:'empty',text:'(Незачем. Это просто железо и песок.)'},
+          {who:'naya',expr:'sad',text:'(...)'},
+        ]},
+    ]}},
+  ]},
+  { flag:'playgroundMemoryTriggered' },
+  { memory:'meeting' },
+  { music:'sad' },
 ],
 
 communeIntroScene: [

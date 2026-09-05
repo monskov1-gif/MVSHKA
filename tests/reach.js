@@ -8,7 +8,7 @@ const ENTRY = {
   prologueHell:[120,200], playground:[150,236], uniCourtyard:[200,268],
   uniStage:[120,262], uniLibrary:[120,258],
   uniHallMain:[190,300], uniCorridorTheatre:[340,216], uniCorridorLib:[398,216],
-  uniFloor2:[320,240],
+  uniFloor2:[320,240], playgroundNow:[150,268],
   uniCanteen:[170,268], uniOldWing:[470,150],
   forestEdge:[196,140], communeRoad:[30,180], communeYard:[40,220], trialRoom:[130,230],
   hellStreet:[60,220],
