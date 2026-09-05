@@ -1046,12 +1046,24 @@ const Assets = {
     // --- the rest of the cast. Everyone who can be talked to has a body. ---
     this.images.genevieve = this.makeChibi('#3f6b4a', '#7d6a52',
       {hair:'short', accent:'#cfc4a8', skirt:'#4a4230', legs:'#5a4a38', shoes:'#3a3028'});
+    /* Земные ведьмы: у каждой свой возраст, силуэт и вещь, по которой её
+       узнаёшь издалека — иначе на общем плане коммуна выглядит как один
+       спрайт, размноженный шесть раз. */
     this.images.witch1    = this.makeChibi('#5a4a6a', '#d8d2c4',        // Мадлен — седая, в шали
-      {hair:'short', sheen:'#f0ece0', accent:'#8a7aa0', skirt:'#43385a', legs:'#4a4450', shoes:'#2f2a34'});
-    this.images.witch2    = this.makeChibi('#7d5a3a', '#b0a08c',        // Роза — тёплая, в фартуке
-      {hair:'short', accent:'#e0d8c0', skirt:'#8a6a44', legs:'#6a5440', shoes:'#3a2f24'});
-    this.images.witch3    = this.makeChibi('#2f4460', '#8a8a94',        // Старшая — строгая
-      {hair:'short', accent:'#5f7590', skirt:'#26374e', legs:'#2a2f3a', shoes:'#1c2028'});
+      {hair:'bob', sheen:'#f2eee4', accent:'#8a7aa0', skirt:'#43385a', legs:'#4a4450', shoes:'#2f2a34',
+       cape:'#6e5c82', sleeves:'#52456a'});
+    this.images.witch2    = this.makeChibi('#8a6a44', '#c8bca8',        // Роза — восемьдесят два, фартук, платок
+      {hair:'short', sheen:'#e2dac8', band:'#b8552f', accent:'#efe6d2', skirt:'#a07a4c',
+       legs:'#7a6448', shoes:'#3f3226', strap:'#6a5236'});
+    this.images.witch3    = this.makeChibi('#2f4460', '#7d7d88',        // Старшая — строгая, высокий ворот
+      {hair:'bob', sheen:'#9a9aa6', accent:'#5f7590', skirt:'#26374e', legs:'#2a2f3a', shoes:'#1c2028',
+       hat:'cap', hatColor:'#1e2c40', hatTrim:'#3c526e'});
+    this.images.witch4    = this.makeChibi('#4a6a52', '#5a3a28',        // Ирма — травница, вечно в земле
+      {hair:'long', sheen:'#7a5238', accent:'#c8d8b8', skirt:'#3d5a44', legs:'#6a5a44', shoes:'#33291f',
+       hat:'straw', hatColor:'#c2a870', hatTrim:'#6a8a52', strap:'#5a4830'});
+    this.images.witch5    = this.makeChibi('#7a4658', '#2e2a34',        // Люси — младшая из старших, в бусах
+      {hair:'long', sheen:'#4e4858', accent:'#e0a8b8', skirt:'#5f3646', legs:'#4a4048', shoes:'#2a2430',
+       sleeves:'#6a3c4c'});
     this.images.acolyte   = this.makeChibi('#4a7a58', '#5a4030',        // ученица коммуны
       {hair:'long', accent:'#cfe0c0', skirt:'#3a5a44', legs:'#6a5a4a', shoes:'#3a3028'});
     this.images.customer  = this.makeChibi('#4a5548', '#3f3228',        // прохожий в пальто
@@ -1116,7 +1128,13 @@ const Assets = {
     P('genevieve', '#20603a','#603820', ['normal','worried','angry','sad','serious'], '#20a04a', {hair:'short'});
     P('witch1',    '#402060','#e0d0c0', ['normal','worried','shocked'], '#8060c0', {hair:'short'});
     P('witch2',    '#603020','#301020', ['normal','worried','angry'], '#a06040', {hair:'short'});
-    P('witch3',    '#204060','#203040', ['normal','serious','angry'], '#4080c0');
+    P('witch3',    '#204060','#203040', ['normal','serious','angry'], '#4080c0',
+      {hair:'bob', hat:'cap', hatColor:'#1e2c40', hatTrim:'#3c526e', collar:'#5f7590'});
+    P('witch4',    '#4a6a52','#5a3a28', ['normal','smile','worried'], '#7a9a68',
+      {hair:'long', sheen:'#7a5238', hat:'straw', hatColor:'#c2a870', hatTrim:'#6a8a52',
+       collar:'#c8d8b8', bg:'#26301f'});
+    P('witch5',    '#7a4658','#2e2a34', ['normal','smile','sad'], '#c07a90',
+      {hair:'long', sheen:'#4e4858', collar:'#e0a8b8', bg:'#2e2028'});
     P('neighbor',  '#5a5a4a','#8a8a80', ['normal'], '#8a8a70');
     P('acolyte',   '#38604a','#2a2018', ['normal','worried'], '#50a070');
     P('imp',       '#701020','#300810', ['normal','smile'], '#c04020', {glowEye:'#ffa020', bg:'#200408'});
@@ -5615,6 +5633,50 @@ communeYard: {
         {who:'naya',expr:'empty',text:'Я знаю.'},
         {who:'acolyte',expr:'worried',text:'Старшая внутри. Иди, раз пришла.'},
       ]) },
+    /* Коммуна должна быть обитаемой: кто-то стоит у котла, кто-то возится
+       с травами, кто-то просто ходит по двору. Все живые — до тех пор,
+       пока Ная не начнёт забирать имена. */
+    { x:266,y:246, sprite:'witch2', name:'Роза',
+      when:()=> F('communeIntro') && !F('firstWitchDead') && !F('sueLeftDead'),
+      dialogue:()=> {
+        if (F('communePanic')) return Dialogue.start([
+          {who:'witch2',expr:'worried',name:'Роза',text:'Мадлен была старше меня на год. Всего на год, деточка.'},
+          {who:'witch2',expr:'sad',name:'Роза',text:'Я вчера полдня не могла вспомнить, как её звали. Полдня.'},
+        ]);
+        return Dialogue.start([
+          {who:'witch2',expr:'smile',name:'Роза',text:'Новенькая! Иди сюда, попробуй. Соли не хватает, скажи честно.'},
+          {who:'naya',expr:'normal',text:'...не хватает.'},
+          {who:'witch2',expr:'smile',name:'Роза',text:'Вот и Женевьева так говорит. Сорок лет говорит, а я всё недосаливаю.'},
+        ]);
+      }},
+    { x:302,y:246, sprite:'witch4', name:'Ирма', speed:0.30,
+      path:[[302,246],[302,262],[276,264],[276,244]],
+      when:()=> F('communeIntro') && !F('sueLeftDead'),
+      dialogue:()=> {
+        if (F('communeWarded')) return Dialogue.start([
+          {who:'witch4',expr:'worried',name:'Ирма',text:'Я развесила полынь на всех окнах. Толку, наверное, никакого.'},
+          {who:'witch4',expr:'sad',name:'Ирма',text:'Но руки хоть чем-то заняты.'},
+        ]);
+        return Dialogue.start([
+          {who:'witch4',expr:'normal',name:'Ирма',text:'Осторожно, не наступи. Тут молодая крапива, я её третий год уговариваю.'},
+          {who:'witch4',expr:'smile',name:'Ирма',text:'Хочешь совет? Ничего не бери у ведьмы в первый же день. Даже чай.'},
+          {who:'naya',expr:'normal',text:'(Поздно.)'},
+        ]);
+      }},
+    { x:148,y:236, sprite:'witch5', name:'Люси', speed:0.34,
+      path:[[148,236],[196,240],[196,258],[132,256]],
+      when:()=> F('communeIntro') && !F('sueLeftDead'),
+      dialogue:()=> {
+        if (F('communePanic')) return Dialogue.start([
+          {who:'witch5',expr:'sad',name:'Люси',text:'Старшая говорит, это была болезнь. Ирма говорит, это была не болезнь.'},
+          {who:'witch5',expr:'normal',name:'Люси',text:'А ты как думаешь?'},
+          {who:'naya',expr:'empty',text:'...я не знаю.'},
+        ]);
+        return Dialogue.start([
+          {who:'witch5',expr:'smile',name:'Люси',text:'Ты с Женевьевой пришла? Значит, тебя уже проверили.'},
+          {who:'witch5',expr:'normal',name:'Люси',text:'Я тут самая младшая. Мне пятьдесят четыре. Привыкай.'},
+        ]);
+      }},
   ],
 },
 
@@ -7563,6 +7625,7 @@ const Dialogue = {
         sue:'Сью', sueGhost:'Сью',
         chris:'Крис', charlotte:'Шарлотта', lilith:'Лиллит', genevieve:'Женевьева',
         witch1:'Мадлен', witch2:'Роза', witch3:'Старшая', acolyte:'Ученица',
+        witch4:'Ирма', witch5:'Люси',
         neighbor:'Соседка', imp:'Житель ада', customer:'Посетитель',
         mother:'Мидея', motherWitch:'Мидея', friend:'Подруга', dorothy:'Дороти', narrator:''
       };
@@ -9501,11 +9564,31 @@ meetGenevieve: [
 
 communeIntroScene: [
   { music:'warm' },
+  /* Женевьева знакомит с живыми людьми, а не с пустым местом: пока идёт
+     сцена, все, кого она называет, стоят во дворе. */
+  { cast:[
+    {x:118,y:214, sprite:'genevieve', name:'Женевьева'},
+    {x:158,y:222, sprite:'sue',       name:'Сью'},
+    {x:214,y:206, sprite:'witch1',    name:'Мадлен'},
+    {x:262,y:240, sprite:'witch2',    name:'Роза'},
+    {x:300,y:222, sprite:'witch4',    name:'Ирма'},
+    {x:88,y:240,  sprite:'witch5',    name:'Люси'},
+  ]},
   { dlg:[
     {who:'genevieve',expr:'normal',text:'Вот и коммуна. Не пугайся, тут нет ничего страшного.'},
     {who:'naya',expr:'normal',text:'(Круг из камней. Свечи. Восемь женщин, которые знают друг друга сорок лет.)'},
     {who:'naya',expr:'normal',text:'(Пахнет овощным супом.)'},
-    {who:'genevieve',expr:'normal',text:'Мадлен — вон та, седая. Роза — та, что смеётся. Ей восемьдесят два.'},
+  ]},
+  { dlg:[
+    {who:'genevieve',expr:'normal',text:'Это Мадлен.'},
+    {who:'witch1',expr:'normal',name:'Мадлен',text:'Здравствуй, деточка. Какая тоненькая.'},
+    {who:'genevieve',expr:'normal',text:'А это Роза. Ей восемьдесят два, и она до сих пор недосаливает суп.'},
+    {who:'witch2',expr:'smile',name:'Роза',text:'Женевьева, я тебя переживу назло.'},
+    {who:'genevieve',expr:'normal',text:'Ирма — травы. Люси — младшая, ей пятьдесят четыре.'},
+    {who:'witch4',expr:'smile',name:'Ирма',text:'Не стой на клумбе, милая.'},
+    {who:'witch5',expr:'normal',name:'Люси',text:'Она всем это говорит. Даже Женевьеве.'},
+  ]},
+  { dlg:[
     {who:'genevieve',expr:'normal',text:'У каждой из нас есть амулет. Мы называем его именем. Он и есть имя.'},
     {who:'naya',expr:'talk',text:'Что будет, если имя потерять?'},
     {who:'genevieve',expr:'worried',text:'Странный вопрос, девочка.'},
