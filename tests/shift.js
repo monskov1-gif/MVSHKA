@@ -1,51 +1,53 @@
-/* Смена в кафе: харнесс отыгрывает четыре заказа как игрок, изредка нажимая
-   заведомо не то — порча заказа не должна ломать смену. */
-const path = require('path');
-const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright');
+/* Смена в кафе: игра должна проходиться и заканчиваться сама.
+
+   Проверяем весь цикл официантки: гость садится → Ная принимает заказ →
+   называет блюдо Крису → Крис готовит → Ная забирает с выдачи и относит
+   тому, кто заказывал. Плюс главное требование: смена завершается, даже
+   если игрок не выдал ни одного заказа. */
+const H = require('./harness.js');
+
 (async () => {
-  const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--no-sandbox','--disable-dev-shm-usage'] });
-  const p = await b.newPage({ viewport:{width:420,height:860} });
-  const errs=[]; p.on('pageerror',e=>errs.push(String(e)));
-  p.on('console',m=>{ if(m.type()==='error') errs.push('console: '+m.text()); });
-  await p.goto('file://' + path.resolve(__dirname, '..', 'index.html'));
-  await p.waitForTimeout(500);
-  await p.evaluate(()=>localStorage.clear()); await p.reload(); await p.waitForTimeout(300);
-  await p.click('#btnNew'); await p.waitForTimeout(900);
-  await p.evaluate(()=>{ Dialogue.active=false; Scene.active=false; Game.mode='explore';
-    document.getElementById('dialogueBox').classList.remove('active');
-    document.getElementById('fade').classList.remove('show');
-    Shift.run().then(()=>{ window.__shiftDone = true; }); });
-  await p.waitForTimeout(500);
-  if (process.argv[2]) await p.screenshot({ path: process.argv[2], clip:{x:0,y:0,width:420,height:600} });
+  const out = await H.run('SHIFT', async page => {
+    await H.newGame(page);
+    // сразу в смену, минуя пролог
+    await page.evaluate(() => {
+      Dialogue.active = false; Scene.active = false; Game.mode = 'explore';
+      document.getElementById('dialogueBox').classList.remove('active');
+      document.getElementById('fade').classList.remove('show');
+      gameState.flags.mainStoryStarted = true; gameState.flags.metSue = true;
+      gameState.currentRoom = 'cafe';
+    });
+    const runShift = () => page.evaluate(() => { Shift.SHIFT_MS = 26000; return Shift.run().then(() => ({
+      served: Shift.served, missed: Shift.missed, wrong: Shift.wrong,
+      done: gameState.flags.cafeShiftFinished,
+      shown: document.getElementById('shiftScreen').classList.contains('show'),
+    })); });
 
-  let guard = 0, wrong = 0;
-  while (guard++ < 900) {
-    const r = await p.evaluate((doWrong) => {
-      if (window.__shiftDone) return 'done';
-      const S = Shift;
-      if (S.brewing) return 'brew';
-      const q = S.queue.find(x => S.tray.every((t, i) => x.r.steps[i] === t));
-      if (!q) { S.spoil(); return 'reset'; }
-      if (doWrong) {                                   // намеренная ошибка: чужой ингредиент
-        const bad = Object.keys(S.T).find(t => t !== q.r.steps[S.tray.length] && t !== 'brew');
-        if (bad) { S.tapToken(bad); return 'wrong'; }
-      }
-      if (S.tray.length === q.r.steps.length) { S.serveIndex(S.queue.indexOf(q)); return 'serve'; }
-      S.tapToken(q.r.steps[S.tray.length]);
-      return 'step';
-    }, guard % 37 === 0);
-    if (r === 'done') break;
-    if (r === 'wrong') wrong++;
-    await p.waitForTimeout(r === 'brew' ? 200 : 70);
-  }
+    // 1. проход игрока: харнесс водит Наю ногами
+    const p1 = runShift();
+    await H.pump(page, [], 'SHIFT:play');
+    const played = await p1;
 
-  const st = await p.evaluate(()=>({ done: !!window.__shiftDone, started: gameState.flags.cafeShiftStarted,
-    finished: gameState.flags.cafeShiftFinished, progress: gameState.counters.cafeMinigameProgress,
-    vis: document.getElementById('shiftScreen').classList.contains('show') }));
-  console.log('итог:', JSON.stringify(st), 'намеренных ошибок:', wrong, 'шагов:', guard);
-  console.log(errs.length ? 'ERRORS ' + errs.slice(0,3).join(' | ') : 'без ошибок');
-  await b.close();
-  const ok = st.done && st.finished && st.progress === 4 && !st.vis && !errs.length;
-  console.log(ok ? 'OK: смена отыграна целиком' : 'ПРОВАЛ: смена не завершилась');
-  process.exit(ok ? 0 : 1);
+    // 2. полное бездействие: смена всё равно должна закончиться
+    await page.evaluate(() => { gameState.flags.cafeShiftFinished = false; });
+    const idle = await page.evaluate(() => { Shift.SHIFT_MS = 9000; return Shift.run().then(() => ({
+      served: Shift.served, done: gameState.flags.cafeShiftFinished,
+      shown: document.getElementById('shiftScreen').classList.contains('show'),
+      mode: Game.mode,
+    })); });
+    return { played, idle };
+  });
+
+  const bad = [];
+  const p = out.played, i = out.idle;
+  console.log('игра:      выдано=%s пропущено=%s ошибок=%s экран закрыт=%s', p.served, p.missed, p.wrong, !p.shown);
+  console.log('бездействие: выдано=%s смена засчитана=%s экран закрыт=%s', i.served, i.done, !i.shown);
+  if (!p.done)  bad.push('после игры не выставлен cafeShiftFinished');
+  if (p.shown)  bad.push('экран смены остался открыт после игры');
+  if (p.served < 1) bad.push('за смену не выдано ни одного заказа: цикл не работает');
+  if (p.wrong > 0)  bad.push('харнесс отнёс блюдо не тому: перепутана адресация');
+  if (!i.done)  bad.push('смена без единого действия не завершилась');
+  if (i.shown)  bad.push('экран смены остался открыт после бездействия');
+  if (bad.length) { bad.forEach(b => console.log('  ' + b)); console.log('\nПРОВАЛ'); process.exit(1); }
+  console.log('\nOK: смена проходится и всегда завершается');
 })();

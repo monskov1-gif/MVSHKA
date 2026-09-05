@@ -23,20 +23,33 @@ async function pump(page, picks, tag) {
       await page.waitForTimeout(120);
       continue;
     }
-    // смена в кафе: харнесс отрабатывает её как обычный игрок — читает рецепт
-    // со экрана и жмёт следующий по порядку ингредиент
+    // смена в кафе: харнесс играет как обычный игрок — ведёт Наю ногами
+    // к гостю, к стойке и обратно, ничего не телепортируя
     if (st.shift) {
       const acted = await page.evaluate(() => {
         const S = Shift;
-        if (S.brewing) return 'brew';
-        // берём первого гостя, чьё блюдо ещё можно собрать, и кладём следующий шаг
-        const q = S.queue.find(x => S.tray.every((t, i) => x.r.steps[i] === t));
-        if (!q) { S.spoil(); return 'reset'; }
-        if (S.tray.length === q.r.steps.length) { S.serveIndex(S.queue.indexOf(q)); return 'serve'; }
-        S.tapToken(q.r.steps[S.tray.length]);
-        return 'step';
+        if (!S.resolve) return 'done';
+        const go = (x, y) => { S.naya.tx = x; S.naya.ty = y; };
+        if (S.menuOpen) {                             // назвать Крису блюдо
+          const g = S.guests.find(x => x.state === 'ordered');
+          if (!g) { S.menuOpen = false; return 'close'; }
+          const i = S.MENU.findIndex(m => m.id === g.dish);
+          const b = S.MENU_BOX;
+          S.pickDish(b.x + 6 + (i % 3) * 66 + 30, b.y + 18 + ((i / 3) | 0) * 42 + 20);
+          return 'cook';
+        }
+        if (S.carry) {                                // отнести тому, кто заказал
+          const g = S.guests.find(x => x.state === 'ordered' && x.dish === S.carry);
+          if (g) { const t = S.TABLES[g.table]; go(t.x, t.y + 26); return 'serve'; }
+          S.carry = null; return 'drop';
+        }
+        if (S.pass.length) { go(160, 118); return 'take'; }      // забрать с выдачи
+        const w = S.guests.find(x => x.state === 'waiting');
+        if (w) { const t = S.TABLES[w.table]; go(t.x, t.y + 26); return 'order'; }
+        if (!S.cooking && S.guests.some(x => x.state === 'ordered')) { go(70, 118); return 'counter'; }
+        return 'wait';
       });
-      await page.waitForTimeout(acted === 'brew' ? 240 : 90);
+      await page.waitForTimeout(acted === 'wait' ? 350 : 700);
       continue;
     }
     if (st.choice && st.n > 0) {

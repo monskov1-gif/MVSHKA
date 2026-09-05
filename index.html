@@ -1242,16 +1242,16 @@ const Assets = {
     this.images.witch3    = this.makeChibi('#2f4460', '#7d7d88',        // Старшая — строгая, высокий ворот
       {hair:'bob', sheen:'#9a9aa6', accent:'#5f7590', skirt:'#26374e', legs:'#2a2f3a', shoes:'#1c2028',
        hat:'cap', hatColor:'#1e2c40', hatTrim:'#3c526e'});
-    /* Агата, Беатрис и Руби собраны по присланным силуэтам: у первой
-       растрёпанные пряди и фестончатый подол, у второй высокий пучок и
-       рукава-колокола, у третьей две пряди-рожка и многослойная юбка. */
-    this.images.witch4    = this.makeChibi('#4a4450', '#2b2730',        // Агата
+    /* Три остальные жительницы коммуны. Имена у них свои: Хэтти, Лидия и
+       Вивиан — Агата, Беатрис и Руби остались в сказе о четырёх ведьмах и
+       на статуях в зале Лиллит, живыми они нигде не появляются. */
+    this.images.witch4    = this.makeChibi('#4a4450', '#2b2730',        // Хэтти
       {hair:'short', sheen:'#3d3844', messy:'#2b2730', accent:'#8a8296',
        skirt:'#3a3540', ruffle:'#4e4854', legs:'#33303a', shoes:'#1e1c24'});
-    this.images.witch5    = this.makeChibi('#5a4656', '#3a3038',        // Беатрис
+    this.images.witch5    = this.makeChibi('#5a4656', '#3a3038',        // Лидия
       {hair:'long', sheen:'#4e4048', updo:'#3a3038', accent:'#c0a8b8',
        skirt:'#4a3a46', ruffle:'#5e4c58', sleeves:'#523f4c', legs:'#3e3440', shoes:'#26202a'});
-    this.images.witch6    = this.makeChibi('#6a3a44', '#4a2c32',        // Руби
+    this.images.witch6    = this.makeChibi('#6a3a44', '#4a2c32',        // Вивиан
       {hair:'long', sheen:'#5e3a40', tufts:'#4a2c32', accent:'#d09aa4',
        skirt:'#5a2f38', ruffle:'#70414a', legs:'#42323a', shoes:'#241c22'});
     this.images.acolyte   = this.makeChibi('#4a7a58', '#5a4030',        // ученица коммуны
@@ -1430,6 +1430,7 @@ function freshState() {
     inventory: [],
     memories: [],
     journal: [],
+    scenesSeen: [],
     settings: { volume:0.5, music:0.4, textSpeed:30, effects:1 },
   };
 }
@@ -4133,54 +4134,41 @@ const Campus = {
   },
 };
 
-/* СМЕНА В КАФЕ.
+/* СМЕНА В КАФЕ — Ная работает официанткой.
 
-   Полноценный кухонный симулятор, а не список кнопок: у стойки стоит
-   очередь гостей, над каждым — пузырь с тем, что он заказал, и полоска
-   терпения. Внизу станции с ингредиентами: нажимаешь — ингредиент
-   отправляется на поднос. Собранное блюдо отдаёшь конкретному гостю,
-   ткнув в него.
+   Петля простая и вся видна на экране: посетитель садится за столик, над
+   ним появляется вопрос — Ная подходит и принимает заказ. С заказом она
+   бежит к стойке, называет блюдо Крису, тот три секунды готовит и ставит
+   тарелку на выдачу. Ная забирает её и несёт тому, кто заказывал. Пока
+   она бегает, приходят следующие — и главная задача не перепутать, кому
+   что нести.
 
-   Рисуется на своём канвасе тем же пиксельным языком, что и вся игра.
-   Ошибка не наказывает: поднос отправляется в мойку, Крис отпускает
-   что-нибудь беззлобное, и заказ собирается заново. */
+   Рецептов нет и знать их не нужно: заказ виден в пузыре над гостем и
+   продублирован в блокноте внизу экрана. Ошибка не наказывает — блюдо
+   уходит в мойку, и его можно приготовить заново. Смена всё равно
+   заканчивается по таймеру, даже если игрок не выдал ни одного заказа. */
 const Shift = {
-  W:240, H:340, TOTAL:4, QUEUE:3,
+  W:240, H:340,
+  SHIFT_MS: 120000,                 // две минуты — ровно столько, чтобы устать
+  SPEED: 0.075,                     // пикселей в миллисекунду
+  COOK_MS: 3000,                    // Крис готовит три секунды
+  PASS_MAX: 2,                      // больше двух тарелок на выдачу не влезает
 
-  T: {
-    cup:      { n:'Чашка',      c:'#e8e2d8' },
-    plate:    { n:'Тарелка',    c:'#dcd6cc' },
-    coffee:   { n:'Кофе',       c:'#4a2c18' },
-    milk:     { n:'Молоко',     c:'#f2efe6' },
-    choco:    { n:'Шоколад',    c:'#5a3020' },
-    brew:     { n:'Машина',     c:'#8a8a92' },
-    marsh:    { n:'Маршмеллоу', c:'#f6d8e0' },
-    glaze:    { n:'Глазурь',    c:'#3f2416' },
-    jam:      { n:'Джем',       c:'#a8323c' },
-    cream:    { n:'Крем',       c:'#f4e8cc' },
-    berry:    { n:'Ягода',      c:'#b02840' },
-    muffin:   { n:'Кекс',       c:'#6a4428' },
-    croissant:{ n:'Круассан',   c:'#d8a860' },
-    base:     { n:'Корж',       c:'#c9a06a' },
-  },
-
+  /* Меню: шесть позиций, каждая со своей формой и цветом, чтобы иконки
+     различались в пузыре размером с ноготь. */
   MENU: [
-    { name:'Эспрессо',        steps:['cup','coffee','brew'],               wait:3000,
-      who:'Студент',          line:'Эспрессо, пожалуйста.' },
-    { name:'Капучино',        steps:['cup','coffee','milk','brew'],        wait:2600,
-      who:'Мужчина в пальто', line:'Капучино, будьте добры.' },
-    { name:'Латте',           steps:['cup','milk','coffee','brew'],        wait:3200,
-      who:'Женщина с коляской', line:'Один латте. И потише, он спит.' },
-    { name:'Горячий шоколад', steps:['cup','choco','milk','brew','marsh'], wait:2400,
-      who:'Девочка лет семи', line:'Горячий шоколад с белыми штучками!' },
-    { name:'Шоколадный кекс', steps:['plate','muffin','glaze'],
-      who:'Постоянная',       line:'Как всегда. Кекс.' },
-    { name:'Круассан',        steps:['plate','croissant','jam'],
-      who:'Курьер',           line:'Круассан навынос.' },
-    { name:'Пирожное',        steps:['plate','base','cream','berry'],
-      who:'Пара у окна',      line:'Пирожное. Одно, две вилки.' },
+    { id:'espresso', n:'Эспрессо',  c:'#3a2416', k:'cup'  },
+    { id:'cappu',    n:'Капучино',  c:'#8a6242', k:'cup'  },
+    { id:'latte',    n:'Латте',     c:'#c9a274', k:'glass'},
+    { id:'choco',    n:'Шоколад',   c:'#5a3020', k:'mug'  },
+    { id:'muffin',   n:'Кекс',      c:'#6a4428', k:'cake' },
+    { id:'croissant',n:'Круассан',  c:'#d8a860', k:'horn' },
   ],
+  TABLES: [ {x:52,y:168}, {x:188,y:168}, {x:52,y:262}, {x:188,y:262} ],
   FACES: ['customer','student','acolyte','neighbor','friend'],
+  ORDER_LINES: [
+    'Мне, пожалуйста,', 'Один', 'Будьте добры,', 'Можно', 'Мне бы',
+  ],
   CHRIS: [
     'Крис: «Кофемашина сегодня добрая. Не буди её.»',
     'Крис: «Слушай, ты вообще ела сегодня?»',
@@ -4188,302 +4176,414 @@ const Shift = {
     'Крис: «Последний. Дальше я сам.»',
   ],
   PHASES: [
-    ['ДНЕВНАЯ СМЕНА',  '#2a1c14', '#160f10'],
-    ['ПОСЛЕ ОБЕДА',    '#33200f', '#180f0c'],
-    ['ЗА ОКНОМ СЕРЕЕТ','#241a1c', '#120c10'],
-    ['КОНЕЦ СМЕНЫ',    '#1a1420', '#0e0a10'],
+    ['ДНЕВНАЯ СМЕНА',  '#2a1c14'],
+    ['ПОСЛЕ ОБЕДА',    '#33200f'],
+    ['ЗА ОКНОМ СЕРЕЕТ','#241a1c'],
+    ['КОНЕЦ СМЕНЫ',    '#1a1420'],
   ],
 
   /* ---------------- состояние ---------------- */
-  queue:[], tray:[], served:0, spawned:0, brewing:null, hit:[], raf:0, flash:0, resolve:null,
-  left:0, _st:null,
-  SHIFT_MS: 150000,               // смена всё равно кончится через две с половиной минуты
+  naya:null, guests:[], pass:[], carry:null, cooking:null, menuOpen:false,
+  served:0, missed:0, wrong:0, left:0, raf:0, resolve:null, last:0, flash:0, spawnIn:0,
 
   run() {
     return new Promise(res => {
       this.resolve = res;
-      this.queue = []; this.tray = []; this.served = 0; this.spawned = 0;
-      this.brewing = null; this.flash = 0; this.left = this.SHIFT_MS;
-      this.plan();
-      setFlag('cafeShiftStarted');
-      const scr = document.getElementById('shiftScreen');
-      scr.classList.add('show');
-      Game.mode = 'menu';
-      const cv = document.getElementById('shiftCanvas');
-      this.ctx = cv.getContext('2d');
-      this.ctx.imageSmoothingEnabled = false;
-      if (!this._wired) {
-        cv.addEventListener('click', e => this.onTap(e));
-        this._wired = true;
-      }
-      this.say(this.CHRIS[0]);
-      this.fill();
+      this.naya = { x:120, y:300, tx:120, ty:300, step:0 };
+      this.guests = []; this.pass = []; this.carry = null; this.cooking = null;
+      this.menuOpen = false; this.served = 0; this.missed = 0; this.wrong = 0;
+      this.left = this.SHIFT_MS; this.spawnIn = 900; this.flash = 0;
+      this.cv = document.getElementById('shiftCanvas');
+      this.ctx = this.cv.getContext('2d');
+      this.bind();
+      document.getElementById('shiftScreen').classList.add('show');
+      Game.mode = 'shift';
+      UI.dimControls(true);
+      this.phase();
+      this.say('Подойди к гостю, чтобы принять заказ.');
       this.last = performance.now();
       const loop = t => {
-        if (!this.resolve) return;
-        const dt = Math.min(60, t - this.last); this.last = t;
-        this.update(dt); this.draw();
-        this.raf = requestAnimationFrame(loop);
+        this.raf = requestAnimationFrame(loop);      // кадр планируем первым:
+        const dt = Math.min(60, t - this.last);      // ошибка в отрисовке не
+        this.last = t;                               // должна замораживать смену
+        try { this.update(dt); this.draw(); } catch (e) { console.error('shift', e); }
       };
       this.raf = requestAnimationFrame(loop);
     });
   },
+
+  /* Управление одно на мышь и палец: тап — Ная идёт туда. Никаких
+     джойстиков поверх и без того тесного экрана. */
+  bind() {
+    if (this._bound) return;
+    this._bound = true;
+    const at = e => {
+      const r = this.cv.getBoundingClientRect();
+      const p = e.touches ? e.touches[0] : e;
+      return [ (p.clientX - r.left) * this.W / r.width, (p.clientY - r.top) * this.H / r.height ];
+    };
+    const tap = e => {
+      if (!this.resolve) return;
+      e.preventDefault();
+      const [x, y] = at(e);
+      if (this.menuOpen) return this.pickDish(x, y);
+      this.naya.tx = clamp(x, 14, this.W - 14);
+      this.naya.ty = clamp(y, 112, this.H - 46);
+    };
+    this.cv.addEventListener('pointerdown', tap);
+    this.cv.addEventListener('touchstart', tap, { passive:false });
+  },
+
+  phase() {
+    const k = Math.min(3, Math.floor((1 - this.left / this.SHIFT_MS) * 4));
+    document.getElementById('shiftPhase').textContent = this.PHASES[k][0];
+    this.bg = this.PHASES[k][1];
+    if (k !== this._k) { this._k = k; this.say(this.CHRIS[k]); }
+  },
+  say(t) { document.getElementById('shiftSay').textContent = t; },
+  dish(id) { return this.MENU.find(m => m.id === id); },
+
+  /* ---------------- логика ---------------- */
+  update(dt) {
+    this.left -= dt;
+    if (this.left <= 0) return this.finish();
+    this.phase();
+    if (this.flash > 0) this.flash -= dt;
+
+    // Ная идёт к точке тапа
+    const n = this.naya, dx = n.tx - n.x, dy = n.ty - n.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 1.5) {
+      const s = Math.min(d, this.SPEED * dt);
+      n.x += dx / d * s; n.y += dy / d * s;
+      n.step += s;
+    }
+
+    // новые гости
+    this.spawnIn -= dt;
+    if (this.spawnIn <= 0) {
+      const free = this.TABLES.map((t, i) => i).filter(i => !this.guests.some(g => g.table === i));
+      if (free.length) {
+        const i = free[(Math.random() * free.length) | 0];
+        const m = this.MENU[(Math.random() * this.MENU.length) | 0];
+        this.guests.push({
+          table:i, dish:m.id, state:'waiting',
+          face:this.FACES[(Math.random() * this.FACES.length) | 0],
+          line:this.ORDER_LINES[(Math.random() * this.ORDER_LINES.length) | 0],
+          pat:1, patMs: 26000 + Math.random() * 10000, t0:0,
+        });
+      }
+      this.spawnIn = 5200 + Math.random() * 3600;
+    }
+
+    // терпение
+    this.guests.forEach(g => {
+      if (g.state === 'served') { g.t0 += dt; return; }
+      g.pat -= dt / g.patMs;
+      if (g.pat <= 0) { g.state = 'left'; this.missed++; this.flash = 260; this.say('Гость ушёл, не дождавшись.'); }
+    });
+    this.guests = this.guests.filter(g => !(g.state === 'left') && !(g.state === 'served' && g.t0 > 2200));
+
+    // Крис готовит
+    if (this.cooking) {
+      this.cooking.ms -= dt;
+      if (this.cooking.ms <= 0 && this.pass.length < this.PASS_MAX) {
+        this.pass.push(this.cooking.id);
+        Audio.beep(660, .08, 'sine', .05);
+        this.cooking = null;
+      }
+    }
+
+    this.contacts();
+  },
+
+  /* Всё взаимодействие — от того, куда Ная дошла ногами. */
+  contacts() {
+    const n = this.naya;
+    // стойка: слева заказ Крису, справа выдача
+    if (n.y < 126) {
+      if (n.x > 122 && this.pass.length && !this.carry) {
+        this.carry = this.pass.shift();
+        Audio.click();
+        this.say('В руках: ' + this.dish(this.carry).n + '. Кому?');
+        n.ty = 150;
+        return;
+      }
+      if (n.x <= 122 && !this.menuOpen && !this.cooking) {
+        const pend = this.guests.filter(g => g.state === 'ordered');
+        if (pend.length) { this.menuOpen = true; this.say('Что готовим?'); n.ty = 150; }
+        else if (!this.carry) this.say('Сначала прими у кого-нибудь заказ.');
+        return;
+      }
+      return;
+    }
+    // столики
+    this.TABLES.forEach((t, i) => {
+      const g = this.guests.find(x => x.table === i && x.state !== 'served');
+      if (!g) return;
+      if (Math.hypot(n.x - t.x, n.y - (t.y + 26)) > 24) return;
+      if (g.state === 'waiting') {
+        g.state = 'ordered';
+        Audio.select();
+        this.say('Стол ' + (i + 1) + ': ' + this.dish(g.dish).n + '.');
+      } else if (g.state === 'ordered' && this.carry) {
+        if (this.carry === g.dish) {
+          g.state = 'served'; g.t0 = 0;
+          this.served++; this.carry = null;
+          Audio.item(); this.flash = -220;
+          this.say('Отдано. ' + this.served + ' за смену.');
+        } else {
+          this.wrong++;
+          this.say('Это не его заказ. В мойку.');
+          this.carry = null; this.flash = 260; Audio.beep(160, .12, 'sawtooth', .06);
+        }
+      }
+    });
+  },
+
+  /* Панель выбора блюда у стойки: шесть позиций меню, три в ряд. */
+  MENU_BOX: { x:16, y:118, w:208, h:104 },
+  pickDish(x, y) {
+    const b = this.MENU_BOX;
+    if (x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) { this.menuOpen = false; return; }
+    const col = Math.min(2, Math.max(0, Math.floor((x - b.x - 6) / 66)));
+    const row = Math.min(1, Math.max(0, Math.floor((y - b.y - 18) / 42)));
+    const m = this.MENU[row * 3 + col];
+    if (!m) return;
+    this.menuOpen = false;
+    this.cooking = { id:m.id, ms:this.COOK_MS, total:this.COOK_MS };
+    Audio.click();
+    this.say('Крис взялся за ' + m.n.toLowerCase() + '.');
+  },
+
   finish() {
     if (!this.resolve) return;
     cancelAnimationFrame(this.raf);
     document.getElementById('shiftScreen').classList.remove('show');
     Game.mode = 'cutscene';
     setFlag('cafeShiftFinished');
+    setCounter('cafeMinigameProgress', this.served);
     saveGame();
     const r = this.resolve; this.resolve = null;
     if (r) r();
   },
-  say(t) { document.getElementById('shiftSay').textContent = t; },
-
-  /* Смена набирается заранее: список блюд на всю смену известен с самого
-     начала, поэтому и набор станций считается один раз и больше никогда не
-     меняется. Стойка, которая переставляет ингредиенты после каждого
-     выданного заказа, уводит кнопку из-под уже занесённого пальца. */
-  plan() {
-    const hot  = this.MENU.filter(m => m.wait).sort(() => Math.random() - .5).slice(0, 3);
-    const cold = this.MENU.filter(m => !m.wait).sort(() => Math.random() - .5).slice(0, 3);
-    this.deck = hot.concat(cold).sort(() => Math.random() - .5);
-    const need = [];
-    this.deck.forEach(r => r.steps.forEach(t => { if (!need.includes(t)) need.push(t); }));
-    if (!need.includes('brew')) need.push('brew');
-    const rest = Object.keys(this.T).filter(t => !need.includes(t));
-    while (need.length < 8 && rest.length) need.push(rest.splice((Math.random() * rest.length) | 0, 1)[0]);
-    this._st = need.slice(0, 8);
-  },
-
-  /* Очередь: держим до трёх гостей, пока не выдано всё, что положено. */
-  fill() {
-    // гости подходят, пока идёт смена: иначе после пары ушедших у стойки
-    // некому подавать, и остаётся только досиживать таймер
-    while (this.queue.length < this.QUEUE) {
-      const r = this.deck[this.spawned % this.deck.length];
-      this.queue.push({ r, face: this.FACES[(this.spawned * 2 + 1) % this.FACES.length],
-                        pat: 1, max: 26000 + r.steps.length * 5000, mood:0 });
-      this.spawned++;
-    }
-    const ph = this.PHASES[Math.min(this.served, this.PHASES.length - 1)];
-    const scr = document.getElementById('shiftScreen');
-    scr.style.setProperty('--shiftTop', ph[1]);
-    scr.style.setProperty('--shiftBot', ph[2]);
-    document.getElementById('shiftPhase').textContent =
-      ph[0] + '  ·  ВЫДАНО ' + this.served + ' ИЗ ' + this.TOTAL;
-  },
-
-  /* Станции: всё, что нужно очереди, плюс машина; добиваем до восьми.
-
-     Набор считается один раз на состав очереди и запоминается. Раньше он
-     пересобирался каждый кадр со случайными «лишними» позициями — кнопки
-     мигали и переставлялись местами шестьдесят раз в секунду, палец попадал
-     не в тот ингредиент, и правильный заказ отменялся сам собой. */
-  stations() { return this._st || []; },
-
-  update(dt) {
-    if (this.flash > 0) this.flash -= dt;
-    this.left -= dt;
-    if (this.left <= 0) return this.finish();   // время вышло — смена закончена в любом случае
-    if (this.brewing) {
-      this.brewing.t += dt;
-      if (this.brewing.t >= this.brewing.ms) { this.tray.push('brew'); this.brewing = null; Audio.beep(720,.12,'sine',.05); }
-    }
-    for (let i = this.queue.length - 1; i >= 0; i--) {
-      const q = this.queue[i];
-      q.pat -= dt / q.max;
-      if (q.pat <= 0) {                      // гость не дождался: не провал, просто ушёл
-        this.queue.splice(i, 1);
-        this.say('Крис: «Ушёл. Бывает, не убивайся.»');
-        Audio.beep(160, .2, 'sawtooth', .04);
-        if (!this.valid()) { this.tray = []; this.brewing = null; }   // поднос собирали для него
-        this.fill();
-      }
-    }
-  },
-
-  /* Поднос должен быть началом хотя бы одного заказа из очереди. */
-  valid() {
-    return this.queue.some(q => this.tray.every((t, i) => q.r.steps[i] === t));
-  },
-  spoil(msg) {
-    this.tray = []; this.brewing = null; this.flash = 420;
-    Audio.beep(150, .22, 'sawtooth', .05);
-    this.say(msg || ['Крис: «Ничего. Вылей и начни заново.»',
-                     'Крис: «Бывает. Гость подождёт.»',
-                     'Крис: «Ну вот, теперь это никому не нужно.»'][(Math.random() * 3) | 0]);
-  },
-
-  tapToken(t) {
-    if (this.brewing) return;
-    if (t === 'brew') {
-      const want = this.queue.find(q => this.tray.every((x, i) => q.r.steps[i] === x) && q.r.steps[this.tray.length] === 'brew');
-      if (!want) return this.spoil('Крис: «Машина пока не нужна.»');
-      this.brewing = { t:0, ms: want.r.wait || 2400 };
-      Audio.beep(320, .5, 'sawtooth', .035);
-      this.say('Кофемашина шипит.');
-      return;
-    }
-    this.tray.push(t);
-    if (!this.valid()) return this.spoil();
-    Audio.beep(500 + this.tray.length * 40, .07, 'sine', .04);
-  },
-
-  serveIndex(i) {
-    const q = this.queue[i];
-    if (!q || this.brewing) return;
-    if (this.tray.length !== q.r.steps.length || !this.tray.every((t, k) => q.r.steps[k] === t))
-      return this.spoil('Крис: «Это не то, что он просил.»');
-    this.queue.splice(i, 1);
-    this.tray = []; this.served++;
-    Audio.item();
-    this.say(this.CHRIS[Math.min(this.served, this.CHRIS.length - 1)]);
-    if (this.served >= this.TOTAL) { setCounter('cafeMinigameProgress', this.served); return this.finish(); }
-    setCounter('cafeMinigameProgress', this.served);
-    this.fill();
-  },
-
-  onTap(e) {
-    const cv = document.getElementById('shiftCanvas');
-    const r = cv.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width * this.W;
-    const y = (e.clientY - r.top) / r.height * this.H;
-    for (const h of this.hit) {
-      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
-        if (h.kind === 'st') this.tapToken(h.t);
-        else if (h.kind === 'guest') this.serveIndex(h.i);
-        else if (h.kind === 'bin') { if (this.tray.length) this.spoil('Крис: «В мойку так в мойку.»'); }
-        return;
-      }
-    }
-  },
 
   /* ---------------- рисование ---------------- */
-  icon(g, t, x, y, s) {
-    const c = (this.T[t] || {}).c || '#888';
-    g.fillStyle = c;
-    if (t === 'cup')       { g.fillRect(x-s*.4, y-s*.35, s*.8, s*.6); g.fillRect(x+s*.4, y-s*.2, s*.16, s*.3); }
-    else if (t === 'plate'){ g.beginPath(); g.ellipse(x, y, s*.55, s*.22, 0, 0, 6.3); g.fill(); }
-    else if (t === 'coffee'){ g.beginPath(); g.arc(x, y, s*.34, 0, 6.3); g.fill();
-                              g.fillStyle='#7a4a28'; g.fillRect(x-s*.1, y-s*.5, s*.2, s*.2); }
-    else if (t === 'milk') { g.fillRect(x-s*.26, y-s*.42, s*.52, s*.76); g.fillStyle='#c8c2b6'; g.fillRect(x-s*.26,y-s*.42,s*.52,s*.12); }
-    else if (t === 'choco'){ g.fillRect(x-s*.4, y-s*.3, s*.8, s*.5);
-                              g.fillStyle='#3a1e12'; for(let i=0;i<3;i++) g.fillRect(x-s*.4+i*s*.27, y-s*.3, s*.05, s*.5); }
-    else if (t === 'brew') { g.fillRect(x-s*.44, y-s*.5, s*.88, s*.9); g.fillStyle='#3a3a42'; g.fillRect(x-s*.3, y-s*.32, s*.6, s*.34);
-                              g.fillStyle='#d8a04a'; g.fillRect(x-s*.08, y+s*.06, s*.16, s*.24); }
-    else if (t === 'marsh'){ for(let i=0;i<3;i++){ g.beginPath(); g.arc(x-s*.24+i*s*.24, y+(i%2?-s*.1:s*.06), s*.16, 0, 6.3); g.fill(); } }
-    else if (t === 'glaze'){ g.beginPath(); g.ellipse(x, y, s*.44, s*.24, 0, 0, 6.3); g.fill();
-                              g.fillStyle='#5f3a22'; g.fillRect(x-s*.44, y, s*.88, s*.14); }
-    else if (t === 'jam')  { g.fillRect(x-s*.3, y-s*.36, s*.6, s*.7); g.fillStyle='#e8dcc0'; g.fillRect(x-s*.3,y-s*.36,s*.6,s*.12); }
-    else if (t === 'cream'){ g.beginPath(); g.arc(x, y+s*.1, s*.3, 0, 6.3); g.fill();
-                              g.beginPath(); g.arc(x, y-s*.16, s*.2, 0, 6.3); g.fill(); }
-    else if (t === 'berry'){ g.beginPath(); g.arc(x, y+s*.06, s*.26, 0, 6.3); g.fill();
-                              g.fillStyle='#4a7a3a'; g.fillRect(x-s*.06, y-s*.32, s*.12, s*.14); }
-    else if (t === 'muffin'){ g.fillRect(x-s*.34, y-s*.06, s*.68, s*.42); g.fillStyle='#8a5a34';
-                              g.beginPath(); g.ellipse(x, y-s*.06, s*.42, s*.24, 0, 0, 6.3); g.fill(); }
-    else if (t === 'croissant'){ g.beginPath(); g.ellipse(x, y, s*.46, s*.24, 0, 0, 6.3); g.fill();
-                              g.fillStyle='#b8863f'; g.fillRect(x-s*.5, y-s*.06, s*.16, s*.14); g.fillRect(x+s*.34, y-s*.06, s*.16, s*.14); }
-    else if (t === 'base') { g.fillStyle='#c9a06a'; g.fillRect(x-s*.4, y-s*.16, s*.8, s*.34); }
-    else { g.beginPath(); g.arc(x, y, s*.3, 0, 6.3); g.fill(); }
-  },
-
   draw() {
     const g = this.ctx, W = this.W, H = this.H;
-    this.hit = [];
-    const dayK = this.served / this.TOTAL;
-
-    // зал: стена, два окна с переплётом, свет за ними уходит в вечер
-    const wall = g.createLinearGradient(0,0,0,118);
-    wall.addColorStop(0,'#6a4a34'); wall.addColorStop(1,'#4e3626');
-    g.fillStyle = wall; g.fillRect(0,0,W,118);
-    [12, 156].forEach(wx => {
-      g.fillStyle = '#33241a'; g.fillRect(wx-3, 2, 78, 38);
-      const sky = g.createLinearGradient(0,8,0,54);
-      sky.addColorStop(0, dayK < .5 ? '#ffeec4' : '#7e6a86');
-      sky.addColorStop(1, dayK < .5 ? '#e8c088' : '#40344c');
-      g.fillStyle = sky; g.fillRect(wx, 5, 72, 32);
-      g.fillStyle = dayK < .5 ? 'rgba(140,90,40,.25)' : 'rgba(30,20,40,.35)';
-      g.beginPath(); g.arc(wx+18, 30, 11, 0, 6.3); g.fill();
-      g.beginPath(); g.arc(wx+52, 33, 8, 0, 6.3); g.fill();
-      g.fillStyle = '#3d2b1e';
-      g.fillRect(wx+34, 5, 3, 32); g.fillRect(wx, 19, 72, 3);
-      g.fillStyle = '#7a5638'; g.fillRect(wx-3, 2, 78, 3); g.fillRect(wx-5, 38, 82, 4);
-    });
-    g.fillStyle = 'rgba(0,0,0,.20)'; g.fillRect(0, 96, W, 22);
-
-    // гости у стойки: сами крупнее, над каждым пузырь с заказом и терпение
-    this.queue.forEach((q, i) => {
-      const gx = 42 + i * 78, gy = 116, K = 2;
-      const img = Assets.images[q.face];
-      if (img) g.drawImage(img, Math.round(gx - img.width), Math.round(gy - img.height*K),
-                           img.width*K, img.height*K);
-      const bw = 46, bh = 30, bx = gx - bw/2, by = 48;
-      g.fillStyle = 'rgba(252,246,234,.96)'; g.fillRect(bx, by, bw, bh);
-      g.fillStyle = '#2a2018';
-      g.fillRect(bx, by, bw, 1); g.fillRect(bx, by+bh-1, bw, 1);
-      g.fillRect(bx, by, 1, bh); g.fillRect(bx+bw-1, by, 1, bh);
-      g.fillStyle = 'rgba(252,246,234,.96)'; g.fillRect(gx-3, by+bh, 6, 5);
-      g.fillStyle = '#2a2018'; g.fillRect(gx-4, by+bh+4, 8, 1);
-      const last = q.r.steps.filter(t => t !== 'brew').slice(-1)[0] || 'cup';
-      this.icon(g, q.r.steps[0], bx + 15, by + 15, 17);
-      this.icon(g, last,          bx + 32, by + 18, 15);
-      g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(bx, by - 7, bw, 4);
-      g.fillStyle = q.pat > .45 ? '#6ac06a' : (q.pat > .2 ? '#e0b040' : '#c03a3a');
-      g.fillRect(bx, by - 7, Math.max(0, bw * q.pat), 4);
-      this.hit.push({ kind:'guest', i, x:gx-26, y:46, w:52, h:74 });
-    });
-
-    // полоса смены: видно, сколько её осталось, и что она точно закончится
-    const k = Math.max(0, this.left / this.SHIFT_MS);
-    g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, 0, W, 4);
-    g.fillStyle = k > .25 ? '#c8a05a' : '#c05a3a'; g.fillRect(0, 0, W * k, 4);
-
-    // стойка
-    g.fillStyle = '#7a5432'; g.fillRect(0,118,W,14);
-    g.fillStyle = '#98693c'; g.fillRect(0,118,W,4);
-    g.fillStyle = '#3a2618'; g.fillRect(0,132,W,5);
-
-    // рабочая поверхность
-    g.fillStyle = '#584434'; g.fillRect(0,137,W,H-137);
-    g.fillStyle = '#4e3b2c'; for (let y=137;y<H;y+=11) g.fillRect(0,y,W,1);
-
-    // поднос
-    const spoiled = this.flash > 0 && ((this.flash/70)|0)%2;
-    g.fillStyle = spoiled ? '#8a2830' : '#3b2e22';
-    g.fillRect(10,144,192,50);
-    g.fillStyle = spoiled ? '#b04048' : '#6b5540'; g.fillRect(10,144,192,3);
-    g.fillStyle = '#d8c4a0'; g.font = '6px Courier New'; g.textAlign='left';
-    g.fillText('ПОДНОС', 14, 154);
-    this.tray.forEach((t, i) => this.icon(g, t, 34 + i * 34, 176, 26));
-    if (this.brewing) {
-      const k = Math.min(1, this.brewing.t / this.brewing.ms);
-      g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(30,188,150,5);
-      g.fillStyle = '#ffc45a'; g.fillRect(30,188,150*k,5);
+    g.fillStyle = this.bg || '#2a1c14'; g.fillRect(0, 0, W, H);
+    this.drawRoom(g);
+    // порядок по глубине: гости, тарелки, Ная
+    const items = [];
+    this.guests.forEach(x => items.push({ y:this.TABLES[x.table].y, f:() => this.drawGuest(g, x) }));
+    items.push({ y:this.naya.y, f:() => this.drawNaya(g) });
+    items.sort((a, b) => a.y - b.y).forEach(i => i.f());
+    this.guests.forEach(x => this.drawBubble(g, x));
+    this.drawHud(g);
+    if (this.menuOpen) this.drawMenu(g);
+    if (this.flash) {
+      g.fillStyle = this.flash > 0 ? 'rgba(200,60,70,' + (this.flash / 900) + ')'
+                                   : 'rgba(120,220,150,' + (-this.flash / 900) + ')';
+      g.fillRect(0, 0, W, H);
     }
-    // мойка
-    g.fillStyle = '#2e2620'; g.fillRect(206,144,28,50);
-    g.fillStyle = '#9aa0a8'; g.fillRect(210,154,20,13);
-    g.fillStyle = '#6a7078'; g.fillRect(218,148,3,6);
-    g.fillStyle = '#d8c4a0'; g.font = '5px Courier New'; g.textAlign='center';
-    g.fillText('МОЙКА', 220, 180);
-    this.hit.push({ kind:'bin', x:206, y:144, w:28, h:50 });
+  },
 
-    // станции с ингредиентами
-    const st = this.stations();
-    st.forEach((t, i) => {
-      const col = i % 4, row = (i / 4) | 0;
-      const x = 6 + col * 58, y = 204 + row * 66;
-      g.fillStyle = '#6b4d34'; g.fillRect(x, y, 54, 60);
-      g.fillStyle = '#87613f'; g.fillRect(x, y, 54, 4);
-      g.fillStyle = '#3a2718'; g.fillRect(x, y + 56, 54, 4);
-      g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x+4, y+34, 46, 8);
-      this.icon(g, t, x + 27, y + 25, 28);
-      g.fillStyle = '#f2e2c2'; g.font = '6px Courier New'; g.textAlign = 'center';
-      g.fillText((this.T[t] || {}).n || t, x + 27, y + 52);
-      this.hit.push({ kind:'st', t, x, y, w:54, h:60 });
+  drawRoom(g) {
+    const W = this.W, H = this.H;
+    // пол
+    g.fillStyle = '#6b4f38'; g.fillRect(0, 100, W, H - 100);
+    g.fillStyle = '#5e452f';
+    for (let y = 106; y < H; y += 14) g.fillRect(0, y, W, 1);
+    for (let x = 0; x < W; x += 22) g.fillRect(x, 100, 1, H - 100);
+    // стена и окно
+    g.fillStyle = '#3f2c20'; g.fillRect(0, 0, W, 100);
+    g.fillStyle = '#4a3427'; for (let x = 0; x < W; x += 9) g.fillRect(x, 0, 3, 100);
+    g.fillStyle = '#2a1d16'; g.fillRect(0, 96, W, 6);
+    // стойка
+    g.fillStyle = '#4e3524'; g.fillRect(28, 62, 184, 40);
+    g.fillStyle = '#6a4a32'; g.fillRect(28, 62, 184, 8);
+    g.fillStyle = '#3a2718'; g.fillRect(28, 96, 184, 6);
+    g.fillStyle = '#8a6a48'; g.fillRect(28, 60, 184, 3);
+    // кофемашина и полки за спиной Криса
+    g.fillStyle = '#7d7d86'; g.fillRect(38, 30, 32, 30);
+    g.fillStyle = '#9a9aa4'; g.fillRect(40, 32, 28, 8);
+    g.fillStyle = '#2e2e34'; g.fillRect(46, 44, 6, 10); g.fillRect(56, 44, 6, 10);
+    g.fillStyle = '#5a4030'; g.fillRect(150, 26, 62, 5); g.fillRect(150, 42, 62, 5);
+    ['#c9a06a','#8a6242','#d8c0a0','#6a4428'].forEach((c, i) => {
+      g.fillStyle = c; g.fillRect(154 + i * 14, 18, 9, 8); g.fillRect(156 + i * 14, 34, 8, 8);
     });
-    g.textAlign = 'left';
+    // Крис за стойкой — его должно быть видно: к нему бегут с каждым заказом
+    this.drawChris(g, 104, 64);
+    g.font = '6px Courier New'; g.fillStyle = 'rgba(240,224,192,.62)'; g.fillText('КРИС', 108, 70);
+    // подписи зон
+    g.font = '6px Courier New';
+    g.fillStyle = 'rgba(240,224,192,.75)'; g.fillText('ЗАКАЗ', 56, 80);
+    g.fillText('ВЫДАЧА', 148, 80);
+    g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(28, 82, 90, 14);
+    g.fillRect(122, 82, 90, 14);
+    // тарелки на выдаче
+    this.pass.forEach((id, i) => this.drawDish(g, 146 + i * 26, 88, id));
+    // прогресс готовки
+    if (this.cooking) {
+      const k = 1 - this.cooking.ms / this.cooking.total;
+      g.fillStyle = '#2a1d16'; g.fillRect(52, 88, 44, 6);
+      g.fillStyle = '#e8b84a'; g.fillRect(53, 89, 42 * k, 4);
+      this.drawDish(g, 74, 74, this.cooking.id, .5);
+    }
+    // столики
+    this.TABLES.forEach((t, i) => {
+      g.fillStyle = 'rgba(0,0,0,.22)';
+      g.beginPath(); g.ellipse(t.x, t.y + 16, 22, 8, 0, 0, 6.3); g.fill();
+      g.fillStyle = '#5a4030'; g.fillRect(t.x - 4, t.y + 2, 8, 14);
+      g.fillStyle = '#7d5a3c'; g.beginPath(); g.ellipse(t.x, t.y, 21, 12, 0, 0, 6.3); g.fill();
+      g.fillStyle = '#8f6a48'; g.beginPath(); g.ellipse(t.x, t.y - 2, 21, 12, 0, 0, 6.3); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.10)'; g.beginPath(); g.ellipse(t.x - 6, t.y - 5, 8, 4, 0, 0, 6.3); g.fill();
+      g.fillStyle = 'rgba(240,224,192,.45)'; g.font = '6px Courier New';
+      g.fillText(String(i + 1), t.x - 2, t.y + 30);
+    });
+  },
+
+  drawChris(g, x, y) {
+    g.fillStyle = '#2a231c'; g.fillRect(x - 1, y - 26, 34, 28);      // силуэт
+    g.fillStyle = '#4a6a8a'; g.fillRect(x + 2, y - 24, 28, 26);      // рубашка
+    g.fillStyle = '#3d5a76'; g.fillRect(x + 2, y - 24, 28, 4);
+    g.fillStyle = '#d8d2c4'; g.fillRect(x + 5, y - 8, 22, 10);       // фартук
+    g.fillStyle = '#c4bcac'; g.fillRect(x + 5, y - 8, 22, 2);
+    g.fillStyle = '#4a6a8a'; g.fillRect(x - 3, y - 20, 5, 14); g.fillRect(x + 30, y - 20, 5, 14);
+    g.fillStyle = '#e8c9a0'; g.fillRect(x + 7, y - 40, 18, 16);      // голова
+    g.fillStyle = '#3a2a1e'; g.fillRect(x + 6, y - 43, 20, 9);       // волосы
+    g.fillRect(x + 5, y - 39, 3, 7); g.fillRect(x + 24, y - 39, 3, 7);
+    g.fillStyle = '#241a12'; g.fillRect(x + 11, y - 34, 2, 3); g.fillRect(x + 19, y - 34, 2, 3);
+    g.fillStyle = '#b08878'; g.fillRect(x + 13, y - 29, 6, 1);
+  },
+
+  drawNaya(g) {
+    const n = this.naya;
+    const b = Math.sin(n.step / 7) * 1.4;
+    g.fillStyle = 'rgba(0,0,0,.26)';
+    g.beginPath(); g.ellipse(n.x, n.y + 2, 8, 3.4, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#2b2230'; g.fillRect(n.x - 6, n.y - 14 + b, 12, 14);
+    g.fillStyle = '#c0304d'; g.fillRect(n.x - 6, n.y - 14 + b, 12, 5);
+    g.fillStyle = '#d8d2c4'; g.fillRect(n.x - 5, n.y - 6 + b, 10, 5);
+    g.fillStyle = '#e8c9a0'; g.fillRect(n.x - 5, n.y - 25 + b, 10, 11);
+    g.fillStyle = '#2a1a20'; g.fillRect(n.x - 6, n.y - 27 + b, 12, 8);
+    g.fillRect(n.x - 7, n.y - 24 + b, 3, 9); g.fillRect(n.x + 4, n.y - 24 + b, 3, 9);
+    g.fillStyle = '#241a12'; g.fillRect(n.x - 3, n.y - 20 + b, 2, 2); g.fillRect(n.x + 1, n.y - 20 + b, 2, 2);
+    if (this.carry) this.drawDish(g, n.x + 11, n.y - 12 + b, this.carry, .8);
+  },
+
+  drawGuest(g, x) {
+    const t = this.TABLES[x.table];
+    const gx = t.x, gy = t.y - 18;
+    g.fillStyle = 'rgba(0,0,0,.22)';
+    g.beginPath(); g.ellipse(gx, gy + 14, 7, 3, 0, 0, 6.3); g.fill();
+    const img = (typeof Assets !== 'undefined' && Assets.images) ? Assets.images[x.face] : null;
+    if (img) g.drawImage(img, Math.round(gx - img.width / 2), Math.round(gy + 12 - img.height));
+    else { g.fillStyle = '#6a5a70'; g.fillRect(gx - 6, gy - 2, 12, 16); }
+    if (x.state !== 'served') {                          // терпение
+      const w = 20, k = Math.max(0, x.pat);
+      g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(gx - w / 2, gy + 16, w, 3);
+      g.fillStyle = k > .5 ? '#7bc47f' : k > .25 ? '#e8b84a' : '#c0304d';
+      g.fillRect(gx - w / 2, gy + 16, w * k, 3);
+    }
+  },
+
+  drawBubble(g, x) {
+    const t = this.TABLES[x.table];
+    const bx = t.x, by = t.y - 46;
+    if (x.state === 'served') {
+      g.fillStyle = '#f2ead8'; g.beginPath(); g.ellipse(bx, by + 6, 11, 9, 0, 0, 6.3); g.fill();
+      g.strokeStyle = '#7bc47f'; g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(bx - 4, by + 6); g.lineTo(bx - 1, by + 9); g.lineTo(bx + 5, by + 2); g.stroke();
+      return;
+    }
+    g.fillStyle = '#f2ead8';
+    g.beginPath(); g.ellipse(bx, by + 6, 13, 10, 0, 0, 6.3); g.fill();
+    g.beginPath(); g.moveTo(bx - 4, by + 14); g.lineTo(bx + 2, by + 14); g.lineTo(bx - 1, by + 20); g.fill();
+    if (x.state === 'waiting') {
+      g.fillStyle = '#3a2a20'; g.font = 'bold 11px Courier New'; g.fillText('?', bx - 3, by + 10);
+    } else {
+      this.drawDish(g, bx, by + 6, x.dish, .85);
+    }
+  },
+
+  /* Иконка блюда: своя форма на каждую позицию меню. */
+  drawDish(g, x, y, id, s) {
+    s = s || 1;
+    const m = this.dish(id); if (!m) return;
+    const w = 14 * s, h = 12 * s;
+    g.save(); g.translate(x, y);
+    g.fillStyle = 'rgba(0,0,0,.20)';
+    g.beginPath(); g.ellipse(0, h / 2 + 1, w / 2, 2.4 * s, 0, 0, 6.3); g.fill();
+    if (m.k === 'cup' || m.k === 'mug') {
+      g.fillStyle = '#efe8dc'; g.fillRect(-w / 2, -h / 2, w, h * .82);
+      g.fillStyle = m.c; g.fillRect(-w / 2 + 1.5 * s, -h / 2 + 1.5 * s, w - 3 * s, h * .34);
+      g.fillStyle = '#d8d0c2'; g.fillRect(-w / 2 - 1, h * .30, w + 2, 2 * s);
+      if (m.k === 'mug') { g.fillStyle = '#f6d8e0'; g.fillRect(-2 * s, -h / 2 + 1, 4 * s, 2.4 * s); }
+      g.fillStyle = '#efe8dc'; g.fillRect(w / 2, -h / 4, 2 * s, h * .4);
+    } else if (m.k === 'glass') {
+      g.fillStyle = 'rgba(240,240,240,.55)'; g.fillRect(-w / 3, -h / 2 - 1 * s, w * .66, h);
+      g.fillStyle = m.c; g.fillRect(-w / 3 + 1, -h / 6, w * .66 - 2, h * .6);
+      g.fillStyle = '#f4ead8'; g.fillRect(-w / 3 + 1, -h / 2, w * .66 - 2, h * .3);
+    } else if (m.k === 'cake') {
+      g.fillStyle = '#dcd6cc'; g.beginPath(); g.ellipse(0, h / 3, w / 2, 3 * s, 0, 0, 6.3); g.fill();
+      g.fillStyle = m.c; g.fillRect(-w / 3, -h / 3, w * .66, h * .6);
+      g.fillStyle = '#3f2416'; g.beginPath(); g.ellipse(0, -h / 3, w * .34, 2.6 * s, 0, 0, 6.3); g.fill();
+    } else {                                                    // круассан
+      g.fillStyle = '#dcd6cc'; g.beginPath(); g.ellipse(0, h / 3, w / 2, 3 * s, 0, 0, 6.3); g.fill();
+      g.fillStyle = m.c;
+      g.beginPath(); g.arc(0, h / 6, w * .40, Math.PI * 1.05, Math.PI * 1.95); 
+      g.lineWidth = 4 * s; g.strokeStyle = m.c; g.stroke();
+      g.fillStyle = '#b07f38'; g.fillRect(-1 * s, -h / 4, 2 * s, 3 * s);
+    }
+    g.restore();
+  },
+
+  drawHud(g) {
+    const W = this.W, H = this.H;
+    // блокнот заказов
+    const taken = this.guests.filter(x => x.state === 'ordered');
+    g.fillStyle = 'rgba(20,14,12,.72)'; g.fillRect(0, H - 40, W, 40);
+    g.fillStyle = 'rgba(240,224,192,.20)'; g.fillRect(0, H - 40, W, 1);
+    g.font = '6px Courier New';
+    g.fillStyle = 'rgba(240,224,192,.55)'; g.fillText('БЛОКНОТ', 6, H - 30);
+    if (!taken.length) {
+      g.fillStyle = 'rgba(240,224,192,.35)'; g.fillText('пусто', 6, H - 18);
+    } else taken.slice(0, 4).forEach((x, i) => {
+      const bx = 6 + i * 58;
+      g.fillStyle = 'rgba(240,224,192,.70)'; g.fillText('стол ' + (x.table + 1), bx, H - 20);
+      this.drawDish(g, bx + 44, H - 22, x.dish, .7);
+    });
+    // счётчик и время
+    g.fillStyle = 'rgba(20,14,12,.66)'; g.fillRect(0, 0, W, 14);
+    g.fillStyle = '#f0e4c0'; g.font = '7px Courier New';
+    g.fillText('ВЫДАНО: ' + this.served, 6, 10);
+    const sec = Math.max(0, Math.ceil(this.left / 1000));
+    g.fillText('ДО КОНЦА: ' + ((sec / 60) | 0) + ':' + String(sec % 60).padStart(2, '0'), 128, 10);
+    if (this.carry) {
+      g.fillStyle = 'rgba(240,224,192,.55)'; g.font = '6px Courier New';
+      g.fillText('в руках: ' + this.dish(this.carry).n, 6, 22);
+    }
+  },
+
+  drawMenu(g) {
+    const b = this.MENU_BOX;
+    g.fillStyle = 'rgba(10,8,10,.82)'; g.fillRect(0, 0, this.W, this.H);
+    g.fillStyle = '#241a16'; g.fillRect(b.x, b.y, b.w, b.h);
+    g.strokeStyle = '#8a6a48'; g.lineWidth = 1; g.strokeRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1);
+    g.fillStyle = '#f0e4c0'; g.font = '7px Courier New';
+    g.fillText('ЧТО ГОТОВИМ?', b.x + 8, b.y + 12);
+    this.MENU.forEach((m, i) => {
+      const col = i % 3, row = (i / 3) | 0;
+      const cx = b.x + 6 + col * 66, cy = b.y + 18 + row * 42;
+      g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(cx, cy, 62, 38);
+      g.strokeStyle = 'rgba(200,170,120,.35)'; g.strokeRect(cx + .5, cy + .5, 61, 37);
+      this.drawDish(g, cx + 31, cy + 14, m.id, .9);
+      g.fillStyle = '#e8dcc0'; g.font = '6px Courier New';
+      g.fillText(m.n, cx + 31 - m.n.length * 1.8, cy + 32);
+    });
+    g.fillStyle = 'rgba(240,224,192,.45)'; g.font = '6px Courier New';
+    g.fillText('нажми мимо, чтобы вернуться', b.x + 8, b.y + b.h + 12);
   },
 };
 
@@ -4698,6 +4798,60 @@ const Journal = {
     return gameState.journal
       .filter(k => this.FACTS[k])
       .map(k => Object.assign({ k }, this.FACTS[k]));
+  },
+};
+
+/* КОРОТКИЙ ПЕРЕСКАЗ ВМЕСТО ПОВТОРА.
+
+   Длинная сцена, которую игрок уже видел, не должна проигрываться заново
+   только потому, что он второй раз нажал на того же человека. Вместо неё
+   Ная в двух строках напоминает, о чём был разговор и что нужно делать
+   сейчас: цель берётся из Quests, последний факт — из журнала. Для
+   ключевых сцен написан свой ответ, чтобы собеседник отвечал сам. */
+const Recap = {
+  LINES: {
+    pastFrank:      [{who:'frank',expr:'sad',text:'Мы уже всё сказали, Ная. Не будем начинать сначала.'},
+                     {who:'nayaTeen',expr:'normal',name:'Ная',text:'Не будем.'}],
+    pastDrizella:   [{who:'drizella',expr:'serious',text:'Мы закончили. Дверь там же, где была.'}],
+    pastStacy:      [{who:'stacy',expr:'smile',text:'Ну ты ещё здесь? Куртку не забудь оставить.'},
+                     {who:'nayaTeen',expr:'normal',name:'Ная',text:'Не забуду забрать.'}],
+    prologSwing:    [{who:'naya',expr:'talk',text:'(Качели. Больше они ничего мне не скажут.)'}],
+    playgroundMemory:[{who:'naya',expr:'sad',text:'(Я уже постояла тут сегодня. Хватит.)'}],
+    cafeScene:      [{who:'chris',expr:'normal',text:'Ная, смена. Потом поговорим.'}],
+    homeTalkWithSue:[{who:'sue',expr:'normal',text:'Мы это уже обсудили. Я с тобой, помнишь?'}],
+    meetLilith:     [{who:'lilith',expr:'smile',text:'Мы уже познакомились, девочка. Дважды я не представляюсь.'}],
+    meetGenevieve:  [{who:'genevieve',expr:'smile',text:'Я всё сказала. Дальше — твоя часть.'}],
+    genevieveReveal:[{who:'genevieve',expr:'normal',text:'Повторять не буду. Порог — договор, приглашать должен человек. Остальное ты знаешь.'}],
+    morelPendant:   [{who:'naya',expr:'talk',text:'(Она уже прошла мимо. И уже посмотрела на кулон.)'}],
+    morelOldCorridor:[{who:'naya',expr:'talk',text:'(«До свидания, Ная.» Я это ещё долго буду прокручивать.)'}],
+    roofPromise:    [{who:'genevieve',expr:'normal',text:'Я сказала: завтра. Слово я держу.'}],
+    securityBan:    [{who:'naya',expr:'angry',text:'(Второй раз через главный вход я не пойду.)'}],
+    premiereShow:   [{who:'naya',expr:'smile',text:'(Она отыграла. Всё остальное — потом.)'}],
+    firstAmuletScene:[{who:'naya',expr:'talk',text:'(Имя уже у меня. Здесь больше нечего брать.)'}],
+    secondAmuletScene:[{who:'naya',expr:'talk',text:'(Имя уже у меня. Здесь больше нечего брать.)'}],
+    thirdAmuletScene:[{who:'naya',expr:'talk',text:'(Ларец пуст. Всё, что в нём было, теперь у меня.)'}],
+  },
+  /* Универсальный ответ: что Ная выяснила последним и что делает сейчас. */
+  generic() {
+    const lines = [{who:'naya',expr:'talk',text:'(Это я уже слышала.)'}];
+    try {
+      const facts = Journal.entries();
+      if (facts.length) {
+        const t = facts[facts.length - 1].t.replace(/\.$/, '');
+        lines.push({who:'naya',expr:'normal',text:'(Что я знаю: ' + t + '.)'});
+      }
+      const g = Quests.goal();
+      if (g && g.t !== '...') {
+        const t = g.t.replace(/\.$/, '');
+        lines.push({who:'naya',expr:'normal',text:'(Что делаю: ' + t.charAt(0).toLowerCase() + t.slice(1) + '.)'});
+      }
+    } catch (e) {}
+    if (lines.length === 1) lines.push({who:'naya',expr:'normal',text:'(Ничего нового тут больше нет.)'});
+    return lines;
+  },
+  show(name) {
+    const own = this.LINES[name];
+    Dialogue.start(own ? own.slice() : this.generic());
   },
 };
 
@@ -6459,6 +6613,64 @@ witch3House: {
     paintDoor(ctx, 62, 326, 32, 14);
     ctx.fillStyle = '#b8c0d0'; ctx.font = '6px Courier New'; ctx.fillText('НА УЛИЦУ', 54, 322);
   },
+  /* ТРИ РУНЫ, КОТОРЫЕ ДЕРЖАТ ЛАРЕЦ.
+
+     Раньше их не было видно вообще: точки взаимодействия стояли, а на
+     стенах ничего не светилось, и игрок гасил невидимое. Теперь каждая
+     руна нарисована своим знаком, дышит светом и гаснет, когда её
+     снимают, — по счётчику runesDisarmed. Рисуется поверх мебели, чтобы
+     свечение читалось на тёмных стенах.                                */
+  RUNES: [
+    { x:35,  y:116, c:'#6ad8ff' },   // над печью в гостиной: холодная, чтобы не тонуть в её свете
+    { x:199, y:70,  c:'#8a7aff' },   // на стене кабинета
+    { x:215, y:278, c:'#c060ff' },   // в ритуальной, у ларца
+  ],
+  overPaint(ctx) {
+    if (F('thirdAmulet')) return;
+    const done = C('runesDisarmed') || 0;
+    const t = Date.now();
+    this.RUNES.forEach((r, i) => {
+      const live = i >= done;
+      const puls = live ? 0.60 + 0.34 * Math.sin(t / 340 + i * 2.1) : 0.14;
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      if (live) {                                   // ореол
+        const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 20);
+        g.addColorStop(0, r.c);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = 0.20 * puls; ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, 20, 0, 6.3); ctx.fill();
+      }
+      ctx.globalAlpha = puls;
+      ctx.strokeStyle = live ? r.c : '#4a4658';
+      ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, 6.3); ctx.stroke();
+      ctx.beginPath();
+      if (i === 0) {                                // косой крест с засечками
+        ctx.moveTo(-6, -6); ctx.lineTo(6, 6); ctx.moveTo(6, -6); ctx.lineTo(-6, 6);
+        ctx.moveTo(-9, 0); ctx.lineTo(-5, 0); ctx.moveTo(5, 0); ctx.lineTo(9, 0);
+      } else if (i === 1) {                         // вертикаль с двумя ветвями
+        ctx.moveTo(0, -8); ctx.lineTo(0, 8);
+        ctx.moveTo(0, -3); ctx.lineTo(6, -7); ctx.moveTo(0, 3); ctx.lineTo(-6, 7);
+      } else {                                      // треугольник в круге
+        ctx.moveTo(0, -7); ctx.lineTo(6, 4); ctx.lineTo(-6, 4); ctx.closePath();
+        ctx.moveTo(0, -1); ctx.lineTo(0, 4);
+      }
+      ctx.stroke();
+      if (live) {                                   // четыре точки по сторонам
+        ctx.globalAlpha = puls * .9; ctx.fillStyle = r.c;
+        [[0,-12],[12,0],[0,12],[-12,0]].forEach(([dx,dy]) => ctx.fillRect(dx - 1, dy - 1, 2, 2));
+      }
+      ctx.restore();
+    });
+  },
+  ambient() {
+    if (F('thirdAmulet')) return;
+    const done = C('runesDisarmed') || 0;
+    if (done >= 3 || Math.random() > 0.04) return;
+    const r = this.RUNES[done];
+    FX.spawn(r.x, r.y, 1, { color:r.c, rise:.28, life:44, spread:5 });
+  },
   objects: [
     // гостиная
     { t:'window_in', x:80,  y:34 },
@@ -6493,9 +6705,9 @@ witch3House: {
         if (!F('thirdAmulet')) { UI.toast('Не уходи. Не после всего.'); return; }
         await changeRoom('nightSpot', 160, 268);
       }},
-    { x:16,y:106,w:38,h:34, name:'rune1', prompt:'Руна', action(){ disarmRune(0, 'Печь холодная. Внутри — не зола, а соль. Кто-то охранял этот дом всерьёз.'); }},
-    { x:180,y:60,w:38,h:34, name:'rune2', prompt:'Руна', action(){ disarmRune(1, 'Руна на стене нарисована кровью. Не человеческой — слишком тёмная.'); }},
-    { x:196,y:262,w:38,h:32, name:'rune3', prompt:'Руна', action(){ disarmRune(2, 'Третья. Она пульсирует, как будто дышит. Она знает, что я здесь.'); }},
+    { x:16,y:110,w:38,h:34, name:'rune1', prompt:'Руна', action(){ disarmRune(0, 'Печь холодная. Внутри — не зола, а соль. Кто-то охранял этот дом всерьёз.'); }},
+    { x:180,y:62,w:38,h:34, name:'rune2', prompt:'Руна', action(){ disarmRune(1, 'Руна на стене нарисована кровью. Не человеческой — слишком тёмная.'); }},
+    { x:196,y:264,w:38,h:32, name:'rune3', prompt:'Руна', action(){ disarmRune(2, 'Третья. Она пульсирует, как будто дышит. Она знает, что я здесь.'); }},
     { x:216,y:272,w:50,h:34, name:'chest', prompt:'Ларец', action(){
         const done = C('runesDisarmed') || 0;
         if (done < 3) {
@@ -7003,44 +7215,44 @@ communeYard: {
           {who:'witch2',expr:'smile',name:'Роза',text:'Вот и Женевьева так говорит. Сорок лет говорит, а я всё недосаливаю.'},
         ]);
       }},
-    { x:206,y:216, sprite:'witch4', name:'Агата', speed:0.30,
+    { x:206,y:216, sprite:'witch4', name:'Хэтти', speed:0.30,
       path:[[206,216],[206,238],[178,240],[178,214]],
       when:()=> F('communeIntro') && !F('sueLeftDead'),
       dialogue:()=> {
         if (F('communeWarded')) return Dialogue.start([
-          {who:'witch4',expr:'worried',name:'Агата',text:'Я развесила полынь на всех окнах. Толку, наверное, никакого.'},
-          {who:'witch4',expr:'sad',name:'Агата',text:'Но руки хоть чем-то заняты.'},
+          {who:'witch4',expr:'worried',name:'Хэтти',text:'Я развесила полынь на всех окнах. Толку, наверное, никакого.'},
+          {who:'witch4',expr:'sad',name:'Хэтти',text:'Но руки хоть чем-то заняты.'},
         ]);
         return Dialogue.start([
-          {who:'witch4',expr:'normal',name:'Агата',text:'Осторожно, не наступи. Тут молодая крапива, я её третий год уговариваю.'},
-          {who:'witch4',expr:'smile',name:'Агата',text:'Хочешь совет? Ничего не бери у ведьмы в первый же день. Даже чай.'},
+          {who:'witch4',expr:'normal',name:'Хэтти',text:'Осторожно, не наступи. Тут молодая крапива, я её третий год уговариваю.'},
+          {who:'witch4',expr:'smile',name:'Хэтти',text:'Хочешь совет? Ничего не бери у ведьмы в первый же день. Даже чай.'},
           {who:'naya',expr:'normal',text:'(Поздно.)'},
         ]);
       }},
-    { x:96,y:200, sprite:'witch6', name:'Руби',
+    { x:96,y:200, sprite:'witch6', name:'Вивиан',
       when:()=> F('communeIntro') && !F('sueLeftDead'),
       dialogue:()=> {
         if (F('communePanic')) return Dialogue.start([
-          {who:'witch6',expr:'serious',name:'Руби',text:'Я говорила Старшей запереть двор. Она сказала, что мы не тюрьма.'},
-          {who:'witch6',expr:'sad',name:'Руби',text:'Мы и не тюрьма. Мы просто шесть женщин, которые никого не удержат.'},
+          {who:'witch6',expr:'serious',name:'Вивиан',text:'Я говорила Старшей запереть двор. Она сказала, что мы не тюрьма.'},
+          {who:'witch6',expr:'sad',name:'Вивиан',text:'Мы и не тюрьма. Мы просто шесть женщин, которые никого не удержат.'},
         ]);
         return Dialogue.start([
-          {who:'witch6',expr:'normal',name:'Руби',text:'Новенькая. Я Руби. Я всегда опаздываю, так что знакомимся последними.'},
-          {who:'witch6',expr:'smile',name:'Руби',text:'Совет: если Агата даст тебе банку — не открывай её в доме.'},
+          {who:'witch6',expr:'normal',name:'Вивиан',text:'Новенькая. Я Вивиан. Я всегда опаздываю, так что знакомимся последними.'},
+          {who:'witch6',expr:'smile',name:'Вивиан',text:'Совет: если Хэтти даст тебе банку — не открывай её в доме.'},
         ]);
       }},
-    { x:148,y:236, sprite:'witch5', name:'Беатрис', speed:0.34,
+    { x:148,y:236, sprite:'witch5', name:'Лидия', speed:0.34,
       path:[[148,236],[196,240],[196,258],[132,256]],
       when:()=> F('communeIntro') && !F('sueLeftDead'),
       dialogue:()=> {
         if (F('communePanic')) return Dialogue.start([
-          {who:'witch5',expr:'sad',name:'Беатрис',text:'Старшая говорит, это была болезнь. Агата говорит, это была не болезнь.'},
-          {who:'witch5',expr:'normal',name:'Беатрис',text:'А ты как думаешь?'},
+          {who:'witch5',expr:'sad',name:'Лидия',text:'Старшая говорит, это была болезнь. Хэтти говорит, это была не болезнь.'},
+          {who:'witch5',expr:'normal',name:'Лидия',text:'А ты как думаешь?'},
           {who:'naya',expr:'empty',text:'...я не знаю.'},
         ]);
         return Dialogue.start([
-          {who:'witch5',expr:'smile',name:'Беатрис',text:'Ты с Женевьевой пришла? Значит, тебя уже проверили.'},
-          {who:'witch5',expr:'normal',name:'Беатрис',text:'Я тут самая младшая. Мне пятьдесят четыре. Привыкай.'},
+          {who:'witch5',expr:'smile',name:'Лидия',text:'Ты с Женевьевой пришла? Значит, тебя уже проверили.'},
+          {who:'witch5',expr:'normal',name:'Лидия',text:'Я тут самая младшая. Мне пятьдесят четыре. Привыкай.'},
         ]);
       }},
   ],
@@ -7870,19 +8082,19 @@ oldHouse: {
         ]);
         setFlag('pastPhotos');
       }},
-    { x:78,y:110,w:44,h:34, name:'tvPast', prompt:'Телевизор', action(){
+    { x:136,y:104,w:44,h:34, name:'tvPast', prompt:'Телевизор', action(){
         Dialogue.start([
           {who:'nayaTeen',expr:'normal',name:'Ная',text:'Работает всегда. Отец включает его, когда не хочет разговаривать.'},
           {who:'nayaTeen',expr:'empty',name:'Ная',text:'То есть всегда.'},
         ]);
       }},
-    { x:192,y:96,w:44,h:34, name:'shelfPast', prompt:'Полка', action(){
+    { x:258,y:100,w:44,h:34, name:'shelfPast', prompt:'Полка', action(){
         Dialogue.start([
           {who:'nayaTeen',expr:'normal',name:'Ная',text:'Дипломы Стейси. Танцы, вокал, конкурс чтецов.'},
           {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Мой аттестат лежит наверху в коробке. Его никто не просил показать.)'},
         ]);
       }},
-    { x:268,y:130,w:44,h:34, name:'dresserPast', prompt:'Комод', action(){
+    { x:78,y:132,w:44,h:34, name:'dresserPast', prompt:'Комод', action(){
         Dialogue.start([
           {who:'nayaTeen',expr:'normal',name:'Ная',text:'Верхний ящик заперт. Там документы: мои, Стейси, все.'},
           {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Свои я забрала вчера. Ключ лежит там же, где лежал всегда.)'},
@@ -10183,7 +10395,7 @@ const Dialogue = {
         sue:'Сью', sueGhost:'Сью',
         chris:'Крис', charlotte:'Шарлотта', lilith:'Лиллит', genevieve:'Женевьева',
         witch1:'Мадлен', witch2:'Роза', witch3:'Старшая', acolyte:'Ученица',
-        witch4:'Агата', witch5:'Беатрис', witch6:'Руби',
+        witch4:'Хэтти', witch5:'Лидия', witch6:'Вивиан',
         neighbor:'Соседка', imp:'Житель ада', customer:'Посетитель',
         mother:'Мидея', motherWitch:'Мидея', friend:'Подруга', dorothy:'Дороти', narrator:''
       };
@@ -10364,14 +10576,34 @@ function doInteract() {
 ===================================================================== */
 const Scene = {
   active:false,
+  /* Диспетчеры: их первая команда сама выбирает ветку по дню, счётчику
+     или флагу, поэтому их нужно пускать каждый раз. Всё остальное —
+     одноразовое: повторное нажатие на того же человека или предмет не
+     переигрывает сцену, а отвечает коротким пересказом. Внутренние
+     переходы goto не блокируются никогда. */
+  DISPATCHERS: new Set([
+    'pastCheck','rehearsalWatch','sueRehearsalTalk','sueDayWait','libraryFolk',
+    'librarianTalk','archiveFolder15','archiveFolder5','chrisShiftDay',
+    'persuadeSue','persuadeResolve','sueHint','distractWitch2','dorothy',
+    'dorothyHall','postRevival','lonerDoor','lonerCaughtScene',
+  ]),
+  seen(name) { return !!(gameState && gameState.scenesSeen && gameState.scenesSeen.includes(name)); },
+  mark(name) {
+    if (!gameState) return;
+    if (!gameState.scenesSeen) gameState.scenesSeen = [];
+    if (!gameState.scenesSeen.includes(name)) gameState.scenesSeen.push(name);
+  },
   play(name) {
     if (this.active) { this.pending = name; return; }
     const scr = Scripts[name];
     if (!scr) { console.warn('No script:', name); return; }
+    if (this.seen(name) && !this.DISPATCHERS.has(name)) { Recap.show(name); return; }
+    this._cur = name;
     this.active = true;
     Game.mode = 'cutscene';
     UI.dimControls(true);
     this._runList(scr).then(() => {
+      this.mark(name);
       this.active = false;
       Game.cast = [];
       if (Game.mode === 'cutscene') Game.mode = 'explore';
@@ -11459,7 +11691,8 @@ function serializeState() {
     currentRoom:gameState.currentRoom,
     playerX:Player.x, playerY:Player.y,
     act:gameState.act, chapter:gameState.chapter, eventStep:gameState.eventStep,
-    flags:gameState.flags, stats:gameState.stats, counters:gameState.counters, journal:gameState.journal,
+    flags:gameState.flags, stats:gameState.stats, counters:gameState.counters,
+    journal:gameState.journal, scenesSeen:gameState.scenesSeen,
     inventory:gameState.inventory, memories:gameState.memories,
     settings:gameState.settings,
   };
@@ -11499,6 +11732,7 @@ function applyState(s) {
   gameState.inventory = Array.isArray(s.inventory) ? s.inventory.slice() : [];
   gameState.memories  = Array.isArray(s.memories) ? s.memories.slice() : [];
   gameState.journal   = Array.isArray(s.journal) ? s.journal.slice() : [];
+  gameState.scenesSeen = Array.isArray(s.scenesSeen) ? s.scenesSeen.slice() : [];
   gameState.settings = Object.assign(freshState().settings, s.settings || {});
   Player.x = gameState.playerX; Player.y = gameState.playerY;
   applySettings();
@@ -11543,7 +11777,7 @@ prologue: [
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Над всеми же властвовала одна — первая и сильнейшая, Лилит, жена самого Люцифера.'},
     {who:'narrator',expr:'normal',name:'',text:'Её чёрная воля стремилась к тому, чтобы множить подобных себе.'},
-    {who:'narrator',expr:'normal',name:'',text:'И потому она избрала четверых особых ведьм: Агату, Беатрис, Руби... и Мидею.'},
+    {who:'narrator',expr:'normal',name:'',text:'И потому она избрала четверых особых ведьм: Агату, Лидия, Вивиан... и Мидею.'},
   ]},
   { star:0 }, { wait:420 }, { star:1 }, { wait:420 }, { star:2 }, { wait:420 }, { star:3 }, { wait:500 },
   { dlg:[
@@ -13351,9 +13585,9 @@ communeIntroScene: [
     {x:158,y:222, sprite:'sue',       name:'Сью'},
     {x:214,y:206, sprite:'witch1',    name:'Мадлен'},
     {x:262,y:240, sprite:'witch2',    name:'Роза'},
-    {x:300,y:222, sprite:'witch4',    name:'Агата'},
-    {x:88,y:240,  sprite:'witch5',    name:'Беатрис'},
-    {x:64,y:214,  sprite:'witch6',    name:'Руби'},
+    {x:300,y:222, sprite:'witch4',    name:'Хэтти'},
+    {x:88,y:240,  sprite:'witch5',    name:'Лидия'},
+    {x:64,y:214,  sprite:'witch6',    name:'Вивиан'},
   ]},
   { dlg:[
     {who:'genevieve',expr:'normal',text:'Вот и коммуна. Не пугайся, тут нет ничего страшного.'},
@@ -13365,9 +13599,9 @@ communeIntroScene: [
     {who:'witch1',expr:'normal',name:'Мадлен',text:'Здравствуй, деточка. Какая тоненькая.'},
     {who:'genevieve',expr:'normal',text:'А это Роза. Ей восемьдесят два, и она до сих пор недосаливает суп.'},
     {who:'witch2',expr:'smile',name:'Роза',text:'Женевьева, я тебя переживу назло.'},
-    {who:'genevieve',expr:'normal',text:'Агата — травы. Беатрис — младшая из старших, ей пятьдесят четыре. И Руби, она вечно опаздывает.'},
-    {who:'witch4',expr:'smile',name:'Агата',text:'Не стой на клумбе, милая.'},
-    {who:'witch5',expr:'normal',name:'Беатрис',text:'Она всем это говорит. Даже Женевьеве.'},
+    {who:'genevieve',expr:'normal',text:'Хэтти — травы. Лидия — младшая из старших, ей пятьдесят четыре. И Вивиан, она вечно опаздывает.'},
+    {who:'witch4',expr:'smile',name:'Хэтти',text:'Не стой на клумбе, милая.'},
+    {who:'witch5',expr:'normal',name:'Лидия',text:'Она всем это говорит. Даже Женевьеве.'},
   ]},
   { dlg:[
     {who:'genevieve',expr:'normal',text:'У каждой из нас есть амулет. Мы называем его именем. Он и есть имя.'},
