@@ -4305,13 +4305,14 @@ const Quests = {
     { w:()=> F('sueAgreed'),         t:'Идти к Мадлен вместе со Сью.' },
     { w:()=> F('sueRefused'),        t:'Попасть в дом ведьмы без приглашения.' },
     { w:()=> F('communeIntro'),      t:'Уговорить Сью пойти с тобой.', s:'Без человека в дом к ведьме не войти.' },
-    { w:()=> F('foundGenevieve'),    t:'Пойти с Женевьевой в коммуну.' },
+    { w:()=> F('foundGenevieve') && F('toldSueWitch'), t:'Пойти с Женевьевой в коммуну.' },
     { w:()=> F('toldSueWitch'),      t:'Найти Женевьеву.' },
     { w:()=> F('returnedFromHell1'), t:'Рассказать Сью, где ты была.' },
     { w:()=> F('metLilith'),         t:'Вернуться на Землю.' },
     { w:()=> F('metCharlotte'),      t:'Добраться до Лиллит.' },
     { w:()=> F('portalOpened'),      t:'Шагнуть в портал.' },
-    { w:()=> F('learnedWitches'),    t:'Поговорить со Сью дома.' },
+    { w:()=> F('learnedWitches'),    t:'Поговорить со Сью дома.',
+      s:()=> F('communeInvite') ? 'Морель зовёт в коммуну после заката.' : '' },
     /* Глава «Женевьева Морель»: цель ведёт по дням, от свежего к старому. */
     { w:()=> C('uniDay') === 4 && F('morelTruth'),   t:'Отправиться в коммуну ведьм после заката.' },
     { w:()=> C('uniDay') === 4 && F('premiereDone'), t:'Встретиться с Морель на крыше.' },
@@ -4361,6 +4362,12 @@ const Quests = {
     { w:()=> true,                   t:'...' },
   ],
   cur:'', curSub:'',
+  /* Уточнение к цели может зависеть от флагов, поэтому s допускается
+     и строкой, и функцией. */
+  sub(g) {
+    if (!g || !g.s) return '';
+    try { return typeof g.s === 'function' ? (g.s() || '') : g.s; } catch (e) { return ''; }
+  },
   goal() {
     if (!gameState) return null;
     for (const g of this.GOALS) { try { if (g.w()) return g; } catch (e) {} }
@@ -4372,7 +4379,7 @@ const Quests = {
     const g = this.goal();
     if (!g) return;
     const changed = g.t !== this.cur;
-    this.cur = g.t; this.curSub = g.s || '';
+    this.cur = g.t; this.curSub = this.sub(g);
     const el = document.getElementById('questPanel');
     if (!el) return;
     const shown = (Game.mode === 'explore' || Game.mode === 'dialogue');
@@ -14808,10 +14815,11 @@ function showStatus() {
     main.className = 'statRow';
     main.innerHTML = `<span style="color:#f0e4c0">${g.t}</span><span></span>`;
     rows.appendChild(main);
-    if (g.s) {
+    const gs = Quests.sub(g);
+    if (gs) {
       const sub = document.createElement('div');
       sub.className = 'statRow';
-      sub.innerHTML = `<span style="opacity:.7">${g.s}</span><span></span>`;
+      sub.innerHTML = `<span style="opacity:.7">${gs}</span><span></span>`;
       rows.appendChild(sub);
     }
     rows.appendChild(document.createElement('hr'));

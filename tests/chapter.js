@@ -38,6 +38,7 @@ const WANT_JOURNAL = [
       day: C('uniDay'),
       journal: gameState.journal.slice(),
       goal: (Quests.goal() || {}).t,
+      sub: Quests.sub(Quests.goal()),
       room: gameState.currentRoom,
     }));
     return { flags: s.flags, chapter: s.chapter, ...st };
@@ -55,10 +56,13 @@ const WANT_JOURNAL = [
   if (out.day !== 5) bad.push('uniDay=' + out.day + ', ожидалось 5');
   if (out.chapter !== 5) bad.push('глава=' + out.chapter + ', ожидалось 5');
   if (out.room !== 'nayaRoom') bad.push('комната=' + out.room + ', ожидалась nayaRoom');
+  // после главы игрока ведут к домашнему разговору со Сью, а не сразу в коммуну
+  if (out.goal !== 'Поговорить со Сью дома.') bad.push('цель после главы: ' + out.goal);
+  if (out.sub !== 'Морель зовёт в коммуну после заката.') bad.push('уточнение цели: ' + out.sub);
 
   console.log('день:', out.day, '| глава:', out.chapter, '| комната:', out.room);
   console.log('записей в журнале:', out.journal.length, 'из', WANT_JOURNAL.length);
-  console.log('цель:', out.goal);
+  console.log('цель:', out.goal, '/', out.sub);
   if (bad.length) { bad.forEach(b => console.log('  ' + b)); console.log('\nПРОВАЛ'); process.exit(1); }
   console.log('\nOK: глава «Женевьева Морель» проходится целиком');
 })();
