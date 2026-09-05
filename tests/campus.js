@@ -7,7 +7,7 @@ const H = require('./harness.js');
       document.getElementById('dialogueBox').classList.remove('active');
       document.getElementById('fade').classList.remove('show');
       ['metSue','cafeSceneComplete','mainStoryStarted','metGenevieveUni'].forEach(f=>gameState.flags[f]=true);
-      gameState.currentRoom='uniCorridorLib'; Player.x=300; Player.y=260; unstickPlayer(); World.invalidate();
+      gameState.currentRoom='uniEastHall'; Player.x=130; Player.y=400; unstickPlayer(); World.invalidate();
     });
     for (let i=1;i<=4;i++) {
       await page.evaluate(()=>{ Campus.noticed(); });
@@ -34,6 +34,12 @@ const H = require('./harness.js');
     await H.pump(page, [], 'CAMPUS');
     s = await H.snap(page);
     console.log('после окна: комната=%s oldWingOpen=%s', s.room, s.flags.includes('oldWingOpen'));
+    if (s.room !== 'uniServiceStair') throw new Error('ожидалась uniServiceStair, а не ' + s.room);
+    // служебная лестница действительно связывает всё здание
+    console.log(await H.useObj(page, 'down'));
+    await H.pump(page, [], 'CAMPUS');
+    s = await H.snap(page);
+    console.log('вниз по лестнице: комната=%s', s.room);
     if (s.room !== 'uniBasement') throw new Error('ожидался uniBasement, а не ' + s.room);
     return {};
   });
