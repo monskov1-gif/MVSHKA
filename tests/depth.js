@@ -16,8 +16,21 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
   await page.goto(URL);
   await page.waitForFunction(() => typeof Art !== 'undefined' && Object.keys(Art.defs).length > 50, null, { timeout: 15000 });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForTimeout(400);
+  await page.click('#btnNew');                    // isBlocked работает только по живому gameState
+  await page.waitForTimeout(700);
 
-  const out = await page.evaluate(() => {
+  // все переходы вида changeRoom('room', x, y) прямо из исходника: точка входа
+  // не должна попадать ни в стену, ни в след мебели
+  const src = require('fs').readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8');
+  const jumps = [];
+  const re = /changeRoom\(\s*'([A-Za-z0-9_]+)'\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/g;
+  let m;
+  while ((m = re.exec(src))) jumps.push({ room:m[1], x:+m[2], y:+m[3] });
+
+  const out = await page.evaluate((jumps) => {
     const anchors = [], inside = [];
     for (const [k, d] of Object.entries(Art.defs)) {
       if (d.flat || d.wall) continue;              // у них нет точки контакта с полом
@@ -38,8 +51,21 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
       (room.npcs || []).forEach(n => hit('NPC ' + (n.name || '?'), n.x, n.y));
       if (room.spawn) Object.entries(room.spawn).forEach(([k, v]) => hit('вход ' + k, v[0], v[1]));
     }
-    return { anchors, inside };
-  });
+    // точки входа из вызовов changeRoom: и мебель, и стены
+    const spawns = [];
+    for (const j of jumps) {
+      const room = Rooms[j.room];
+      if (!room) { spawns.push({ ...j, why:'нет такой комнаты' }); continue; }
+      const prev = gameState.currentRoom;
+      gameState.currentRoom = j.room;
+      const stuck = isBlocked(j.x, j.y);
+      gameState.currentRoom = prev;
+      if (stuck) spawns.push({ ...j, why:'внутри стены или мебели' });
+      else if (j.x < 4 || j.y < 4 || j.x > room.w - 4 || j.y > room.h - 4)
+        spawns.push({ ...j, why:'за пределами комнаты' });
+    }
+    return { anchors, inside, spawns };
+  }, jumps);
 
   let bad = 0;
   if (out.anchors.length) {
@@ -52,6 +78,12 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
     console.log('внутри мебели:');
     out.inside.forEach(i => console.log(`  ${i.room}: ${i.kind} (${i.x},${i.y}) внутри ${i.prop}`));
   }
+  if (out.spawns.length) {
+    bad += out.spawns.length;
+    console.log('плохие точки входа:');
+    out.spawns.forEach(v => console.log(`  changeRoom('${v.room}', ${v.x}, ${v.y}) — ${v.why}`));
+  }
+  console.log(`проверено переходов: ${jumps.length}`);
   errs.forEach(e => console.log(e));
   console.log(bad || errs.length ? `\nПРОВАЛ: ${bad} нарушений` : '\nOK: якоря, спавны и глубина в порядке');
   await browser.close();

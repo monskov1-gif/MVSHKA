@@ -3730,7 +3730,7 @@ corridor1: {
     { x:232,y:114,w:38,h:52, name:'toBalcony', prompt:'Балкон',
       action: async ()=> await changeRoom('balcony', 140, 196) },
     { x:118,y:222,w:44,h:32, name:'toStairs', prompt:'В прихожую',
-      action: async ()=> await changeRoom('stairwell', 120, 108) },
+      action: async ()=> await changeRoom('stairwell', 'fromStairs') },
     { x:28,y:228,w:40,h:40, name:'shoes', prompt:'Обувь', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Её кеды стоят у двери. Носками к выходу, как всегда.'},
@@ -3894,7 +3894,7 @@ street: {
       }},
     { x:58,y:118,w:36,h:30, name:'toHome', prompt:'Домой', action: async ()=> {
         if (Game.chase && Game.chase.active) { Chase.reachedHome(); return; }
-        await changeRoom('stairwell', 120, 250);
+        await changeRoom('stairwell', 'fromOutside');
       }},
     { x:282,y:118,w:36,h:30, name:'toLeftHouse',
       prompt:()=> F('invitationPlan') || F('firstAmulet') || F('sueRefused') ? 'Дом Мадлен' : 'Соседний дом',
@@ -3949,7 +3949,7 @@ street: {
       }},
     { x:574,y:252,w:44,h:58, name:'toPark', prompt:'Парк', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
-        await changeRoom('parkWalk', 30, 258);
+        await changeRoom('parkWalk', 30, 244);
       }},
     { x:452,y:118,w:36,h:30, name:'chapelLook', prompt:'Церковь', action(){
         if (F('firstWitchDead')) return Dialogue.start([
@@ -4490,7 +4490,7 @@ communeHall: {
     { x:130,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> {
         if (F('lonerSuspected') && !F('lonerChase')) { Scene.play('lonerCaughtScene'); return; }
         if (F('sueLeftDead')) { await changeRoom('communeYard', 96, 196); return; }
-        await changeRoom('genevieveHouse', 120, 210);
+        await changeRoom('genevieveHouse', 120, 244);
       }},
     { x:242,y:100,w:42,h:32, name:'toTrial', prompt:'Вниз, в комнату испытания',
       when:()=> F('evilTrialOffered'),
@@ -5920,6 +5920,9 @@ balcony: {
 /* ---------------------------------------------------------------- */
 stairwell: {
   name:"Прихожая", music:'home', w:240, h:300,
+  /* с лестницы игрок выходит на свободный пол у её нижней ступени,
+     с улицы — на коврик перед дверью; одна общая точка сажала его в комод */
+  spawn:{ fromStairs:[80, 176], fromOutside:[120, 250], default:[120, 232] },
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.03, wind:0 },
   light:{ tint:'#20191c', dark:.18 },
   lights:[{x:56,y:66,r:56,c:'#e8d0a0',i:.45},{x:196,y:52,r:44,c:'#9fc0e0',i:.32}],
@@ -6590,9 +6593,9 @@ uniHallMain: {
     { x:150,y:300,w:80,h:34, name:'toStreet', prompt:'На улицу',
       action: async ()=> await changeRoom('street', 210, 200) },
     { x:8,y:56,w:44,h:44, name:'toTheatre', prompt:'Театральное крыло',
-      action: async ()=> await changeRoom('uniCorridorTheatre', 596, 156) },
+      action: async ()=> await changeRoom('uniCorridorTheatre', 596, 216) },
     { x:328,y:56,w:44,h:44, name:'toStudy', prompt:'Учебное крыло',
-      action: async ()=> await changeRoom('uniCorridorLib', 44, 156) },
+      action: async ()=> await changeRoom('uniCorridorLib', 44, 216) },
     { x:10,y:250,w:36,h:58, name:'toYard', prompt:'Во внутренний двор',
       action: async ()=> await changeRoom('uniCourtyard', 200, 268) },
     { x:336,y:250,w:36,h:58, name:'toCanteen', prompt:'Столовая',
@@ -6605,7 +6608,7 @@ uniHallMain: {
             {who:'naya',expr:'talk',text:'(Пыли на ленточке столько, что ремонт идёт не первый год.)'},
           ]);
         }
-        await changeRoom('uniOldWing', 470, 150);
+        await changeRoom('uniOldWing', 470, 208);
       }},
     { x:120,y:58,w:44,h:38, name:'boardMain', prompt:'Расписание', action(){
         if (F('waitingAtAud')) return Dialogue.start([
@@ -6692,7 +6695,7 @@ uniCorridorTheatre: {
   ],
   interactables: [
     { x:596,y:200,w:40,h:52, name:'toHall', prompt:'В холл',
-      action: async ()=> await changeRoom('uniHallMain', 34, 82) },
+      action: async ()=> await changeRoom('uniHallMain', 34, 114) },
     { x:316,y:200,w:48,h:36, name:'toStage', prompt:'Сцена',
       action: async ()=> await changeRoom('uniStage', 120, 262) },
     { x:8,y:224,w:40,h:56, name:'toFoyer', prompt:'Дальше по крылу', action(){
@@ -6797,7 +6800,7 @@ uniCorridorLib: {
   ],
   interactables: [
     { x:8,y:224,w:40,h:52, name:'toHall', prompt:'В холл',
-      action: async ()=> await changeRoom('uniHallMain', 346, 82) },
+      action: async ()=> await changeRoom('uniHallMain', 346, 114) },
     { x:376,y:200,w:46,h:36, name:'toLib', prompt:'Библиотека',
       action: async ()=> await changeRoom('uniLibrary', 120, 258) },
     { x:216,y:200,w:44,h:36, name:'aud14', prompt:'Аудитория 14', action(){
@@ -6980,7 +6983,7 @@ uniOldWing: {
   ],
   interactables: [
     { x:472,y:210,w:40,h:52, name:'toHall', prompt:'Вниз, в холл',
-      action: async ()=> await changeRoom('uniHallMain', 190, 130) },
+      action: async ()=> await changeRoom('uniHallMain', 190, 170) },
     { x:56,y:224,w:60,h:40, name:'oldArchive', prompt:'Старый архив', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Коробки составлены до потолка. На боках — годы, дальше семидесятых уже не разобрать.'},
@@ -7032,7 +7035,7 @@ uniStage: {
     {x:0,y:192,w:92,h:8},{x:148,y:192,w:92,h:8},
   ],
   interactables: [
-    { x:100,y:264,w:40,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniCorridorTheatre', 340, 140) },
+    { x:100,y:264,w:40,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniCorridorTheatre', 340, 216) },
     { x:100,y:120,w:44,h:36, name:'stageSpot', prompt:'Центр сцены', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Её место на прогоне было вот здесь. Метка мелом ещё не стёрлась.'},
@@ -7098,7 +7101,7 @@ uniLibrary: {
     {x:0,y:0,w:280,h:56},{x:0,y:0,w:8,h:300},{x:272,y:0,w:8,h:300},{x:0,y:295,w:280,h:5},
   ],
   interactables: [
-    { x:96,y:264,w:44,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniCorridorLib', 398, 140) },
+    { x:96,y:264,w:44,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('uniCorridorLib', 398, 216) },
     { x:118,y:184,w:46,h:34, name:'deskRead', prompt:'Стол', action(){ Scene.play('libraryDesk'); }},
     { x:14,y:104,w:44,h:34, name:'shelfFolk', prompt:'Фольклор', action(){ Scene.play('libraryFolk'); }},
     { x:172,y:104,w:44,h:34, name:'shelfTheatre', prompt:'История театра', action(){ Scene.play('libraryTheatre'); }},
@@ -7220,8 +7223,20 @@ function unstickPlayer() {
 /* =====================================================================
    ROOM MANAGEMENT
 ===================================================================== */
+/* Комнату можно назвать точкой входа, а не координатами: changeRoom('stairwell',
+   'fromStairs'). Точки объявлены в самой комнате в поле spawn, поэтому при
+   перестановке мебели правится одно место, а не каждый вызов перехода.
+   Универсальная точка на все двери сразу — как раз то, из-за чего игрок
+   вылезал из тумбочки. */
 async function changeRoom(roomKey, x, y) {
   const wasCutscene = (Game.mode === 'cutscene');
+  const dest = Rooms[roomKey];
+  if (typeof x === 'string') {
+    const pt = (dest && dest.spawn && (dest.spawn[x] || dest.spawn.default)) || null;
+    if (!pt) console.warn('нет точки входа', roomKey, x);
+    x = pt ? pt[0] : (dest ? dest.w / 2 : 0);
+    y = pt ? pt[1] : (dest ? dest.h - 40 : 0);
+  }
   Game.mode = 'transition';
   Audio.door();
   await fadeOut(300);
