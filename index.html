@@ -1224,7 +1224,8 @@ function freshState() {
       ending:false,
     },
     stats: { trustSue:50, witchAmbition:20, humanity:70, hellAffinity:0 },
-    counters: { witch2Distract:0, mirrorLooks:0, impTalks:0, silenceLooks:0, libClues:0,
+    counters: {
+      campusHeat:0, witch2Distract:0, mirrorLooks:0, impTalks:0, silenceLooks:0, libClues:0,
                 sueResolve:0, sueRespected:0, persuadeStep:0, postStep:0, catPets:0,
                 runesDisarmed:0, lonerFails:0, evilLooks:0 },
     inventory: [],
@@ -3590,9 +3591,38 @@ function roomNPCs(room) { return (room.npcs || []).filter(n => !n.when || n.when
 
    Формулировки говорят, что делать, но не куда идти по координатам, и не
    называют того, чего Ная ещё не знает. */
+/* ОХРАНА УНИВЕРСИТЕТА.
+
+   Ная не студентка, и бесконечно ходить по корпусу ей никто не даст.
+   Каждый разговор со студентом или сотрудником добавляет внимания; на
+   четвёртом кто-то доносит охране. Наказание не приходит после первого
+   разговора — игрок должен успеть понять, что корпус живой и за доступом
+   следят. После высылки прямой вход закрыт, и остаётся обходной путь. */
+const Campus = {
+  LIMIT: 4,
+  UNI_ROOMS: ['uniHallMain','uniCorridorTheatre','uniCorridorLib','uniFloor2',
+              'uniCanteen','uniOldWing','uniCourtyard','uniLibrary','uniStage'],
+  inside() { return gameState && this.UNI_ROOMS.includes(gameState.currentRoom); },
+
+  /* Зовётся из диалогов со студентами и сотрудниками. */
+  noticed() {
+    if (!gameState || F('universityAccessRestricted') || !this.inside()) return;
+    addC('campusHeat');
+    const n = C('campusHeat');
+    if (n === this.LIMIT - 1 && !F('universityWarned')) {
+      setFlag('universityWarned');
+      UI.toast('На тебя оглядываются', 2400);
+    }
+    if (n >= this.LIMIT) setTimeout(()=> Scene.play('securityEject'), 600);
+  },
+};
+
 const Quests = {
   GOALS: [
     { w:()=> F('ending'),            t:'История закончена.' },
+    // временная преграда: пока она стоит, всё остальное подождёт
+    { w:()=> F('universityAccessRestricted') && !F('oldWingOpen'),
+      t:'Найти другой путь в корпус.', s:'Главный вход для тебя закрыт.' },
     { w:()=> F('evilRecognised'),    t:'Дойти до великого портала.' },
     { w:()=> F('evilTrialDone'),     t:'Вернуться к Старшей.' },
     { w:()=> F('evilTrialOffered'),  t:'Пройти испытание.' },
@@ -4192,9 +4222,26 @@ street: {
         if (!F('mainStoryStarted')) {
           return Dialogue.start([{who:'naya',expr:'normal',text:'Автобус до университета. Мне туда сегодня незачем.'}]);
         }
+        if (F('universityAccessRestricted') && !F('oldWingOpen')) {
+          return Dialogue.start([
+            {who:'naya',expr:'talk',text:'(Через главный вход меня больше не пустят. Охранник запомнил лицо.)'},
+            {who:'naya',expr:'normal',text:'(Надо обойти корпус с торца. Там был двор и открытая створка.)'},
+          ]);
+        }
         Audio.door();
         UI.toast('Двенадцать минут на автобусе', 1600);
         await changeRoom('uniHallMain', 190, 300);
+      }},
+    { x:252,y:126,w:52,h:34, name:'uniBackYard', prompt:'В обход, к торцу корпуса',
+      when:()=> F('universityWindowRouteUnlocked'),
+      action: async ()=> {
+        if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
+        if (F('oldWingOpen')) {
+          Audio.door();
+          UI.toast('Через створку в старом крыле', 1800);
+          return await changeRoom('uniOldWing', 470, 208);
+        }
+        Scene.play('uniWindowEntry');
       }},
     { x:6,y:252,w:34,h:60, name:'toOldTown', prompt:'Старый квартал', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Туда нельзя. Только домой.'); return; }
@@ -6822,7 +6869,7 @@ uniCourtyard: {
     { x:120,y:250, sprite:'student', name:'Студентка', speed:0.34,
       path:[[120,250],[280,248],[290,276],[110,278]],
       when:()=> !F('sueDead'),
-      dialogue:()=> {
+      dialogue:()=> { Campus.noticed();
         if (F('investigatedUniversity')) return Dialogue.start([{who:'sue',expr:'normal',name:'Студентка',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
         return Dialogue.start([{who:'sue',expr:'smile',name:'Студентка',text:'Ты Сью ждёшь? Она ещё на сцене, у них прогон. Минут двадцать.'}]);
       }},
@@ -6955,17 +7002,17 @@ uniHallMain: {
     { x:120, y:260, sprite:'acolyte', name:'Студентка', speed:0.42,
       path:[[120,260],[300,258],[300,300],[120,300]],
       when:()=> !F('sueDead'),
-      dialogue:()=> Dialogue.start([
+      dialogue:()=> { Campus.noticed(); return Dialogue.start([
         {who:'acolyte',expr:'normal',name:'Студентка',text:'Ты ведь не с нашего факультета?'},
         {who:'naya',expr:'normal',text:'Нет. Я жду Сью.'},
         {who:'acolyte',expr:'normal',name:'Студентка',text:'А, актёрские. Они всегда задерживаются. Всегда.'},
-      ]) },
+      ]); } },
     { x:300, y:180, sprite:'customer', name:'Преподаватель', speed:0.55,
       path:[[300,180],[300,290],[90,290],[90,180]],
       when:()=> !F('sueDead'),
-      dialogue:()=> Dialogue.start([
+      dialogue:()=> { Campus.noticed(); return Dialogue.start([
         {who:'customer',expr:'normal',name:'Преподаватель',text:'Четырнадцатая — в учебном крыле, до конца и налево. Не заблудитесь.'},
-      ]) },
+      ]); } },
   ],
 },
 
@@ -7044,7 +7091,7 @@ uniCorridorTheatre: {
     { x:220, y:274, sprite:'student', name:'Студентка', speed:0.40,
       path:[[220,274],[520,272],[520,304],[180,304]],
       when:()=> !F('sueDead'),
-      dialogue:()=> {
+      dialogue:()=> { Campus.noticed();
         if (F('investigatedUniversity')) return Dialogue.start([{who:'sue',expr:'normal',name:'Студентка',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
         return Dialogue.start([{who:'sue',expr:'smile',name:'Студентка',text:'Ты Сью ждёшь? Она ещё на сцене, у них прогон. Минут двадцать.'}]);
       }},
@@ -7145,7 +7192,7 @@ uniCorridorLib: {
     { x:180, y:276, sprite:'student', name:'Студент', speed:0.46,
       path:[[180,276],[460,274],[460,300],[140,300]],
       when:()=> !F('sueDead'),
-      dialogue:()=> {
+      dialogue:()=> { Campus.noticed();
         if (F('learnedMedea')) return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Ты вчера в архиве сидела? Морель потом туда заходила. Спрашивала, кто брал папки.'}]);
         return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Морель сегодня добрая. Значит, зачёт будет злой.'}]);
       }},
@@ -7241,7 +7288,7 @@ uniFloor2: {
     { x:300, y:246, sprite:'student', name:'Студентка', speed:0.36,
       path:[[300,246],[470,244],[470,262],[220,262]],
       when:()=> !F('sueDead'),
-      dialogue:()=> Dialogue.start([{who:'student',expr:'normal',name:'Студентка',text:'Архив? По коридору и налево. Только тётенька там строгая, без студенческого не пустит.'}]) },
+      dialogue:()=> { Campus.noticed(); return Dialogue.start([{who:'student',expr:'normal',name:'Студентка',text:'Архив? По коридору и налево. Только тётенька там строгая, без студенческого не пустит.'}]); } },
   ],
 },
 
@@ -9637,6 +9684,70 @@ meetGenevieve: [
   { flag:'foundGenevieve' },
   { act:3 },
   { dlg:[{who:'naya',expr:'normal',text:'(Дверь в коммуну — слева, в её доме. Надо посмотреть, что там.)'}] },
+],
+
+/* Охрана выводит Наю: она действительно не студентка. */
+securityEject: [
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'В конце коридора кто-то показывает на неё пальцем. Через минуту подходит человек в форменной куртке.'},
+    {who:'customer',expr:'normal',name:'Охрана',text:'Девушка. Вы студентка?'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Врать бессмысленно: студенческого у неё нет.', options:[
+      { text:'«Нет. Я жду подругу.»',
+        stats:{humanity:+3},
+        then:[
+          {who:'naya',expr:'normal',text:'Нет. Я жду Сью, она у вас учится.'},
+          {who:'customer',expr:'normal',name:'Охрана',text:'Подождите на улице. Тут не зал ожидания.'},
+          {who:'naya',expr:'talk',text:'Я никому не мешаю.'},
+          {who:'customer',expr:'normal',name:'Охрана',text:'Вы тут четвёртый день. Мне уже трижды про вас сказали.'},
+        ]},
+      { text:'«А что, нельзя?»',
+        stats:{witchAmbition:+5, humanity:-3},
+        then:[
+          {who:'naya',expr:'angry',text:'А что, по коридору ходить теперь нельзя?'},
+          {who:'customer',expr:'normal',name:'Охрана',text:'По корпусу — нельзя. Пойдёмте, не будем устраивать спектакль.'},
+          {who:'naya',expr:'angry',text:'(Половина коридора уже смотрит.)'},
+        ]},
+      { text:'Молча пойти к выходу.',
+        stats:{humanity:+5, witchAmbition:-2},
+        then:[
+          {who:'naya',expr:'empty',text:'...'},
+          {who:'customer',expr:'normal',name:'Охрана',text:'Вот и правильно. Без обид, работа такая.'},
+          {who:'naya',expr:'empty',text:'(Без обид.)'},
+        ]},
+    ]}},
+  ]},
+  { flag:'universityAccessRestricted' },
+  { fadeOut:600 },
+  { room:'street' },
+  { fadeIn:600 },
+  { dlg:[
+    {who:'naya',expr:'angry',text:'(Выставили. Как попрошайку из подъезда.)'},
+    {who:'naya',expr:'talk',text:'(Ладно. Через главный вход — больше нельзя. Значит, не через главный.)'},
+  ]},
+  { flag:'universityWindowRouteUnlocked' },
+],
+
+/* Обходной путь: створка на первом этаже старого крыла, со двора. */
+uniWindowEntry: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Двор с торца. Отсюда корпус выглядит совсем не парадно: трубы, ящики, чей-то велосипед.)'},
+    {who:'naya',expr:'talk',text:'(И створка на первом этаже, которую подпёрли книгой, чтобы не хлопала.)'},
+  ]},
+  { sfx:'door' },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Подоконник высокий. Ну и ладно.)'},
+  ]},
+  { shake:3 },
+  { fadeOut:500 },
+  { room:'uniOldWing' },
+  { fadeIn:600 },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Старое крыло. Пыль, чехлы на партах, никого.)'},
+    {who:'naya',expr:'talk',text:'(Отсюда до учебного коридора — два поворота. И мимо охраны.)'},
+  ]},
+  { flag:'oldWingOpen' },
 ],
 
 communeIntroScene: [
