@@ -6,7 +6,7 @@ const H = require('./harness.js');
       Dialogue.active=false; Scene.active=false; Game.mode='explore';
       document.getElementById('dialogueBox').classList.remove('active');
       document.getElementById('fade').classList.remove('show');
-      ['metSue','cafeSceneComplete','waitingAtAud','mainStoryStarted','metGenevieveUni'].forEach(f=>gameState.flags[f]=true);
+      ['metSue','cafeSceneComplete','mainStoryStarted','metGenevieveUni'].forEach(f=>gameState.flags[f]=true);
       gameState.currentRoom='uniCorridorLib'; Player.x=300; Player.y=260; unstickPlayer(); World.invalidate();
     });
     for (let i=1;i<=4;i++) {
@@ -24,11 +24,17 @@ const H = require('./harness.js');
     await H.pump(page, [], 'CAMPUS');
     s = await H.snap(page);
     console.log('после попытки автобусом: комната=%s', s.room);
-    // обходной путь
+    // обходной путь: улица -> задний двор -> окно -> служебный коридор в цоколе
     console.log(await H.useObj(page, 'uniBackYard'));
     await H.pump(page, [], 'CAMPUS');
     s = await H.snap(page);
-    console.log('после обхода: комната=%s oldWingOpen=%s', s.room, s.flags.includes('oldWingOpen'));
+    console.log('задний двор: комната=%s', s.room);
+    if (s.room !== 'uniBackYard') throw new Error('ожидался uniBackYard, а не ' + s.room);
+    console.log(await H.useObj(page, 'window'));
+    await H.pump(page, [], 'CAMPUS');
+    s = await H.snap(page);
+    console.log('после окна: комната=%s oldWingOpen=%s', s.room, s.flags.includes('oldWingOpen'));
+    if (s.room !== 'uniBasement') throw new Error('ожидался uniBasement, а не ' + s.room);
     return {};
   });
   H.errors.forEach(e=>console.log(e));

@@ -1374,11 +1374,23 @@ function freshState() {
       // университет: второй этаж, архив, охрана
       archiveUnlocked:false, universityWarned:false, universityAccessRestricted:false,
       universityWindowRouteUnlocked:false,
+      // глава «Женевьева Морель»: четыре дня расследования
+      uniArrived:false, uniDayDone:false, uniHallStands:false, uniTeacherList:false,
+      complaintFiled:false,
+      symbolPhoto:false, libAsked:false, sueDay1Done:false, sawRehearsal:false,
+      morelCorridor2:false,
+      libPeriods:false, propsSymbol:false, propsMorel:false, morelKnowsName:false,
+      oldWingSearched:false, basementFound:false, archiveMedeaFound:false,
+      archiveMorelFound:false, roofPromise:false, sueDay3Done:false,
+      chrisCovering:false, libMissing:false, morelPhotoSeen:false,
+      universityBanned:false, backWindowUsed:false, knowsServiceRoute:false,
+      archiveFolderFound:false, premiereDone:false, morelTruth:false,
+      communeInvite:false,
       metSue:false, cafeSceneComplete:false,
       cafeShiftStarted:false, cafeShiftFinished:false,
       // площадка в настоящем
       presentPlaygroundVisited:false, playgroundMemoryTriggered:false,
-      waitingAtAud:false, metGenevieveUni:false, crystalReacted:false, oldWingOpen:false,
+      metGenevieveUni:false, crystalReacted:false, oldWingOpen:false,
       investigatedUniversity:false, learnedMedea:false, learnedWitches:false,
       homeTalkDone:false, portalOpened:false, metCharlotte:false, metLilith:false,
       returnedFromHell1:false, toldSueWitch:false, foundGenevieve:false,
@@ -1411,11 +1423,13 @@ function freshState() {
     },
     stats: { trustSue:50, witchAmbition:20, humanity:70, hellAffinity:0 },
     counters: {
+      uniDay:0, sueRehearsal:0,
       campusHeat:0, cafeMinigameProgress:0, witch2Distract:0, mirrorLooks:0, impTalks:0, silenceLooks:0, libClues:0,
                 sueResolve:0, sueRespected:0, persuadeStep:0, postStep:0, catPets:0,
                 runesDisarmed:0, lonerFails:0, evilLooks:0 },
     inventory: [],
     memories: [],
+    journal: [],
     settings: { volume:0.5, music:0.4, textSpeed:30, effects:1 },
   };
 }
@@ -2415,6 +2429,34 @@ function woodGrain(g, x, y, w, h, col) {
       g.fillRect(5 + (i % 3) * 13, 5 + ((i / 3) | 0) * 12, 10, 9);
       g.fillStyle = '#a03a2c'; g.fillRect(9 + (i % 3) * 13, 5 + ((i / 3) | 0) * 12, 2, 2);
     }
+  });
+  /* Декоративный щит из старой постановки. На нём вырезан тот же знак,
+     что и на раме театральной фотографии, и на срезе кристалла. */
+  D('old_shield', {w:26,h:30,ax:13,ay:15,foot:null, wall:true}, g => {
+    g.fillStyle = '#2e2620';
+    g.beginPath(); g.moveTo(1,1); g.lineTo(25,1); g.lineTo(25,17); g.lineTo(13,29); g.lineTo(1,17); g.closePath(); g.fill();
+    g.fillStyle = '#6b543f';
+    g.beginPath(); g.moveTo(3,3); g.lineTo(23,3); g.lineTo(23,16); g.lineTo(13,26); g.lineTo(3,16); g.closePath(); g.fill();
+    g.fillStyle = '#57432f';
+    g.beginPath(); g.moveTo(3,3); g.lineTo(13,3); g.lineTo(13,26); g.lineTo(3,16); g.closePath(); g.fill();
+    g.fillStyle = '#c9a05a';                                   // круг, четыре луча, четыре точки
+    g.fillRect(12, 7, 2, 12); g.fillRect(7, 12, 12, 2);
+    g.fillStyle = '#e0bf7e';
+    g.fillRect(9, 9, 1, 1); g.fillRect(16, 9, 1, 1); g.fillRect(9, 16, 1, 1); g.fillRect(16, 16, 1, 1);
+    g.strokeStyle = '#c9a05a'; g.lineWidth = 1;
+    g.beginPath(); g.arc(13, 13, 5, 0, 6.3); g.stroke();
+  });
+  /* Напольный стенд под стеклом: на таких в холле висят списки
+     преподавателей, награды и фотографии выпусков. */
+  D('info_stand', {w:26,h:36,ax:13,ay:35,foot:{x:-9,y:-4,w:18,h:6}}, g => {
+    g.fillStyle = '#2e2820'; g.fillRect(3, 33, 20, 3);
+    g.fillStyle = '#3a3128'; g.fillRect(11, 21, 4, 13);
+    g.fillStyle = '#4a3f32'; g.fillRect(1, 0, 24, 23);
+    g.fillStyle = '#6b5b46'; g.fillRect(3, 2, 20, 19);
+    g.fillStyle = '#e8e2d4'; g.fillRect(5, 4, 16, 15);
+    g.fillStyle = '#8a8070'; for (let y = 6; y < 18; y += 3) g.fillRect(6, y, 14, 1);
+    g.fillStyle = '#a03a2c'; g.fillRect(6, 6, 5, 1);
+    g.fillStyle = 'rgba(200,225,255,.18)'; g.fillRect(3, 2, 20, 8);
   });
   D('uni_door', {w:32,h:44,ax:16,ay:42,foot:null}, g => {
     g.fillStyle = '#3a2c1e'; g.fillRect(0, 0, 32, 42);
@@ -3850,7 +3892,8 @@ function roomNPCs(room) { return (room.npcs || []).filter(n => !n.when || n.when
 const Campus = {
   LIMIT: 4,
   UNI_ROOMS: ['uniHallMain','uniCorridorTheatre','uniCorridorLib','uniFloor2',
-              'uniCanteen','uniOldWing','uniCourtyard','uniLibrary','uniStage'],
+              'uniCanteen','uniOldWing','uniCourtyard','uniLibrary','uniStage',
+              'uniRehearsal','uniDressing','uniProps','uniMorelOffice'],
   inside() { return gameState && this.UNI_ROOMS.includes(gameState.currentRoom); },
 
   /* Зовётся из диалогов со студентами и сотрудниками. */
@@ -3862,7 +3905,19 @@ const Campus = {
       setFlag('universityWarned');
       UI.toast('На тебя оглядываются', 2400);
     }
-    if (n >= this.LIMIT) setTimeout(()=> Scene.play('securityEject'), 600);
+    if (n < this.LIMIT) return;
+    /* Пока идёт глава «Женевьева Морель», внимание не выставляет Наю сразу:
+       оно копится в жалобу, по которой её остановят на четвёртый день. Это
+       та самая жалоба из сценария, а не отдельная случайная сцена. */
+    const d = C('uniDay');
+    if (d >= 1 && d <= 4) {
+      if (!F('complaintFiled')) {
+        setFlag('complaintFiled');
+        UI.toast('Кто-то пошёл к охране', 2600);
+      }
+      return;
+    }
+    setTimeout(()=> Scene.play('securityEject'), 600);
   },
 };
 
@@ -4257,10 +4312,48 @@ const Quests = {
     { w:()=> F('metCharlotte'),      t:'Добраться до Лиллит.' },
     { w:()=> F('portalOpened'),      t:'Шагнуть в портал.' },
     { w:()=> F('learnedWitches'),    t:'Поговорить со Сью дома.' },
-    { w:()=> F('learnedMedea'),      t:'Расспросить Женевьеву о ведьмах.' },
-    { w:()=> F('investigatedUniversity'), t:'Узнать больше о Женевьеве.', s:'В университете есть архив.' },
-    { w:()=> F('metGenevieveUni'),   t:'Понять, кто такая Женевьева.' },
-    { w:()=> F('waitingAtAud'),      t:'Дождаться Сью у четырнадцатой аудитории.' },
+    /* Глава «Женевьева Морель»: цель ведёт по дням, от свежего к старому. */
+    { w:()=> C('uniDay') === 4 && F('morelTruth'),   t:'Отправиться в коммуну ведьм после заката.' },
+    { w:()=> C('uniDay') === 4 && F('premiereDone'), t:'Встретиться с Морель на крыше.' },
+    { w:()=> C('uniDay') === 4 && F('archiveFolderFound'),
+      t:'Попасть на премьеру Сью.', s:'Зрительный зал — через театральное крыло.' },
+    { w:()=> C('uniDay') === 4 && F('backWindowUsed'),
+      t:'Найти в цокольном архиве пропавшую папку.' },
+    { w:()=> C('uniDay') === 4 && F('universityBanned'),
+      t:'Вернуться в корпус обходным путём.', s:'Задний двор, окно, служебный коридор.' },
+    { w:()=> C('uniDay') === 4 && F('morelPhotoSeen'),
+      t:'Вернуться в холл.', s:'Здесь больше нечего искать.' },
+    { w:()=> C('uniDay') === 4 && F('libMissing'),   t:'Проверить кабинет Морель.' },
+    { w:()=> C('uniDay') === 4,
+      t:'Узнать, что связывает Морель и Медею.', s:'Сегодня за тебя работает Крис.' },
+    { w:()=> C('uniDay') === 3 && F('roofPromise'),  t:'Посмотреть генеральную репетицию Сью.' },
+    { w:()=> C('uniDay') === 3 && F('archiveMorelFound'),
+      t:'Проследить за Морель.', s:'Она поднялась наверх.' },
+    { w:()=> C('uniDay') === 3 && F('archiveMedeaFound'),
+      t:'Досмотреть остальные папки архива.' },
+    { w:()=> C('uniDay') === 3 && F('basementFound'),
+      t:'Найти в цокольном архиве упоминания Медеи.' },
+    { w:()=> C('uniDay') === 3,
+      t:'Осмотреть старое крыло и найти архив.', s:'Лестница наверх — из главного холла.' },
+    { w:()=> C('uniDay') === 2 && F('morelKnowsName'), t:'Вернуться к Сью на репетицию.' },
+    { w:()=> C('uniDay') === 2 && F('propsMorel'),   t:'Выйти в коридор театрального крыла.' },
+    { w:()=> C('uniDay') === 2 && F('propsSymbol'),
+      t:'Осмотреть коробки театрального общества.' },
+    { w:()=> C('uniDay') === 2 && F('libPeriods'),
+      t:'Найти источник символа в театральном крыле.' },
+    { w:()=> C('uniDay') === 2,
+      t:'Сравнить материалы за 30, 25, 15 и 5 лет назад.', s:'Альбомы по годам в библиотеке.' },
+    { w:()=> C('uniDay') === 1 && F('libAsked'),     t:'Дождаться Сью после репетиции.' },
+    { w:()=> C('uniDay') === 1 && F('symbolPhoto'),
+      t:'Спросить библиотекаря о старых материалах.' },
+    { w:()=> C('uniDay') === 1 && F('metGenevieveUni'),
+      t:'Осмотреть старую фотографию и символ.' },
+    { w:()=> C('uniDay') === 1 && F('sawRehearsal'),
+      t:'Выйти в коридор театрального крыла.' },
+    { w:()=> C('uniDay') === 1 && F('uniTeacherList'),
+      t:'Найти Сью в репетиционном зале.' },
+    { w:()=> C('uniDay') === 1,
+      t:'Осмотреть стенды в холле.', s:'Афиши, награды, выпускники, преподаватели.' },
     { w:()=> F('cafeSceneComplete'), t:'Зайти за Сью в университет.' },
     { w:()=> F('metSue'),            t:'Доработать смену в кафе.' },
     { w:()=> F('backstoryDone'),     t:'Начать день.' },
@@ -4287,6 +4380,105 @@ const Quests = {
     el.textContent = 'ЦЕЛЬ: ' + g.t;
     el.classList.add('show');
     if (changed && announce) { UI.toast('Новая цель: ' + g.t, 2600); Audio.beep(660, .10, 'sine', .04); }
+  },
+};
+
+/* ЧЕТЫРЕ ДНЯ ГЛАВЫ «ЖЕНЕВЬЕВА МОРЕЛЬ».
+
+   День — это не таймер, а список того, что Ная должна успеть до конца
+   репетиции. Пока список не закрыт, Сью не зовёт её домой; когда закрыт —
+   вечер заканчивается, и счётчик переводится на следующий день. Первые три
+   дня Ная приходит после смены в кафе, на четвёртый её подменяет Крис. */
+const UniDay = {
+  MAX: 4,
+  cur() { return C('uniDay'); },
+  /* Первый приход в корпус после смены открывает главу. */
+  start() {
+    if (C('uniDay') !== 0) return;
+    setCounter('uniDay', 1);
+    setFlag('uniArrived');
+    Journal.add('goalUni');
+  },
+  TODO: {
+    1: [ ['uniTeacherList', 'Найти имя в списке преподавателей'],
+         ['sawRehearsal',   'Посмотреть репетицию'],
+         ['metGenevieveUni','Столкнуться с Морель в коридоре'],
+         ['symbolPhoto',    'Осмотреть старую фотографию и символ'],
+         ['libAsked',       'Спросить библиотекаря о Морель'] ],
+    2: [ ['libPeriods',     'Сравнить материалы разных лет'],
+         ['propsSymbol',    'Найти источник символа'],
+         ['propsMorel',     'Осмотреть коробки театрального общества'],
+         ['morelKnowsName', 'Понять, откуда Морель знает моё имя'] ],
+    3: [ ['basementFound',  'Найти настоящий архив'],
+         ['archiveMedeaFound','Найти упоминания Медеи'],
+         ['archiveMorelFound','Сопоставить Медею и Морель'],
+         ['roofPromise',    'Догнать Морель на крыше'] ],
+    4: [ ['libMissing',     'Проверить пропавшие материалы'],
+         ['morelPhotoSeen', 'Осмотреть кабинет Морель'],
+         ['archiveFolderFound','Найти пропавшую папку'],
+         ['premiereDone',   'Попасть на премьеру Сью'] ],
+  },
+  todo(d) { return (this.TODO[d || this.cur()] || []).map(([f, t]) => ({ f, t, done:F(f) })); },
+  ready(d) { return this.todo(d).every(t => t.done); },
+  left(d)  { return this.todo(d).filter(t => !t.done); },
+  advance() {
+    const d = this.cur();
+    if (d >= this.MAX) return;
+    setCounter('uniDay', d + 1);
+    setCounter('sueRehearsal', d + 1);
+  },
+};
+
+/* ЖУРНАЛ РАССЛЕДОВАНИЯ.
+
+   Цель Quests отвечает на вопрос «что делать сейчас», а журнал — на вопрос
+   «что я уже знаю». Ная записывает только то, что нашла руками: строку в
+   списке преподавателей, символ на раме, фотографию из архива. Факты
+   хранятся в состоянии по ключам и никогда не дублируются, поэтому вернуться
+   к той же фотографии второй раз безопасно. */
+const Journal = {
+  FACTS: {
+    // --- глава «Женевьева Морель» ---
+    goalUni:      { d:1, t:'Понять, почему Морель узнала мой кристалл.', main:true },
+    teacherList:  { d:1, t:'Женевьева Морель — преподаватель театрального направления.' },
+    morelPendant: { d:1, t:'Морель заметила кулон и сказала «понимаю». Она его узнала.' },
+    symbolPhoto:  { d:1, t:'На раме старой театральной фотографии — символ, как на кристалле.' },
+    libOld:       { d:1, t:'Библиотекарь: Морель давно работает со старыми театральными материалами.' },
+    libPeriods:   { d:2, t:'Морель есть на фотографиях 30, 25, 15 и 5 лет назад. Она почти не меняется.' },
+    propsSymbol:  { d:2, t:'Тот же символ — на старом декоративном щите в реквизиторской. Кристалл отозвался.' },
+    propsMorel:   { d:2, t:'В коробках театрального общества фамилия МОРЕЛЬ встречается снова и снова.' },
+    morelKnows:   { d:2, t:'Морель назвала меня по имени. Я ей не представлялась.' },
+    archiveBelow: { d:3, t:'Дверь «АРХИВ» в старом крыле закрыта. Настоящий архив — в цоколе.' },
+    serviceRoute: { d:3, t:'Из цоколя служебный коридор выходит низким окном на задний двор.' },
+    archiveMedea: { d:3, t:'В цокольном архиве есть папка с именем МЕДЕЯ и тем же символом.' },
+    archiveMorel: { d:3, t:'В тех же документах — фамилия МОРЕЛЬ. Они пересекались.' },
+    roofPromise:  { d:3, t:'Морель сказала, что я похожа на Медею, и обещала рассказать остальное завтра.' },
+    chrisCover:   { d:4, t:'Крис вышел за меня. Сегодня я весь день здесь.' },
+    libMissing:   { d:4, t:'Из открытой коллекции пропали именно те папки, что мне нужны.' },
+    morelPhoto:   { d:4, t:'В кабинете Морель — старая фотография. На ней МОРЕЛЬ и МЕДЕЯ.' },
+    banned:       { d:4, t:'На меня пожаловались охране. Через главный вход меня больше не пустят.' },
+    folderFound:  { d:4, t:'Пропавшая папка нашлась в цокольном архиве. Морель знала Медею лично.' },
+    premiere:     { d:4, t:'Сью сыграла Элису от начала до конца. Премьера прошла без остановок.' },
+    morelTruth:   { d:4, t:'Морель призналась: она знала Медею и знала, что сила перешла ко мне.' },
+    communeInvite:{ d:4, t:'Морель зовёт меня в коммуну ведьм — завтра после заката.' },
+  },
+  has(k) { return !!(gameState && gameState.journal && gameState.journal.includes(k)); },
+  add(k) {
+    if (!gameState || !this.FACTS[k]) return false;
+    if (!gameState.journal) gameState.journal = [];
+    if (gameState.journal.includes(k)) return false;
+    gameState.journal.push(k);
+    if (typeof UI !== 'undefined' && UI.toast) UI.toast('Записано в журнал', 1800);
+    if (typeof Audio !== 'undefined' && Audio.beep) Audio.beep(520, .07, 'sine', .03);
+    return true;
+  },
+  /* Факты в журнале сгруппированы по дням: так видно, что расследование
+     заняло четыре вечера, а не один осмотр стенда. */
+  entries() {
+    if (!gameState || !gameState.journal) return [];
+    return gameState.journal
+      .filter(k => this.FACTS[k])
+      .map(k => Object.assign({ k }, this.FACTS[k]));
   },
 };
 
@@ -4476,13 +4668,13 @@ const UNI_F2_WALL = wallLayout(560, [
 ]);
 const UNI_THEATRE_WALL = wallLayout(640, [
   { k:'win', id:'win0' },
-  { k:'door', label:'101' },
-  { k:'door', label:'102' },
+  { k:'door', label:'ЗАЛ', w:44, id:'rehearsal', style:'heavy' },
+  { k:'door', label:'ГРИМ.', w:42, id:'dressing' },
   { k:'win', id:'win1' },
   { k:'door', label:'103' },
   { k:'door', label:'СЦЕНА', w:56, id:'stage', style:'stage' },
   { k:'win', id:'win2' },
-  { k:'door', label:'105' },
+  { k:'door', label:'РЕКВИЗИТ', w:46, id:'props' },
   { k:'door', label:'106' },
   { k:'win', id:'win3' },
   { k:'door', label:'107' },
@@ -4941,26 +5133,25 @@ street: {
         if (!F('mainStoryStarted')) {
           return Dialogue.start([{who:'naya',expr:'normal',text:'Автобус до университета. Мне туда сегодня незачем.'}]);
         }
-        if (F('universityAccessRestricted') && !F('oldWingOpen')) {
+        if (F('universityBanned') || (F('universityAccessRestricted') && !F('oldWingOpen'))) {
           return Dialogue.start([
             {who:'naya',expr:'talk',text:'(Через главный вход меня больше не пустят. Охранник запомнил лицо.)'},
-            {who:'naya',expr:'normal',text:'(Надо обойти корпус с торца. Там был двор и открытая створка.)'},
+            {who:'naya',expr:'normal',text:'(Надо обойти корпус с торца. Там двор и низкое окно старого крыла.)'},
           ]);
         }
         Audio.door();
         UI.toast('Двенадцать минут на автобусе', 1600);
         await changeRoom('uniHallMain', 190, 300);
       }},
+    /* Задний двор корпуса — теперь настоящее место, а не сцена: туда
+       приезжают тем же автобусом и обходят здание пешком. */
     { x:252,y:126,w:52,h:34, name:'uniBackYard', prompt:'В обход, к торцу корпуса',
-      when:()=> F('universityWindowRouteUnlocked'),
+      when:()=> F('universityWindowRouteUnlocked') || F('universityBanned'),
       action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
-        if (F('oldWingOpen')) {
-          Audio.door();
-          UI.toast('Через створку в старом крыле', 1800);
-          return await changeRoom('uniOldWing', 470, 208);
-        }
-        Scene.play('uniWindowEntry');
+        Audio.door();
+        UI.toast('Двенадцать минут на автобусе', 1600);
+        await changeRoom('uniBackYard', 44, 244);
       }},
     { x:6,y:252,w:34,h:60, name:'toOldTown', prompt:'Старый квартал', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Туда нельзя. Только домой.'); return; }
@@ -5146,7 +5337,11 @@ cafe: {
       dialogue:()=> Dialogue.start([{who:'chris',expr:'normal',text:'Ная. Нам надо поговорить. Сядь со мной на минуту.'}]) },
     { x:256,y:268, sprite:'chris', name:'Крис',
       when:()=> F('cafeSceneComplete') && !F('sueDead') && !F('firstAmulet'),
-      dialogue:()=> Scene.play('chrisAfter') },
+      dialogue:()=> {
+        const d = C('uniDay');
+        if (d >= 2 && d <= 4) return Scene.play('chrisShiftDay');
+        return Scene.play('chrisAfter');
+      } },
     { x:34,y:230, sprite:'customer', name:'Посетитель',
       when:()=> !F('sueDead'),
       dialogue:()=> {
@@ -7793,6 +7988,7 @@ uniHallMain: {
     { t:'plant_pot', x:64,  y:314 }, { t:'plant_pot', x:316, y:314 },
     { t:'plant_pot', x:120, y:170 }, { t:'plant_pot', x:260, y:170 },
     { t:'bin', x:96, y:306 }, { t:'radiator', x:284, y:306 },
+    { t:'info_stand', x:268, y:212 }, { t:'info_stand', x:112, y:212 },
   ],
   walls: [
     {x:0,y:0,w:380,h:96},{x:0,y:0,w:8,h:340},{x:372,y:0,w:8,h:340},{x:0,y:335,w:380,h:5},
@@ -7810,7 +8006,7 @@ uniHallMain: {
       action: async ()=> await changeRoom('uniCanteen', 170, 268) },
     { x:150,y:104,w:80,h:44, name:'toOldWing', prompt:'Наверх, в старое крыло',
       action: async ()=> {
-        if (!F('oldWingOpen')) {
+        if (!F('oldWingOpen') && C('uniDay') < 3) {
           return Dialogue.start([
             {who:'naya',expr:'normal',text:'Лестница наверх. Поперёк ступеней — ленточка и табличка «ремонт».'},
             {who:'naya',expr:'talk',text:'(Пыли на ленточке столько, что ремонт идёт не первый год.)'},
@@ -7819,7 +8015,7 @@ uniHallMain: {
         await changeRoom('uniOldWing', 470, 208);
       }},
     { x:120,y:58,w:44,h:38, name:'boardMain', prompt:'Расписание', action(){
-        if (F('waitingAtAud')) return Dialogue.start([
+        if (C('uniDay') >= 1) return Dialogue.start([
           {who:'naya',expr:'normal',text:'«История театра, ауд. 14, Морель Ж.» Каждый вторник и четверг.'},
           {who:'naya',expr:'talk',text:'(Сегодня четверг.)'},
         ]);
@@ -7832,10 +8028,38 @@ uniHallMain: {
           {who:'naya',expr:'talk',text:'(Совпадение. Это просто пьеса, её ставят все.)'},
         ]);
       }},
-    { x:96,y:60,w:40,h:36, name:'portraits', prompt:'Портреты', action(){
+    { x:96,y:60,w:40,h:36, name:'portraits', prompt:'Портреты и награды', action(){
+        setFlag('uniHallStands');
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Портреты ректоров. Самый левый — тысяча восемьсот какой-то, лицо в трещинах лака.'},
-          {who:'naya',expr:'talk',text:'(Здание старше города вокруг него.)'},
+          {who:'naya',expr:'normal',text:'Под ними витрина с наградами: кубки за студенческие фестивали, ленты, одна медаль за что-то спортивное.'},
+          {who:'naya',expr:'talk',text:'(Здание старше города вокруг него. Самые старые таблички просто перестали чистить.)'},
+        ]);
+      }},
+    /* Стенды холла: с них начинается расследование. Список преподавателей
+       даёт первое имя, остальные три — фон, из-за которого имя не выглядит
+       подсказкой, воткнутой ради сюжета. */
+    { x:96,y:192,w:34,h:32, name:'graduates', prompt:'Фотографии выпускников', action(){
+        setFlag('uniHallStands');
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Стенд с выпусками. Ряды одинаковых лиц под стеклом, год под каждым рядом.'},
+          {who:'naya',expr:'talk',text:'(Через двадцать лет их никто не узнает. Через сорок — снимут и уберут в архив.)'},
+        ]);
+      }},
+    { x:252,y:192,w:34,h:32, name:'teachers', prompt:'Список преподавателей', action(){
+        setFlag('uniHallStands');
+        if (!F('uniTeacherList') && C('uniDay') >= 1) {
+          setFlag('uniTeacherList');
+          Journal.add('teacherList');
+          return Dialogue.start([
+            {who:'naya',expr:'normal',text:'Список преподавателей театрального направления. Восемь фамилий, у половины кабинет не указан.'},
+            {who:'naya',expr:'normal',text:'«ЖЕНЕВЬЕВА МОРЕЛЬ — преподаватель театрального направления».'},
+            {who:'naya',expr:'normal',text:'Морель...'},
+            {who:'naya',expr:'talk',text:'(Это пока просто фамилия. Сью про неё говорит через слово, вот и всё.)'},
+          ]);
+        }
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«ЖЕНЕВЬЕВА МОРЕЛЬ — преподаватель театрального направления». Кабинет в учебном крыле.'},
         ]);
       }},
   ],
@@ -7855,6 +8079,16 @@ uniHallMain: {
         {who:'customer',expr:'normal',name:'Преподаватель',text:'Четырнадцатая — в учебном крыле, до конца и налево. Не заблудитесь.'},
       ]); } },
   ],
+  /* Первый вход в корпус после смены открывает главу; на четвёртый день,
+     когда Ная выходит из старого крыла, её здесь останавливают. */
+  onEnter() {
+    if (F('cafeSceneComplete') && C('uniDay') === 0) {
+      UniDay.start();
+      return setTimeout(()=> Scene.play('uniDay1Arrive'), 500);
+    }
+    if (C('uniDay') === 4 && F('morelPhotoSeen') && !F('universityBanned'))
+      setTimeout(()=> Scene.play('securityBan'), 600);
+  },
 },
 
 /* ---------------------------------------------------------------- */
@@ -7874,7 +8108,7 @@ uniCorridorTheatre: {
     });
     // указатели в торцах коридора
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('← ФОЙЕ, РЕКВИЗИТ', 12, 220);
+    ctx.fillText('← ФОЙЕ', 12, 220);
     ctx.fillText('ХОЛЛ →', 594, 220);
   },
   objects: [
@@ -7899,9 +8133,15 @@ uniCorridorTheatre: {
       action: async ()=> await changeRoom('uniHallMain', 34, 114) },
     { x:UNI_THEATRE_WALL.at('stage'),y:200,w:56,h:36, name:'toStage', prompt:'Сцена',
       action: async ()=> await changeRoom('uniStage', 120, 262) },
+    { x:UNI_THEATRE_WALL.at('rehearsal')-2,y:200,w:48,h:36, name:'toRehearsal', prompt:'Репетиционный зал',
+      action: async ()=> await changeRoom('uniRehearsal', 34, 286) },
+    { x:UNI_THEATRE_WALL.at('dressing')-2,y:200,w:46,h:36, name:'toDressing', prompt:'Гримёрная',
+      action: async ()=> await changeRoom('uniDressing', 40, 236) },
+    { x:UNI_THEATRE_WALL.at('props')-2,y:200,w:50,h:36, name:'toProps', prompt:'Реквизиторская',
+      action: async ()=> await changeRoom('uniProps', 44, 254) },
     { x:8,y:224,w:40,h:56, name:'toFoyer', prompt:'Дальше по крылу', action(){
         Dialogue.start([
-          {who:'naya',expr:'normal',text:'Фойе, костюмерная, кладовая реквизита. Оттуда пахнет клеем и старой тканью.'},
+          {who:'naya',expr:'normal',text:'Коридор упирается в фойе. Двери заперты — там уже другой корпус.'},
           {who:'naya',expr:'talk',text:'(Мне туда незачем. Я тут вообще на птичьих правах.)'},
         ]);
       }},
@@ -7921,6 +8161,26 @@ uniCorridorTheatre: {
     { x:UNI_THEATRE_WALL.pierMid(4)-22,y:172,w:44,h:28, name:'masksLook', prompt:'Маски', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Две маски над дверью. Одна смеётся, вторая нет. Обе смотрят в коридор.'}]);
       }},
+    /* Старая театральная фотография: на раме — символ, который Ная уже
+       видела рядом с кристаллом. Первая физическая улика главы. */
+    { x:UNI_THEATRE_WALL.pierMid(8)-22,y:172,w:44,h:30, name:'oldPhoto', prompt:'Старая фотография', action(){
+        if (!F('metGenevieveUni')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Групповая фотография в тяжёлой раме. Тридцать человек в костюмах, все смотрят чуть мимо объектива.'},
+        ]);
+        if (!F('symbolPhoto')) {
+          setFlag('symbolPhoto');
+          Journal.add('symbolPhoto');
+          Audio.rune();
+          FX.spawn(Player.x, Player.y - 12, 10, {color:'#c060ff', spread:12, rise:-.4, life:46});
+          return Dialogue.start([
+            {who:'naya',expr:'normal',text:'Та самая фотография, мимо которой она прошла. Рама старше снимка: дерево тёмное, углы стёрты.'},
+            {who:'naya',expr:'shocked',text:'(В нижнем углу рамы вырезан знак. Круг, четыре луча, четыре точки.)'},
+            {who:'naya',expr:'shocked',text:'(Я видела его. На срезе кристалла, если смотреть против света.)'},
+            {who:'naya',expr:'talk',text:'Вот это уже интересно.'},
+          ]);
+        }
+        Dialogue.start([{who:'naya',expr:'normal',text:'Знак на раме никуда не делся. Круг, четыре луча, четыре точки.'}]);
+      }},
     { x:180,y:224,w:44,h:34, name:'benchTheatre', prompt:'Скамья', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Я сидела тут и ждала её. Каждый четверг.'},
@@ -7934,12 +8194,21 @@ uniCorridorTheatre: {
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed();
         if (F('investigatedUniversity')) return Dialogue.start([{who:'sue',expr:'normal',name:'Студентка',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
-        return Dialogue.start([{who:'sue',expr:'smile',name:'Студентка',text:'Ты Сью ждёшь? Она ещё на сцене, у них прогон. Минут двадцать.'}]);
+        return Dialogue.start([{who:'sue',expr:'smile',name:'Студентка',text:'Ты Сью ждёшь? Она ещё в зале, у них прогон. Минут двадцать.'}]);
       }},
     { x:480, y:300, sprite:'acolyte', name:'Студент', speed:0.5, pause:0,
       path:[[480,300],[120,300],[120,268],[480,268]],
       when:()=> !F('sueDead') },
   ],
+  /* Обе встречи с Морель происходят здесь и сами: она идёт по коридору
+     навстречу, а не ждёт, пока игрок ткнёт в неё. */
+  onEnter() {
+    const d = C('uniDay');
+    if (d === 1 && F('sawRehearsal') && !F('metGenevieveUni'))
+      return setTimeout(()=> Scene.play('morelPendant'), 700);
+    if (d === 2 && F('propsMorel') && !F('morelKnowsName'))
+      return setTimeout(()=> Scene.play('morelOldCorridor'), 700);
+  },
 },
 
 /* ---------------------------------------------------------------- */
@@ -7996,30 +8265,29 @@ uniCorridorLib: {
       action: async ()=> await changeRoom('uniHallMain', 346, 114) },
     { x:UNI_LIB_WALL.at('lib')+2,y:200,w:46,h:36, name:'toLib', prompt:'Библиотека',
       action: async ()=> await changeRoom('uniLibrary', 120, 258) },
-    /* Четырнадцатая открывается только тогда, когда Сью попросила её тут
-       подождать. Раньше в неё можно было войти сразу с первого визита и
-       перепрыгнуть через полглавы. */
+    /* Четырнадцатая — рабочая аудитория Морель, и внутрь игрока не пускают
+       никогда: расписание на двери работает как указатель, а не как дверь.
+       Раньше нажатие на неё перепрыгивало через полглавы. */
     { x:UNI_LIB_WALL.at('aud14'),y:200,w:48,h:36, name:'aud14', prompt:'Аудитория 14', action(){
         if (F('metGenevieveUni'))
           return Dialogue.start([{who:'naya',expr:'normal',text:'Дверь закрыта. Расписание на ней: «История театра. Морель Ж.»'}]);
-        if (!F('waitingAtAud')) return Dialogue.start([
-          {who:'naya',expr:'normal',text:'Четырнадцатая. Внутри идёт занятие — слышно голос.'},
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Четырнадцатая. Внутри идёт занятие — слышно ровный негромкий голос, будто читают вслух.'},
           {who:'naya',expr:'talk',text:'(Мне туда незачем. Я вообще не за этим пришла.)'},
         ]);
-        Scene.play('meetGenevieveUni');
       }},
-    { x:UNI_LIB_WALL.at('office'),y:200,w:38,h:36, name:'office', prompt:'Кабинет Морель', action(){
+    { x:UNI_LIB_WALL.at('office'),y:200,w:38,h:36, name:'office', prompt:'Кабинет Морель', action: async ()=>{
         if (!F('metGenevieveUni')) return Dialogue.start([
           {who:'naya',expr:'normal',text:'Табличка: «Морель Ж.» Закрыто.'},
         ]);
-        if (!F('learnedMedea')) return Dialogue.start([
+        /* Дверь открывается только на четвёртый день: до этого Морель
+           внутри и не открывает, а раньше времени пускать игрока в кабинет
+           значит отдать ему фотографию Мидеи до всей цепочки архива. */
+        if (C('uniDay') < 4) return Dialogue.start([
           {who:'naya',expr:'talk',text:'Закрыто. Внутри горит лампа — значит, она там и не открывает.'},
           {who:'naya',expr:'normal',text:'(Пока рано. Мне нечего ей предъявить.)'},
         ]);
-        Dialogue.start([
-          {who:'naya',expr:'normal',text:'Дверь приоткрыта. Стол, книги, лампа. Всё как у любого преподавателя.'},
-          {who:'naya',expr:'talk',text:'Почти всё. На полке — сушёная трава в банке, подписанная тем же почерком, что и в её книге.'},
-        ]);
+        await changeRoom('uniMorelOffice', 40, 220);
       }},
     { x:508,y:410,w:100,h:50, name:'toFloor2', prompt:'Наверх, на второй этаж',
       action: async ()=> await changeRoom('uniFloor2', 92, 340) },
@@ -8245,7 +8513,7 @@ uniOldWing: {
     paintCorridor(ctx, 520, 340, {
       wallH:190, warm:'#4e4236', warm2:'#3f352c', floor:'#5f5040', floor2:'#4f4234',
       windows:[104, 324],
-      doors:[[36,'—'],[176,'—'],[248,'—'],[404,'—'],[468,'—']],
+      doors:[[36,'АРХИВ'],[176,'ВНИЗ'],[248,'—'],[404,'КРЫША'],[468,'—']],
       skyTop:'#5a6270', skyBot:'#7a7668', leaf1:'#7a3626', leaf2:'#8a6a24',
       ground:'#454a30', lightA:.09,
     });
@@ -8253,6 +8521,8 @@ uniOldWing: {
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
     ctx.fillText('ХОЛЛ →', 466, 210);
     ctx.fillText('← АРХИВ', 12, 210);
+    ctx.fillText('ЦОКОЛЬ ↓', 158, 210);
+    ctx.fillText('КРЫША ↑', 388, 210);
   },
   objects: [
     { t:'pillar_wood', x:200, y:244 }, { t:'pillar_wood', x:368, y:244 },
@@ -8271,10 +8541,37 @@ uniOldWing: {
   interactables: [
     { x:472,y:210,w:40,h:52, name:'toHall', prompt:'Вниз, в холл',
       action: async ()=> await changeRoom('uniHallMain', 190, 170) },
-    { x:56,y:224,w:60,h:40, name:'oldArchive', prompt:'Старый архив', action(){
+    /* Дверь с табличкой «АРХИВ». Она закрыта всегда: настоящий архив
+       под ногами, и именно эта закрытая дверь отправляет Наю на лестницу. */
+    { x:30,y:190,w:46,h:34, name:'archiveDoor', prompt:'Дверь «АРХИВ»', action(){
+        if (!F('basementFound')) {
+          setFlag('basementFound');
+          Journal.add('archiveBelow');
+          return Dialogue.start([
+            {who:'naya',expr:'normal',text:'Табличка: «АРХИВ». Дверь заперта, и замок не открывали давно — краска легла поверх скважины.'},
+            {who:'naya',expr:'talk',text:'(Рядом лестница вниз. Значит, архив не здесь. Он под нами.)'},
+          ]);
+        }
+        Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. Настоящий архив — этажом ниже.'}]);
+      }},
+    { x:154,y:190,w:48,h:36, name:'toBasement', prompt:'Лестница вниз, в цоколь',
+      action: async ()=> await changeRoom('uniBasement', 58, 186) },
+    { x:382,y:190,w:48,h:36, name:'toRoof', prompt:'Лестница наверх, на крышу', action: async ()=>{
+        if (!F('basementFound') && C('uniDay') < 3) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Узкая лестница наверх, к чердачной двери. Оттуда тянет холодом.'},
+        ]);
+        await changeRoom('uniRoof', 52, 202);
+      }},
+    { x:96,y:190,w:44,h:34, name:'oldWindow', prompt:'Окно', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Окно во внутренний двор. Стекло в мелкий переплёт, снаружи — мокрая листва.'},
+          {who:'naya',expr:'talk',text:'(Отсюда виден задний двор и глухая стена старого крыла.)'},
+        ]);
+      }},
+    { x:56,y:224,w:60,h:40, name:'oldArchive', prompt:'Старые коробки', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Коробки составлены до потолка. На боках — годы, дальше семидесятых уже не разобрать.'},
-          {who:'naya',expr:'talk',text:'(Если что-то и осталось про мать, то здесь.)'},
+          {who:'naya',expr:'talk',text:'(Если что-то и осталось про мать, то не тут: это программки и списки инвентаря.)'},
         ]);
       }},
     { x:264,y:218,w:44,h:34, name:'oldShelf', prompt:'Стеллаж', action(){
@@ -8285,6 +8582,618 @@ uniOldWing: {
       }},
   ],
   npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+/* ================================================================
+   УНИВЕРСИТЕТ — недостающие помещения по архитектурному плану.
+
+   Первый этаж:  холл в центре, театральное крыло на западе
+                 (репетиционный зал, гримёрная с костюмерной, сцена,
+                 реквизиторская), библиотека и кабинеты на востоке.
+   Второй этаж:  западное и восточное крыло, старое крыло сверху.
+   Ниже:         служебная лестница из старого крыла в цоколь,
+                 цокольный архив.
+   Выше:         крыша над старым крылом.
+   Снаружи:      задний двор с окном старого крыла — обходной путь.
+================================================================ */
+
+/* Репетиционный зал: сюда Ная приходит смотреть, как Сью работает.
+   Вид зала меняется по дням: читка, сцена, генеральная, премьера. */
+uniRehearsal: {
+  name:"Университет. Репетиционный зал", music:'warm', w:300, h:320,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
+  light:{ tint:'#1c1820', dark:.24 },
+  lights:[
+    {x:150,y:110,r:70,c:'#ffe0a8',i:.55},{x:52,y:80,r:36,c:'#ffd0a0',i:.30},
+    {x:248,y:80,r:36,c:'#ffd0a0',i:.30},
+  ],
+  bgKey:()=> 'd' + C('uniDay') + (F('premiereDone') ? 'p' : ''),
+  bgPaint(ctx) {
+    const day = Math.max(1, C('uniDay'));
+    paintInterior(ctx, 300, 320, { wall:'#4e4238', wall2:'#423830', floor:'#8a7454', floor2:'#77603f', wallH:64 });
+    // зеркальная стена репетиционного зала
+    ctx.fillStyle = '#5c6a72'; ctx.fillRect(20, 12, 260, 44);
+    ctx.fillStyle = '#6e7d86'; ctx.fillRect(22, 14, 256, 40);
+    ctx.fillStyle = 'rgba(255,255,255,.10)';
+    for (let x = 26; x < 278; x += 46) ctx.fillRect(x, 14, 14, 40);
+    ctx.fillStyle = '#3a3128'; ctx.fillRect(20, 56, 260, 4);
+    // станок вдоль зеркала
+    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(24, 66, 252, 3);
+    for (let x = 34; x < 276; x += 60) { ctx.fillStyle = '#5f5040'; ctx.fillRect(x, 66, 3, 16); }
+    // разметка сценической площадки на полу
+    ctx.strokeStyle = 'rgba(240,230,200,.22)'; ctx.lineWidth = 1;
+    ctx.strokeRect(56.5, 108.5, 188, 116);
+    ctx.fillStyle = 'rgba(240,230,200,.16)';
+    ctx.fillRect(148, 108, 4, 116); ctx.fillRect(56, 164, 188, 2);
+    if (day >= 3) {                                  // с генеральной появляются декорации
+      ctx.fillStyle = '#5a4636'; ctx.fillRect(70, 96, 46, 62);
+      ctx.fillStyle = '#6b543f'; ctx.fillRect(73, 99, 40, 56);
+      ctx.fillStyle = '#3f342a'; ctx.fillRect(86, 120, 14, 34);      // дверной проём декорации
+      ctx.fillStyle = '#4e4034'; ctx.fillRect(190, 100, 52, 44);
+      ctx.fillStyle = '#8a95a0'; ctx.fillRect(196, 106, 40, 30);     // «окно» декорации
+    }
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText(day >= 4 ? '«ПОСЛЕДНИЙ СВЕТ» — ПРЕМЬЕРА'
+                          : ['','ЧИТКА','НА НОГАХ','ГЕНЕРАЛЬНАЯ'][Math.min(3, day)], 24, 78);
+    ctx.fillText('← КОРИДОР', 12, 300);
+    paintDoor(ctx, 20, 306, 30, 14);
+  },
+  objects: [
+    { t:'piano', x:266, y:120 },
+    { t:'chair_wood', x:44, y:250 }, { t:'chair_wood', x:70, y:254 },
+    { t:'chair_wood', x:230, y:250 }, { t:'chair_wood', x:256, y:254 },
+    { t:'bench_stone', x:150, y:262 },
+    { t:'book_stack', x:96, y:250 },
+    { t:'bin', x:280, y:280 },
+    { t:'plant_pot', x:20, y:250 },
+    { t:'spotlight', x:70, y:24, when:()=> C('uniDay') >= 3 },
+    { t:'spotlight', x:230, y:24, when:()=> C('uniDay') >= 3 },
+  ],
+  walls: [
+    {x:0,y:0,w:300,h:64},{x:0,y:0,w:8,h:320},{x:292,y:0,w:8,h:320},{x:0,y:315,w:300,h:5},
+  ],
+  interactables: [
+    { x:12,y:276,w:44,h:36, name:'exit', prompt:'В коридор',
+      action: async ()=> await changeRoom('uniCorridorTheatre', 87, 216) },
+    { x:120,y:150,w:60,h:44, name:'watch', prompt:'Смотреть репетицию',
+      action(){ Scene.play('rehearsalWatch'); }},
+    { x:246,y:96,w:44,h:34, name:'piano', prompt:'Пианино', action(){
+        Audio.beep(392,.18,'sine',.05);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Пианино расстроено ровно настолько, чтобы это было слышно, но не настолько, чтобы кто-то его настроил.'}]);
+      }},
+    { x:24,y:64,w:60,h:26, name:'boardRe', prompt:'Расписание репетиций', action(){
+        const day = Math.max(1, C('uniDay'));
+        const line = ['','Сегодня: читка. Завтра: на ногах.',
+                        'Сегодня: на ногах. Послезавтра — генеральная.',
+                        'Сегодня: генеральная. Завтра — премьера.',
+                        'Сегодня: ПРЕМЬЕРА. Вход со зрительской стороны.'][Math.min(4, day)];
+        Dialogue.start([{who:'naya',expr:'normal',text:'«ПОСЛЕДНИЙ СВЕТ». ' + line}]);
+      }},
+  ],
+  npcs: [
+    { x:96, y:196, sprite:'acolyte', name:'Режиссёр',
+      when:()=> F('uniArrived') && !F('premiereDone'),
+      dialogue:()=> {
+        const day = Math.max(1, C('uniDay'));
+        if (day <= 1) return Dialogue.start([
+          {who:'acolyte',expr:'normal',name:'Режиссёр',text:'Пока это читка. Текст у всех в руках, и это нормально.'},
+          {who:'acolyte',expr:'normal',name:'Режиссёр',text:'У вашей подруги текст уже в голове. Это редкость.'},
+        ]);
+        if (day === 2) return Dialogue.start([
+          {who:'acolyte',expr:'normal',name:'Режиссёр',text:'Сегодня без листов. Слушайте друг друга, а не бумагу.'},
+        ]);
+        if (day === 3) return Dialogue.start([
+          {who:'acolyte',expr:'normal',name:'Режиссёр',text:'Костюмы, свет, декорации. Завтра премьера, остановок больше не будет.'},
+        ]);
+        return Dialogue.start([{who:'acolyte',expr:'normal',name:'Режиссёр',text:'Все по местам. Зал уже собирается.'}]);
+      }},
+    { x:186, y:200, sprite:'student', name:'Актёр', speed:0.34,
+      path:[[186,200],[214,206],[214,232],[176,230]],
+      when:()=> F('uniArrived') && !F('premiereDone'),
+      dialogue:()=> Dialogue.start([{who:'student',expr:'normal',name:'Актёр',text:'Мы репетируем «Последний свет». Про девушку, которая возвращается в дом перед продажей.'}]) },
+    { x:150, y:190, sprite:'sue', name:'Сью',
+      when:()=> F('uniArrived') && !F('premiereDone'),
+      dialogue:()=> Scene.play('sueRehearsalTalk') },
+    { x:120, y:296, sprite:'acolyte', name:'Актриса', speed:0.30,
+      path:[[120,296],[200,294],[204,266],[116,268]],
+      when:()=> F('uniArrived') && !F('premiereDone'),
+      dialogue:()=> { const d = Math.max(1, C('uniDay'));
+        if (d >= 3) return Dialogue.start([{who:'acolyte',expr:'worried',name:'Актриса',text:'У меня во втором акте четыре реплики, и я все четыре забываю. Каждый раз одни и те же.'}]);
+        return Dialogue.start([{who:'acolyte',expr:'normal',name:'Актриса',text:'Ты подруга Сью? Она нас всех держит. Без неё бы третью сцену до сих пор читали с листа.'}]);
+      } },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+/* Гримёрная и костюмерная одной комнатой: столики с зеркалами,
+   вешалки с костюмами, ширма. */
+uniDressing: {
+  name:"Университет. Гримёрная", music:'warm', w:240, h:260,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
+  light:{ tint:'#1e1820', dark:.28 },
+  lights:[{x:70,y:76,r:44,c:'#ffe8c0',i:.5},{x:176,y:76,r:40,c:'#ffe8c0',i:.42}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 240, 260, { wall:'#4a3f42', wall2:'#3e353a', floor:'#7d6a58', floor2:'#6d5b4a', wallH:56 });
+    // гримёрные зеркала с лампочками
+    [40, 138].forEach(mx => {
+      ctx.fillStyle = '#3a3238'; ctx.fillRect(mx, 10, 62, 40);
+      ctx.fillStyle = '#7d8a92'; ctx.fillRect(mx + 3, 13, 56, 34);
+      ctx.fillStyle = '#95a2aa'; ctx.fillRect(mx + 5, 15, 24, 30);
+      ctx.fillStyle = '#ffe8b0';
+      for (let i = 0; i < 5; i++) { ctx.fillRect(mx + 4 + i * 13, 6, 4, 4); ctx.fillRect(mx + 4 + i * 13, 50, 4, 4); }
+      ctx.fillStyle = '#5f5040'; ctx.fillRect(mx - 4, 54, 70, 6);
+    });
+    // ширма в углу
+    ctx.fillStyle = '#3f3640'; ctx.fillRect(196, 70, 36, 62);
+    ctx.fillStyle = '#4e4450'; ctx.fillRect(199, 73, 30, 56);
+    ctx.fillStyle = '#5c5260'; ctx.fillRect(199, 73, 10, 56); ctx.fillRect(219, 73, 10, 56);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('КОСТЮМЕРНАЯ →', 150, 200);
+    ctx.fillText('← КОРИДОР', 12, 244);
+    paintDoor(ctx, 18, 248, 28, 12);
+  },
+  objects: [
+    { t:'desk', x:70, y:96 }, { t:'desk', x:168, y:96 },
+    { t:'stool', x:70, y:126 }, { t:'stool', x:168, y:126 },
+    { t:'coat_rack', x:36, y:168 }, { t:'coat_rack', x:64, y:176 },
+    { t:'coat_rack', x:92, y:168 },
+    { t:'chest', x:196, y:172 },
+    { t:'mirror_tall', x:214, y:40 },
+    { t:'bin', x:26, y:216 },
+    { t:'book_stack', x:196, y:212 },
+  ],
+  walls: [
+    {x:0,y:0,w:240,h:56},{x:0,y:0,w:8,h:260},{x:232,y:0,w:8,h:260},{x:0,y:255,w:240,h:5},
+  ],
+  interactables: [
+    { x:10,y:220,w:42,h:34, name:'exit', prompt:'В коридор',
+      action: async ()=> await changeRoom('uniCorridorTheatre', 147, 216) },
+    { x:44,y:70,w:56,h:34, name:'mirrors', prompt:'Гримёрный столик', action(){
+        if (C('uniDay') >= 3) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Кисти, тон, гуталин для бровей. Всё разложено ровными рядами — кто-то тут серьёзно относится к делу.'},
+          {who:'naya',expr:'smile',text:'(На третьем столике лежит записка: «СЬЮ — НЕ ТРОГАТЬ». Узнаю почерк.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Пустые столики. Грим достанут только к генеральной.'}]);
+      }},
+    { x:20,y:146,w:96,h:38, name:'costumes', prompt:'Костюмы', action(){
+        Scene.play('dressingCostumes');
+      }},
+    { x:180,y:150,w:48,h:38, name:'wardrobeBox', prompt:'Сундук костюмерной', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Сундук набит тканью, которую перешивали столько раз, что подкладка стала лоскутной.'},
+          {who:'naya',expr:'talk',text:'(На крышке изнутри выцарапан год. И ещё один. И ещё.)'},
+        ]);
+      }},
+  ],
+  npcs: [
+    { x:150, y:150, sprite:'friend', name:'Костюмер', speed:0.30,
+      path:[[150,150],[178,158],[178,192],[140,188]],
+      when:()=> F('uniArrived'),
+      dialogue:()=> {
+        if (C('uniDay') >= 3) return Dialogue.start([{who:'friend',expr:'normal',name:'Костюмер',text:'Не трогай ничего на вешалках, я их два часа развешивала по сценам.'}]);
+        return Dialogue.start([{who:'friend',expr:'normal',name:'Костюмер',text:'Костюмы выдаём к генеральной. Раньше только испачкают.'}]);
+      }},
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+/* Реквизиторская и склад декораций: здесь лежит щит с символом. */
+uniProps: {
+  name:"Университет. Реквизиторская", music:'tense', w:280, h:280,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.14, wind:0 },
+  light:{ tint:'#171420', dark:.42 },
+  lights:[{x:140,y:96,r:44,c:'#e0c890',i:.34,flicker:true},
+          {x:120,y:52,r:30,c:'#f0cc84',i:.34}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 280, 280, { wall:'#443a34', wall2:'#39312c', floor:'#6a5a48', floor2:'#5b4d3d', wallH:54 });
+    // стеллажи под потолок
+    ctx.fillStyle = '#3a3028';
+    for (let x = 16; x < 264; x += 62) { ctx.fillRect(x, 54, 52, 6); ctx.fillRect(x, 84, 52, 6); }
+    ctx.fillStyle = '#4c4034';
+    for (let x = 16; x < 264; x += 62) { ctx.fillRect(x, 54, 52, 2); ctx.fillRect(x, 84, 52, 2); }
+    // сложенные декорации у дальней стены
+    ctx.fillStyle = '#5a4636'; ctx.fillRect(190, 62, 70, 40);
+    ctx.fillStyle = '#6b543f'; ctx.fillRect(194, 66, 62, 32);
+    ctx.fillStyle = '#8a95a0'; ctx.fillRect(200, 72, 22, 18);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('СКЛАД ДЕКОРАЦИЙ', 186, 58);
+    ctx.fillText('← КОРИДОР', 12, 264);
+    paintDoor(ctx, 18, 266, 28, 14);
+  },
+  objects: [
+    { t:'archive_box', x:44, y:150 }, { t:'archive_box', x:70, y:156 },
+    { t:'archive_box', x:58, y:132 },
+    { t:'chest', x:130, y:158 },
+    { t:'mask_pair', x:196, y:34 },
+    { t:'old_shield', x:120, y:36 },
+    { t:'library_shelf', x:236, y:158 },
+    { t:'lib_ladder', x:200, y:166 },
+    { t:'bin', x:24, y:236 },
+    { t:'book_stack', x:104, y:214 },
+    { t:'stool', x:170, y:216 },
+  ],
+  ambient() { if (Math.random() < 0.015) FX.spawn(Math.random()*280, 60, 1, {color:'#3a3448', rise:.08, life:130, spread:8}); },
+  walls: [
+    {x:0,y:0,w:280,h:54},{x:0,y:0,w:8,h:280},{x:272,y:0,w:8,h:280},{x:0,y:275,w:280,h:5},
+  ],
+  interactables: [
+    { x:10,y:238,w:42,h:34, name:'exit', prompt:'В коридор',
+      action: async ()=> await changeRoom('uniCorridorTheatre', 439, 216) },
+    { x:104,y:24,w:34,h:32, name:'shield', prompt:'Старый щит',
+      action(){ Scene.play('propsShield'); }},
+    { x:30,y:118,w:70,h:46, name:'propBoxes', prompt:'Коробки театрального общества',
+      action(){ Scene.play('propsBoxes'); }},
+    { x:210,y:130,w:52,h:40, name:'propShelf', prompt:'Стеллаж', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Короны из фольги, деревянные мечи, гипсовая ваза с отбитым краем.'},
+          {who:'naya',expr:'talk',text:'(Всё это выходило на сцену. Некоторые вещи — раз тридцать.)'},
+        ]);
+      }},
+  ],
+  npcs: [
+    { x:220, y:220, sprite:'customer', name:'Реквизитор', speed:0.28,
+      path:[[220,220],[240,226],[240,250],[190,246]],
+      when:()=> F('uniArrived'),
+      dialogue:()=> Dialogue.start([
+        {who:'customer',expr:'normal',name:'Реквизитор',text:'Ищешь что-то? Тут половина вещей старше меня.'},
+        {who:'customer',expr:'normal',name:'Реквизитор',text:'Списывать не дают: вдруг понадобится. За тридцать лет ни разу не понадобилось.'},
+      ]) },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+/* Кабинет Морель — на первом этаже восточного крыла, как на плане. */
+uniMorelOffice: {
+  name:"Университет. Кабинет Морель", music:'tense', w:220, h:240,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
+  light:{ tint:'#1d1710', dark:.30 },
+  lights:[{x:110,y:110,r:52,c:'#ffd89a',i:.44}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 220, 240, { wall:'#5e5142', wall2:'#4e4436', floor:'#7a6a58', floor2:'#6a5b4a', wallH:56 });
+    // высокое окно во двор
+    ctx.fillStyle = '#33291f'; ctx.fillRect(150, 8, 54, 44);
+    const sky = ctx.createLinearGradient(0, 10, 0, 50);
+    sky.addColorStop(0, '#e8c890'); sky.addColorStop(1, '#8a7a6a');
+    ctx.fillStyle = sky; ctx.fillRect(154, 12, 46, 36);
+    ctx.fillStyle = '#3d2b1e'; ctx.fillRect(176, 12, 3, 36); ctx.fillRect(154, 28, 46, 3);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('← КОРИДОР', 12, 226);
+    paintDoor(ctx, 18, 228, 28, 12);
+  },
+  objects: [
+    { t:'desk', x:104, y:120 },
+    { t:'chair_wood', x:104, y:148 },
+    { t:'bookshelf', x:34, y:100 },
+    { t:'library_shelf', x:186, y:120 },
+    { t:'lamp_floor', x:70, y:150 },
+    { t:'photo_frame', x:60, y:30 },
+    { t:'painting', x:104, y:30 },
+    { t:'herb_shelf', x:186, y:86 },
+    { t:'plant_pot', x:30, y:196 },
+    { t:'archive_box', x:180, y:196 },
+  ],
+  walls: [
+    {x:0,y:0,w:220,h:56},{x:0,y:0,w:8,h:240},{x:212,y:0,w:8,h:240},{x:0,y:235,w:220,h:5},
+  ],
+  interactables: [
+    { x:10,y:200,w:42,h:34, name:'exit', prompt:'В коридор',
+      action: async ()=> await changeRoom('uniCorridorLib', UNI_LIB_WALL.at('office') + 18, 226) },
+    { x:82,y:96,w:52,h:38, name:'morelDesk', prompt:'Стол Морель', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Стопки распечаток, красная ручка, остывший чай. Обычный преподавательский стол.'},
+          {who:'naya',expr:'talk',text:'(И ни одной личной вещи. Ни одной.)'},
+        ]);
+      }},
+    { x:82,y:14,w:52,h:34, name:'morelPhoto', prompt:'Фотография на стене',
+      action(){ Scene.play('morelPhoto'); }},
+    { x:20,y:74,w:44,h:38, name:'morelBooks', prompt:'Полка', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'История театра, античная драма, четыре тома по сценической речи.'},
+          {who:'naya',expr:'talk',text:'(И один корешок без надписи. Он не вынимается — приклеен.)'},
+        ]);
+      }},
+    { x:164,y:66,w:44,h:36, name:'morelHerbs', prompt:'Банки на полке', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Сушёные травы в подписанных банках. Почерк тот же, что и на её распечатках.'},
+          {who:'naya',expr:'talk',text:'(Полынь. Тысячелистник. И одна банка без подписи.)'},
+        ]);
+      }},
+  ],
+  npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+/* Цоколь: технические помещения, трубы, шкафы, старый реквизит.
+   Не лабиринт — служебный этаж, через который идёт путь в архив. */
+uniBasement: {
+  name:"Университет. Цоколь", music:'tense', w:420, h:280,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.22, wind:0 },
+  light:{ tint:'#0e1018', dark:.52 },
+  lights:[
+    {x:70,y:120,r:38,c:'#c8d0a0',i:.26,flicker:true},
+    {x:230,y:120,r:34,c:'#c8d0a0',i:.22,flicker:true},
+    {x:366,y:130,r:36,c:'#c8d0a0',i:.24,flicker:true},
+  ],
+  bgPaint(ctx) {
+    const W = 420, H = 280;
+    ctx.fillStyle = '#2a2a30'; ctx.fillRect(0, 0, W, 62);            // бетонная стена
+    ctx.fillStyle = '#31313a';
+    for (let y = 0; y < 62; y += 10) for (let x = ((y / 10) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 9);
+    ctx.fillStyle = '#1d1d24'; ctx.fillRect(0, 58, W, 4);
+    ctx.fillStyle = '#4a4a54'; ctx.fillRect(0, 56, W, 2);
+    ctx.fillStyle = '#3a3a42'; ctx.fillRect(0, 62, W, H - 62);       // бетонный пол
+    ctx.fillStyle = '#333340';
+    for (let y = 70; y < H; y += 22) ctx.fillRect(0, y, W, 1);
+    for (let x = 0; x < W; x += 44) ctx.fillRect(x, 62, 1, H - 62);
+    // трубы вдоль стены
+    ctx.fillStyle = '#5a5a62'; ctx.fillRect(0, 16, W, 6); ctx.fillRect(0, 30, W, 4);
+    ctx.fillStyle = '#6e6e78'; ctx.fillRect(0, 16, W, 2); ctx.fillRect(0, 30, W, 1);
+    for (let x = 30; x < W; x += 88) { ctx.fillStyle = '#4a4a52'; ctx.fillRect(x, 12, 6, 26); }
+    // лужа под трубой и потёк на стене
+    ctx.fillStyle = 'rgba(120,150,170,.10)';
+    ctx.beginPath(); ctx.ellipse(150, 200, 30, 10, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(146, 34, 6, 24);
+    ctx.fillStyle = '#b8c0a0'; ctx.font = '6px Courier New';
+    ctx.fillText('← ЛЕСТНИЦА НАВЕРХ', 14, 80);
+    ctx.fillText('АРХИВ →', 366, 80);
+    ctx.fillText('СЛУЖЕБНЫЙ КОРИДОР ↑', 224, 78);
+  },
+  objects: [
+    { t:'stairs_main', x:56, y:150 },
+    { t:'cabinet', x:150, y:130 }, { t:'cabinet', x:186, y:130 },
+    { t:'archive_box', x:262, y:140 }, { t:'archive_box', x:288, y:146 },
+    { t:'chest', x:322, y:150 },
+    { t:'library_shelf', x:396, y:150 },
+    { t:'bin', x:120, y:250 },
+    { t:'book_stack', x:250, y:250 },
+    { t:'stool', x:210, y:246 },
+  ],
+  ambient() { if (Math.random() < 0.02) FX.spawn(150, 60, 1, {color:'#7a90a0', rise:.4, life:70, spread:2}); },
+  walls: [
+    {x:0,y:0,w:420,h:62},{x:0,y:0,w:8,h:280},{x:412,y:0,w:8,h:280},{x:0,y:275,w:420,h:5},
+  ],
+  interactables: [
+    { x:26,y:120,w:64,h:44, name:'up', prompt:'Наверх, в старое крыло',
+      action: async ()=> await changeRoom('uniOldWing', 178, 224) },
+    { x:378,y:120,w:40,h:52, name:'toArchive', prompt:'Цокольный архив',
+      action: async ()=> await changeRoom('uniArchive', 40, 220) },
+    /* Служебный коридор — вторая половина обходного пути. Пока Ная не
+       заглянула в него, выхода она не знает; после — он работает в обе
+       стороны, и из цоколя можно выйти во двор, минуя охрану. */
+    { x:224,y:84,w:56,h:34, name:'service', prompt:'Служебный коридор', action: async ()=>{
+        if (!F('knowsServiceRoute')) {
+          setFlag('knowsServiceRoute');
+          Journal.add('serviceRoute');
+          return Dialogue.start([
+            {who:'naya',expr:'normal',text:'Узкий проход между трубами. В конце — низкое окно на задний двор, подпёртое книгой.'},
+            {who:'naya',expr:'talk',text:'(Запомню. Мало ли.)'},
+          ]);
+        }
+        await changeRoom('uniBackYard', 206, 206);
+      }},
+    { x:140,y:106,w:82,h:38, name:'lockers', prompt:'Шкафы', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Металлические шкафы с инвентарными номерами. Половина не заперта, и там пусто.'},
+        ]);
+      }},
+    { x:300,y:126,w:56,h:40, name:'oldProps', prompt:'Старый реквизит', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Декорации, которые уже не поднимут наверх. Крашеный картон, из которого вылезла проволока.'},
+        ]);
+      }},
+  ],
+  npcs: [
+    { x:180, y:210, sprite:'customer', name:'Техник', speed:0.30,
+      path:[[180,210],[130,214],[130,240],[200,238]],
+      when:()=> !F('universityBanned'),
+      dialogue:()=> Dialogue.start([
+        {who:'customer',expr:'normal',name:'Техник',text:'Студентам сюда нельзя. Хотя кого это когда останавливало.'},
+        {who:'customer',expr:'normal',name:'Техник',text:'Только за трубы не хватайся, они горячие.'},
+      ]) },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+/* Цокольный архив: то самое место, где Ная находит имя матери. */
+uniArchive: {
+  name:"Университет. Цокольный архив", music:'tense', w:300, h:280,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.26, wind:0 },
+  light:{ tint:'#0c0e16', dark:.56 },
+  lights:[{x:150,y:110,r:44,c:'#d8c890',i:.30,flicker:true}],
+  bgPaint(ctx) {
+    const W = 300, H = 280;
+    ctx.fillStyle = '#26242c'; ctx.fillRect(0, 0, W, 58);
+    ctx.fillStyle = '#2d2b35';
+    for (let y = 0; y < 58; y += 10) for (let x = ((y / 10) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 9);
+    ctx.fillStyle = '#1a1820'; ctx.fillRect(0, 54, W, 4);
+    ctx.fillStyle = '#37343e'; ctx.fillRect(0, 58, W, H - 58);
+    ctx.fillStyle = '#302d38'; for (let y = 66; y < H; y += 20) ctx.fillRect(0, y, W, 1);
+    // ряды стеллажей уходят в темноту
+    ctx.fillStyle = '#2a2731';
+    for (let x = 24; x < W; x += 68) ctx.fillRect(x, 58, 44, 26);
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 58, W, 10);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('← ЦОКОЛЬ', 12, 78);
+    ctx.fillText('30      ·      15      ·      5   ЛЕТ НАЗАД', 84, 78);
+  },
+  objects: [
+    { t:'library_shelf', x:70, y:150 }, { t:'library_shelf', x:150, y:150 },
+    { t:'library_shelf', x:230, y:150 },
+    { t:'archive_box', x:56, y:210 }, { t:'archive_box', x:82, y:216 },
+    { t:'archive_box', x:220, y:212 },
+    { t:'desk', x:150, y:236 },
+    { t:'lib_ladder', x:196, y:200 },
+    { t:'book_stack', x:118, y:222 },
+  ],
+  ambient() { if (Math.random() < 0.02) FX.spawn(Math.random()*300, 56, 1, {color:'#3a3448', rise:.08, life:140, spread:8}); },
+  walls: [
+    {x:0,y:0,w:300,h:58},{x:0,y:0,w:8,h:280},{x:292,y:0,w:8,h:280},{x:0,y:275,w:300,h:5},
+  ],
+  interactables: [
+    { x:12,y:200,w:44,h:44, name:'back', prompt:'Обратно в цоколь',
+      action: async ()=> await changeRoom('uniBasement', 392, 200) },
+    { x:44,y:122,w:56,h:44, name:'arch30', prompt:'Папки: 30 лет назад',
+      action(){ Scene.play('archiveFolder30'); }},
+    { x:124,y:122,w:56,h:44, name:'arch15', prompt:'Папки: 15 лет назад',
+      action(){ Scene.play('archiveFolder15'); }},
+    { x:204,y:122,w:56,h:44, name:'arch5', prompt:'Папки: 5 лет назад',
+      action(){ Scene.play('archiveFolder5'); }},
+    { x:126,y:210,w:52,h:38, name:'archDesk', prompt:'Стол архива',
+      action(){ Scene.play('archiveDesk'); }},
+    { x:40,y:186,w:64,h:38, name:'archBoxes', prompt:'Коробки без описи', action(){
+        if (F('universityBanned')) return Scene.play('archiveMissingFolder');
+        Dialogue.start([{who:'naya',expr:'normal',text:'Коробки без описи. Внутри — программы, афиши, чьи-то конспекты.'}]);
+      }},
+  ],
+  npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+/* Крыша: выход по лестнице из старого крыла. Здесь два разговора
+   с Морель — обещание на третий день и правда на четвёртый. */
+uniRoof: {
+  name:"Университет. Крыша", music:'sad', w:320, h:260, wet:true, wetFrom:60,
+  zone:'town', weather:{ rain:.18, fog:.20, wind:.5, leaves:.1 },
+  light:{ tint:'#141824', dark:.34 },
+  lights:[{x:60,y:90,r:44,c:'#ffcf7a',i:.36},{x:266,y:96,r:36,c:'#9fb0c8',i:.22}],
+  bgPaint(ctx) {
+    const W = 320, H = 260;
+    const sky = ctx.createLinearGradient(0, 0, 0, 70);
+    sky.addColorStop(0, '#1a2030'); sky.addColorStop(1, '#4a3a44');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 70);
+    // город внизу за парапетом
+    ctx.fillStyle = '#20202c';
+    for (let x = -8; x < W; x += 26) { const h = 14 + ((x * 7) % 22); ctx.fillRect(x, 70 - h, 22, h); }
+    ctx.fillStyle = '#e8c880';
+    for (let i = 0; i < 40; i++) ctx.fillRect((i * 37) % W, 52 + ((i * 13) % 16), 2, 2);
+    // парапет
+    ctx.fillStyle = '#4a4650'; ctx.fillRect(0, 66, W, 14);
+    ctx.fillStyle = '#5e5a66'; ctx.fillRect(0, 66, W, 3);
+    ctx.fillStyle = '#33303a'; ctx.fillRect(0, 80, W, 4);
+    // рубероид
+    ctx.fillStyle = '#3d3a44'; ctx.fillRect(0, 84, W, H - 84);
+    ctx.fillStyle = '#454250';
+    for (let y = 92; y < H; y += 16) ctx.fillRect(0, y, W, 2);
+    ctx.fillStyle = 'rgba(150,180,200,.08)';
+    ctx.beginPath(); ctx.ellipse(210, 190, 44, 14, 0, 0, Math.PI*2); ctx.fill();
+    // будка выхода с лестницы
+    ctx.fillStyle = '#4a4048'; ctx.fillRect(24, 96, 58, 56);
+    ctx.fillStyle = '#574c56'; ctx.fillRect(27, 99, 52, 50);
+    ctx.fillStyle = '#2a242c'; ctx.fillRect(44, 118, 20, 34);
+    ctx.fillStyle = '#c9a05a'; ctx.fillRect(60, 136, 3, 4);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('ВНИЗ', 40, 112);
+  },
+  objects: [
+    { t:'pole_power', x:280, y:130 },
+    { t:'bin', x:120, y:150 },
+    { t:'bench_stone', x:180, y:214 },
+    { t:'archive_box', x:96, y:206 },
+    { t:'puddle', x:210, y:190 },
+  ],
+  walls: [
+    {x:0,y:0,w:320,h:84},{x:0,y:0,w:8,h:260},{x:312,y:0,w:8,h:260},{x:0,y:255,w:320,h:5},
+    {x:24,y:84,w:58,h:36},
+  ],
+  interactables: [
+    { x:34,y:120,w:44,h:40, name:'down', prompt:'Вниз, в старое крыло',
+      action: async ()=> await changeRoom('uniOldWing', 406, 224) },
+    { x:120,y:88,w:80,h:26, name:'edge', prompt:'Парапет', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Отсюда видно полгорода. Кафе, где я работаю, — вон та жёлтая точка.'},
+          {who:'naya',expr:'talk',text:'(Раньше мне казалось, что мой мир большой.)'},
+        ]);
+      }},
+    { x:82,y:186,w:44,h:34, name:'roofBox', prompt:'Ящик', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Ящик с кабелем и старым прожектором. Сюда таскали свет для какого-то представления.'}]);
+      }},
+  ],
+  npcs: [
+    { x:236, y:170, sprite:'genevieve', name:'Морель',
+      when:()=> (C('uniDay') === 3 && F('archiveMorelFound') && !F('roofPromise'))
+             || (C('uniDay') === 4 && F('premiereDone') && !F('morelTruth')),
+      dialogue:()=> Scene.play(C('uniDay') >= 4 ? 'roofTruth' : 'roofPromise') },
+  ],
+  onEnter() {
+    if (C('uniDay') === 3 && F('archiveMorelFound') && !F('roofPromise'))
+      setTimeout(()=> UI.toast('Морель у парапета', 2200), 600);
+  },
+},
+
+/* ---------------------------------------------------------------- */
+/* Задний двор: сюда Ная выходит после запрета и отсюда лезет в окно. */
+uniBackYard: {
+  name:"Университет. Задний двор", music:'street', w:360, h:280, wet:true, wetFrom:110,
+  zone:'town', weather:{ rain:.24, fog:.20, wind:.3, leaves:.3 },
+  light:{ tint:'#12141e', dark:.38 },
+  lights:[{x:300,y:120,r:44,c:'#ffcf7a',i:.34},{x:96,y:104,r:30,c:'#9fb0c8',i:.18}],
+  bgPaint(ctx) {
+    const W = 360, H = 280;
+    const sky = ctx.createLinearGradient(0, 0, 0, 60);
+    sky.addColorStop(0, '#1c2230'); sky.addColorStop(1, '#3f3a44');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 60);
+    // глухая стена старого крыла с редкими окнами
+    ctx.fillStyle = '#4a4238'; ctx.fillRect(0, 30, W, 130);
+    ctx.fillStyle = '#413a31';
+    for (let y = 30; y < 160; y += 12) for (let x = ((y / 12) % 2) * 14; x < W; x += 28) ctx.fillRect(x, y, 26, 11);
+    ctx.fillStyle = '#332d26'; ctx.fillRect(0, 154, W, 6);
+    [60, 132, 268].forEach(wx => {                    // тёмные окна
+      ctx.fillStyle = '#2a2620'; ctx.fillRect(wx - 3, 54, 40, 46);
+      ctx.fillStyle = '#3a4450'; ctx.fillRect(wx, 57, 34, 40);
+      ctx.fillStyle = '#2f2921'; ctx.fillRect(wx + 16, 57, 3, 40); ctx.fillRect(wx, 76, 34, 3);
+    });
+    // то самое окно первого этажа: приоткрыто, подпёрто книгой
+    ctx.fillStyle = '#2a2620'; ctx.fillRect(197, 100, 44, 52);
+    ctx.fillStyle = '#59616e'; ctx.fillRect(200, 103, 38, 46);
+    ctx.fillStyle = '#6e7886'; ctx.fillRect(200, 103, 38, 12);
+    ctx.fillStyle = '#2f2921'; ctx.fillRect(217, 103, 3, 46);
+    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(203, 112, 9, 5);       // книга в щели
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('СТАРОЕ КРЫЛО', 194, 96);
+    // двор: асфальт, забор, ящики
+    ctx.fillStyle = '#4e4a4c'; ctx.fillRect(0, 160, W, H - 160);
+    ctx.fillStyle = '#565254'; for (let y = 168; y < H; y += 18) ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = '#3a3a40'; ctx.fillRect(0, 246, W, 4);
+    for (let x = 4; x < W; x += 16) { ctx.fillStyle = '#44444c'; ctx.fillRect(x, 240, 4, 34); }
+    ctx.fillStyle = '#c8b8a0'; ctx.fillText('← К ГЛАВНОМУ ВХОДУ', 12, 268);
+  },
+  objects: [
+    { t:'bin', x:96, y:206 }, { t:'bin', x:122, y:210 },
+    { t:'archive_box', x:290, y:200 }, { t:'archive_box', x:316, y:206 },
+    { t:'chest', x:150, y:216 },
+    { t:'lamp_street', x:300, y:186 },
+    { t:'puddle', x:216, y:216 }, { t:'puddle', x:80, y:236 },
+    { t:'bush', x:340, y:180 },
+  ],
+  walls: [
+    {x:0,y:0,w:360,h:160},{x:0,y:0,w:8,h:280},{x:352,y:0,w:8,h:280},{x:0,y:275,w:360,h:5},
+  ],
+  interactables: [
+    { x:10,y:236,w:52,h:38, name:'toStreet', prompt:'К главному входу',
+      action: async ()=> await changeRoom('street', 218, 178) },
+    { x:196,y:160,w:52,h:36, name:'window', prompt:'Приоткрытое окно', action: async ()=>{
+        if (!F('backWindowUsed')) return Scene.play('uniWindowEntry');
+        Audio.door();
+        await changeRoom('uniBasement', 250, 162);
+      }},
+    { x:132,y:190,w:52,h:38, name:'yardCrates', prompt:'Ящики', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Ящики из-под декораций, сложенные под самое окно.'},
+          {who:'naya',expr:'talk',text:'(Удобно. Слишком удобно, чтобы это было случайно.)'},
+        ]);
+      }},
+    { x:270,y:170,w:60,h:40, name:'staffDoor', prompt:'Вход для сотрудников', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Дверь для сотрудников. Электронный замок, карточки у меня нет и не будет.'}]);
+      }},
+  ],
+  npcs: [
+    /* Кто-то же подпёр эту створку книгой. Вот он. */
+    { x:250, y:240, sprite:'student', name:'Студент', speed:0.24,
+      path:[[250,240],[286,246],[286,262],[236,258]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> Dialogue.start([
+        {who:'student',expr:'normal',name:'Студент',text:'Не сдавай окно, ладно? Иначе придётся бегать курить через весь корпус.'},
+        {who:'naya',expr:'smile',text:'Мне-то зачем.'},
+        {who:'student',expr:'normal',name:'Студент',text:'Вот и я о том же.'},
+      ]) },
+  ],
 },
 
 /* ---------------------------------------------------------------- */
@@ -8344,11 +9253,13 @@ uniStage: {
         Dialogue.start([{who:'naya',expr:'normal',text:'Комедия и трагедия. Висят над сценой сколько стоит здание.'}]);
       }},
   ],
-  npcs: [
-    { x:150,y:150, sprite:'sue', name:'Сью',
-      when:()=> F('cafeSceneComplete') && !F('metGenevieveUni'),
-      dialogue:()=> Scene.play('sueRehearsal') },
-  ],
+  npcs: [],
+  /* Зрительный зал. На четвёртый день, попав в корпус в обход охраны,
+     Ная приходит сюда — и отсюда смотрит премьеру. */
+  onEnter() {
+    if (C('uniDay') === 4 && F('archiveFolderFound') && !F('premiereDone'))
+      setTimeout(()=> Scene.play('premiereShow'), 600);
+  },
 },
 
 /* ---------------------------------------------------------------- */
@@ -8392,12 +9303,25 @@ uniLibrary: {
     { x:118,y:184,w:46,h:34, name:'deskRead', prompt:'Стол', action(){ Scene.play('libraryDesk'); }},
     { x:14,y:104,w:44,h:34, name:'shelfFolk', prompt:'Фольклор', action(){ Scene.play('libraryFolk'); }},
     { x:172,y:104,w:44,h:34, name:'shelfTheatre', prompt:'История театра', action(){ Scene.play('libraryTheatre'); }},
-    { x:208,y:60,w:44,h:40, name:'archive', prompt:'Архив', action(){ Scene.play('libraryArchive'); }},
+    { x:208,y:60,w:44,h:40, name:'archive', prompt:'Дверь архива', action(){ Scene.play('libraryArchive'); }},
+    /* Открытая коллекция по периодам — сердце второго дня. На четвёртый
+       день ровно эти папки исчезают. */
+    { x:14,y:224,w:44,h:34, name:'albums', prompt:'Альбомы по годам', action(){
+        if (C('uniDay') >= 4 && !F('libMissing')) return Scene.play('libraryMissing');
+        if (C('uniDay') >= 2 && !F('libPeriods')) return Scene.play('libraryPeriods');
+        if (F('libPeriods')) return Dialogue.start([
+          {who:'naya',expr:'talk',text:'Те же четыре фотографии. Тридцать, двадцать пять, пятнадцать, пять. И ни одной морщины сверх.'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Альбомы с фотографиями постановок, подписанные годами выпуска.'},
+          {who:'naya',expr:'talk',text:'(Сегодня я сюда не за этим. Но запомню, где они стоят.)'},
+        ]);
+      }},
   ],
   npcs: [
-    { x:60,y:236, sprite:'genevieve', name:'Женевьева',
-      when:()=> F('learnedMedea') && !F('learnedWitches'),
-      dialogue:()=> Scene.play('genevieveReveal') },
+    { x:210,y:268, sprite:'friend', name:'Библиотекарь', speed:0,
+      when:()=> !F('sueDead') || F('sueRevived'),
+      dialogue:()=> Scene.play('librarianTalk') },
   ],
 },
 
@@ -9601,7 +10525,12 @@ const Memories = {
         g.fillStyle='#08060c'; for(let i=0;i<4;i++){g.beginPath();g.arc(34+i*44,40,11,0,7);g.fill();}
         g.strokeStyle='#5a2040'; for(let i=0;i<4;i++){g.beginPath();g.arc(34+i*44,40,11,0,7);g.stroke();}
         g.fillStyle='#c060ff';g.beginPath();g.arc(100,86,7,0,7);g.fill(); } },
-    { key:'firstMeeting', title:'У четырнадцатой', text:'«Ты ведь не студентка.»\n\n«Нет.»\n\n«Тогда почему ты уже третий раз ждёшь кого-то у моей аудитории?»\n\nОна смотрела не на меня. Она смотрела на кристалл.',
+    { key:'motherFace', title:'Лицо матери', text:'Я знала её по одной фотографии из отцовской коробки.\n\nА в кабинете чужого преподавателя она стоит рядом с живым человеком и улыбается.\n\nЗначит, у неё была не только смерть. У неё была ещё и жизнь.',
+      draw:(g)=>{ g.fillStyle='#1a1620';g.fillRect(0,0,200,120); g.fillStyle='#3a3040';g.fillRect(52,24,96,72); g.fillStyle='#6a5a70';g.fillRect(56,28,88,64);
+                  g.fillStyle='#c8b0c0';g.beginPath();g.ellipse(82,56,11,14,0,0,7);g.fill(); g.beginPath();g.ellipse(118,56,11,14,0,0,7);g.fill();
+                  g.fillStyle='#2a2230';g.fillRect(70,70,24,22); g.fillRect(106,70,24,22);
+                  g.fillStyle='#c060ff';g.fillRect(114,86,4,4); } },
+    { key:'firstMeeting', title:'Красивый кулон', text:'«Красивый кулон.»\n\n«Семейная вещь.»\n\nОна смотрела на него чуть дольше, чем нужно, и сказала: «Понимаю».\n\nОна смотрела не на меня. Она смотрела на кристалл.',
       draw:(g)=>{ g.fillStyle='#221c18';g.fillRect(0,0,200,120);
         g.fillStyle='#5f4530';g.fillRect(80,24,40,72); g.fillStyle='#a8c0d8';g.fillRect(86,32,28,20);
         g.fillStyle='#c9a05a';g.fillRect(112,60,4,5);
@@ -9875,7 +10804,7 @@ function serializeState() {
     currentRoom:gameState.currentRoom,
     playerX:Player.x, playerY:Player.y,
     act:gameState.act, chapter:gameState.chapter, eventStep:gameState.eventStep,
-    flags:gameState.flags, stats:gameState.stats, counters:gameState.counters,
+    flags:gameState.flags, stats:gameState.stats, counters:gameState.counters, journal:gameState.journal,
     inventory:gameState.inventory, memories:gameState.memories,
     settings:gameState.settings,
   };
@@ -9914,6 +10843,7 @@ function applyState(s) {
   gameState.counters = Object.assign(freshState().counters, s.counters || {});
   gameState.inventory = Array.isArray(s.inventory) ? s.inventory.slice() : [];
   gameState.memories  = Array.isArray(s.memories) ? s.memories.slice() : [];
+  gameState.journal   = Array.isArray(s.journal) ? s.journal.slice() : [];
   gameState.settings = Object.assign(freshState().settings, s.settings || {});
   Player.x = gameState.playerX; Player.y = gameState.playerY;
   applySettings();
@@ -10428,84 +11358,286 @@ chapterOne: [
 ],
 
 /* ---------- ACT 1: the university ---------- */
-sueRehearsal: [
+/* ГЛАВА «ЖЕНЕВЬЕВА МОРЕЛЬ» — четыре вечера в университете.
+   Дни ведёт UniDay: список дел на вечер закрывается физическими
+   находками, и только после этого Сью зовёт Наю домой. */
+
+uniDay1Arrive: [
+  { chapter:3 },
+  { music:'home' },
   { dlg:[
-    {who:'sue',expr:'smile',text:'Ная! Ты рано. У нас ещё прогон.'},
-    {who:'naya',expr:'normal',text:'Я подожду.'},
-    {who:'sue',expr:'normal',text:'Подожди у четырнадцатой, ладно? Мне после прогона к Морель, это две минуты.'},
-    {who:'sue',expr:'smile',text:'И не стой с этим лицом.'},
-    {who:'naya',expr:'smile',text:'У меня. Обычное. Лицо.'},
+    {who:'naya',expr:'normal',text:'(Старый корпус. Окна светятся все разом, и от этого он кажется больше, чем днём.)'},
+    {who:'naya',expr:'normal',text:'(Сью написала, что задержится. Значит, у меня есть время.)'},
   ]},
-  { flag:'waitingAtAud' },
-  { dlg:[{who:'naya',expr:'normal',text:'(Аудитория 14. Это в коридоре, посередине.)'}] },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Ладно. Осмотрюсь. Стенды, доска, списки — всё, что тут висит для таких, как я.)'},
+  ]},
 ],
 
-meetGenevieveUni: [
-  { chapter:3 },
+/* Репетиция: четыре разные картины одного спектакля. */
+rehearsalWatch: [
+  ()=>{ const d = Math.max(1, C('uniDay')); return { goto:'rehearsalDay' + Math.min(4, d) }; },
+],
+rehearsalDay1: [
+  { music:'warm' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'На площадке пять человек. У всех в руках распечатки, и все читают.'},
+    {who:'acolyte',expr:'normal',name:'Режиссёр',text:'Стоп. Пока это читка. Сью, ты текст уже знаешь. Теперь попробуй не читать его — проживи.'},
+    {who:'sue',expr:'normal',text:'Хорошо.'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Сью кладёт лист на пол и начинает сцену заново — уже глазами, а не бумагой.'},
+    {who:'sue',expr:'normal',text:'«Я думала, дом меня узнает. А он просто дом».'},
+    {who:'naya',expr:'smile',text:'(Она заметно лучше остальных. И, кажется, сама этого не понимает.)'},
+  ]},
+  { flag:'sawRehearsal' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Сью замечает Наю у стены. Улыбается — и возвращается к работе.'},
+    {who:'naya',expr:'smile',text:'(Не буду мешать. Выйду в коридор.)'},
+  ]},
+],
+rehearsalDay2: [
+  { music:'warm' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Листов почти нет. Актёры ходят по площадке, берут реквизит, задевают друг друга плечами.'},
+    {who:'acolyte',expr:'normal',name:'Режиссёр',text:'Теперь слушайте друг друга. Вы уже знаете текст.'},
+    {who:'naya',expr:'smile',text:'(Сью держит сцену. Не громкостью — паузами.)'},
+  ]},
+  { flag:'sawRehearsal' },
+],
+rehearsalDay3: [
+  { music:'warm' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Костюмы, грим, декорации, полный свет. Прогон идёт от начала до конца почти без остановок.'},
+    {who:'acolyte',expr:'normal',name:'Режиссёр',text:'Хорошо. Завтра — премьера. Никаких остановок.'},
+  ]},
+  { flag:'sawRehearsal' },
+],
+rehearsalDay4: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Зал пустой. Всё уже перенесли на сцену — сегодня играют там.'},
+  ]},
+],
+
+/* Конец вечера: Сью выходит с сумкой. Пока дела дня не закрыты, она
+   спокойно ждёт — без упрёков и без нытья, это их обычный тон. */
+sueRehearsalTalk: [
+  ()=>{
+    const d = Math.max(1, C('uniDay'));
+    if (d >= 4) return { goto:'suePremiereDay' };
+    if (!UniDay.ready(d)) return { goto:'sueDayWait' };
+    return { goto:'sueDayEnd' + d };
+  },
+],
+sueDayWait: [
+  ()=>{
+    const left = UniDay.left(C('uniDay'));
+    const first = left.length ? left[0].t : '';
+    return new Promise(res => Dialogue.start([
+      {who:'sue',expr:'smile',text:'Мы ещё не закончили. Погуляй по корпусу, только не пугай первокурсников.'},
+      {who:'naya',expr:'smile',text:'У меня обычное лицо.'},
+      {who:'sue',expr:'smile',text:'У тебя лицо человека, который пришёл описывать имущество.'},
+      {who:'naya',expr:'talk',text:'(Сначала — ' + first.charAt(0).toLowerCase() + first.slice(1) + '.)'},
+    ], res));
+  },
+],
+sueDayEnd1: [
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Долго ждала?'},
+    {who:'naya',expr:'normal',text:'Не очень. Немного походила по университету.'},
+    {who:'sue',expr:'normal',text:'Нашла что-нибудь интересное?'},
+    {who:'naya',expr:'talk',text:'Кажется, да. Но пока не уверена.'},
+    {who:'sue',expr:'smile',text:'Если захочешь проверить — проверяй. Я могу помочь.'},
+    {who:'naya',expr:'smile',text:'Спасибо. Сначала сама пойму, что именно нашла.'},
+    {who:'sue',expr:'smile',text:'Договорились.'},
+  ]},
+  { stats:{ trustSue:+3, humanity:+2 } },
+  { goto:'uniDayEnd' },
+],
+sueDayEnd2: [
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Ты закончила?'},
+    {who:'naya',expr:'normal',text:'Да. Ты стала заметно лучше.'},
+    {who:'sue',expr:'smile',text:'Завтра нас заставят делать всё в костюмах.'},
+    {who:'naya',expr:'smile',text:'Тогда я официально боюсь за тебя.'},
+    {who:'sue',expr:'smile',text:'Правильно. Бойся.'},
+    {who:'naya',expr:'smile',text:'(Мы смеёмся на весь коридор, и кто-то из режиссёрских шикает.)'},
+  ]},
+  { flag:'investigatedUniversity' },
+  { stats:{ trustSue:+4 } },
+  { goto:'uniDayEnd' },
+],
+sueDayEnd3: [
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Ты придёшь завтра?'},
+    {who:'naya',expr:'normal',text:'Конечно.'},
+    {who:'sue',expr:'worried',text:'Даже если я забуду текст?'},
+    {who:'naya',expr:'smile',text:'Тогда я скажу, что это была гениальная импровизация.'},
+    {who:'sue',expr:'smile',text:'Отлично. Мне уже спокойнее.'},
+  ]},
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Они обнимаются. Сью пахнет гримом и чужим костюмом.'},
+    {who:'naya',expr:'talk',text:'(Завтра у меня смена. И завтра Морель обещала рассказать.)'},
+  ]},
+  { stats:{ trustSue:+6, humanity:+3 } },
+  { goto:'uniDayEnd' },
+],
+suePremiereDay: [
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Ная, я не могу сейчас — меня уже зовут. Увидимся после спектакля!'},
+  ]},
+],
+
+/* Общий переход между днями: вечер, дорога домой, утро. */
+uniDayEnd: [
+  { fadeOut:800 },
+  ()=>{ UniDay.advance(); },
+  { room:'nayaRoom', x:120, y:250 },
+  { music:'home' },
+  { fadeIn:800 },
+  ()=>{
+    const d = C('uniDay');
+    if (d === 4) return { goto:'uniDay4Morning' };
+    return new Promise(res => Dialogue.start([
+      {who:'naya',expr:'normal',text:'(Дома. Сью уснула с текстом на лице.)'},
+      {who:'naya',expr:'talk',text:'(Завтра смена до шести. А потом — снова туда.)'},
+    ], res));
+  },
+],
+
+/* Четвёртый день начинается дома: Ная просит Криса подменить её. */
+uniDay4Morning: [
   { music:'tense' },
   { dlg:[
-    {who:'naya',expr:'normal',text:'(Дверь четырнадцатой. Внутри кто-то говорит — ровно, негромко, будто читает вслух.)'},
-    {who:'naya',expr:'normal',text:'(Стою третий раз за неделю на одном и том же месте. Уже знаю, где паркет скрипит.)'},
+    {who:'naya',expr:'empty',text:'(Я почти не спала. На столе — кристалл и мой почерк на полях тетради.)'},
+    {who:'naya',expr:'talk',text:'(Сегодня у неё премьера. И сегодня Морель обещала рассказать.)'},
   ]},
-  { wait:600 },
-  { sfx:'rune' }, { magic:'#c060ff', dur:1500 }, { shake:2 },
+  { sfx:'select' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Крис? Можешь сегодня меня подменить?'},
+    {who:'chris',expr:'normal',text:'Сегодня? Что случилось?'},
+    {who:'naya',expr:'normal',text:'Мне нужно кое-что закончить.'},
+    {who:'chris',expr:'normal',text:'Ладно. Я выйду.'},
+    {who:'naya',expr:'smile',text:'Спасибо. Я верну тебе должок.'},
+    {who:'chris',expr:'smile',text:'Верну. Не «верну», а «вернёшь». Иди уже.'},
+  ]},
+  { flag:'chrisCovering' },
+  ()=>{ Journal.add('chrisCover'); },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Всё. Сегодня я весь день там.)'},
+  ]},
+],
+
+/* Первая встреча: она проходит мимо, кристалл отзывается, и Морель
+   задерживает взгляд ровно на секунду дольше, чем нужно. */
+morelPendant: [
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Коридор театрального крыла. Пусто, только где-то за дверью кто-то распевается.)'},
+  ]},
+  /* Морель идёт навстречу с того конца коридора, где Наи нет, —
+     иначе она появлялась бы за спиной у камеры. */
+  ()=>{ const far = Player.x < 320 ? 640 : 0;
+        Game.cast = [{ sprite:'genevieve', x:far, y:262, name:'Морель' }];
+        return Prologue.castWalk('Морель', [Player.x + (far ? 96 : -96), 262], 2000); },
+  { wait:200 },
+  { sfx:'rune' }, { magic:'#c060ff', dur:1300 }, { shake:2 },
   { dlg:[
     {who:'naya',expr:'shocked',text:'...'},
-    {who:'naya',expr:'shocked',text:'(Кристалл. Он дёрнулся под кофтой — коротко, как разряд.)'},
-    {who:'naya',expr:'shocked',text:'(И горячий. Он никогда не был горячим.)'},
+    {who:'naya',expr:'shocked',text:'(Кристалл дёрнулся под кофтой. Коротко, как разряд.)'},
   ]},
-  { flash:'#c060ff', dur:280, peak:.5 },
+  { flash:'#c060ff', dur:260, peak:.45 },
   { dlg:[
     {who:'naya',expr:'shocked',text:'(Вспышка. Секунда, не больше. Никто в коридоре не обернулся.)'},
     {who:'naya',expr:'normal',text:'(...кроме одного человека.)'},
   ]},
-  { wait:500 },
+  ()=>Prologue.castWalk('Морель', [Player.x + (Player.x < 320 ? 40 : -40), 258], 900),
   { dlg:[
-    {who:'genevieve',expr:'normal',text:'Ты ведь не студентка.'},
-    {who:'naya',expr:'normal',text:'Нет.'},
-    {who:'genevieve',expr:'normal',text:'Тогда почему ты уже третий раз ждёшь кого-то у моей аудитории?'},
-  ]},
-  { dlg:[
-    {choice:{ prompt:'Она не сердится. Она просто ждёт ответа.', options:[
-      { text:'«Я жду подругу. Сью. Она у вас учится.»',
-        stats:{trustSue:+4, humanity:+3},
-        then:[
-          {who:'naya',expr:'normal',text:'Я жду подругу. Сью. Она у вас учится.'},
-          {who:'genevieve',expr:'smile',text:'А. Громкая, рыжий шарф, вечно опаздывает и всегда знает текст.'},
-          {who:'naya',expr:'smile',text:'Это она.'},
-        ]},
-      { text:'«А это запрещено — стоять в коридоре?»',
-        stats:{witchAmbition:+4, humanity:-2},
-        then:[
-          {who:'naya',expr:'angry',text:'А это запрещено — стоять в коридоре?'},
-          {who:'genevieve',expr:'normal',text:'Нет. Стоять можно сколько угодно.'},
-          {who:'genevieve',expr:'serious',text:'Я просто отмечаю, что ты стоишь.'},
-        ]},
-      { text:'Промолчать.',
-        stats:{witchAmbition:+2},
-        then:[
-          {who:'naya',expr:'normal',text:'...'},
-          {who:'genevieve',expr:'normal',text:'Понятно.'},
-          {who:'genevieve',expr:'smile',text:'Ты не первая, кто мне не отвечает. Обычно у таких есть причина.'},
-        ]},
-    ]}},
-  ]},
-  { dlg:[
-    {who:'sue',expr:'smile',name:'Сью',text:'НАЯ!'},
-    {who:'naya',expr:'shocked',text:'(Сью машет с другого конца коридора и, конечно, роняет папку.)'},
+    {who:'genevieve',expr:'normal',text:'Красивый кулон.'},
+    {who:'naya',expr:'normal',text:'Семейная вещь.'},
   ]},
   { wait:400 },
   { dlg:[
-    {who:'narrator',expr:'normal',name:'',text:'Женевьева смотрит на кристалл. Потом на Наю. Слегка улыбается.'},
-    {who:'genevieve',expr:'smile',text:'Хорошего вечера.'},
-    {who:'narrator',expr:'normal',name:'',text:'И уходит.'},
+    {who:'narrator',expr:'normal',name:'',text:'Она смотрит на кристалл чуть дольше, чем нужно.'},
+    {who:'genevieve',expr:'normal',text:'Понимаю.'},
   ]},
+  { dlg:[
+    {choice:{ prompt:'Она не уходит. Она ждёт, что скажет Ная.', options:[
+      { text:'«Вы преподаёте здесь?»',
+        stats:{humanity:+3},
+        then:[
+          {who:'naya',expr:'normal',text:'Вы ведь здесь преподаёте? Я видела фамилию в списке.'},
+          {who:'genevieve',expr:'smile',text:'Историю театра. А вы, судя по куртке, не отсюда.'},
+          {who:'naya',expr:'normal',text:'Я жду подругу. Сью.'},
+          {who:'genevieve',expr:'smile',text:'А. Громкая, рыжий шарф, вечно опаздывает и всегда знает текст.'},
+          {who:'naya',expr:'smile',text:'Это она.'},
+        ]},
+      { text:'«Почему вы на него смотрите?»',
+        stats:{witchAmbition:+4, humanity:-1},
+        then:[
+          {who:'naya',expr:'angry',text:'Почему вы на него так смотрите?'},
+          {who:'genevieve',expr:'normal',text:'Потому что он старше вас лет на двести. Это редко видно на улице.'},
+          {who:'naya',expr:'shocked',text:'...'},
+          {who:'genevieve',expr:'smile',text:'Я преподаю историю. Профессиональная деформация.'},
+        ]},
+      { text:'Закрыть кулон ладонью.',
+        stats:{witchAmbition:+2, humanity:+2},
+        then:[
+          {who:'naya',expr:'normal',text:'(Я накрываю его ладонью. Молча.)'},
+          {who:'genevieve',expr:'normal',text:'Правильно делаете.'},
+          {who:'naya',expr:'shocked',text:'(Что?)'},
+        ]},
+    ]}},
+  ]},
+  ()=>Prologue.castWalk('Морель', [Player.x < 320 ? -40 : 680, 254], 1600),
+  { uncast:true },
   { flag:'metGenevieveUni' },
   { flag:'crystalReacted' },
+  ()=>{ Journal.add('morelPendant'); },
   { memory:'firstMeeting' },
+  { music:'home' },
   { dlg:[
     {who:'naya',expr:'shocked',text:'(Она посмотрела не на меня. Она посмотрела на кристалл.)'},
-    {who:'naya',expr:'talk',text:'(В библиотеке есть архив. Надо посмотреть, кто она такая.)'},
+    {who:'naya',expr:'talk',text:'(На стене рядом висит старая фотография. И на раме что-то вырезано.)'},
+  ]},
+],
+
+/* Второй день: та же женщина, тот же коридор — и имя, которого она
+   знать не могла. */
+morelOldCorridor: [
+  { music:'tense' },
+  ()=>{ const far = Player.x < 320 ? 640 : 0;
+        Game.cast = [{ sprite:'genevieve', x:far, y:258, name:'Морель' }];
+        return Prologue.castWalk('Морель', [Player.x + (far ? 70 : -70), 258], 1600); },
+  { dlg:[
+    {who:'genevieve',expr:'normal',text:'Вы опять здесь.'},
+    {who:'naya',expr:'normal',text:'Да.'},
+    {who:'genevieve',expr:'normal',text:'Вижу.'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'talk',text:'Вы давно работаете в университете?'},
+    {who:'genevieve',expr:'normal',text:'Достаточно давно.'},
+    {who:'naya',expr:'normal',text:'На старых фотографиях вы тоже есть.'},
+    {who:'genevieve',expr:'serious',text:'Вы нашли архив.'},
+    {who:'naya',expr:'normal',text:'Получается, вы знали, что я его найду.'},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Она смотрит на Наю. Долго, спокойно, без всякого выражения.'},
+    {who:'genevieve',expr:'normal',text:'До свидания, Ная.'},
+  ]},
+  { sfx:'heart' }, { shake:2 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'Я не называла вам своего имени.'},
+  ]},
+  ()=>Prologue.castWalk('Морель', [Player.x < 320 ? -40 : 680, 254], 1400),
+  { uncast:true },
+  { flag:'morelKnowsName' },
+  ()=>{ Journal.add('morelKnows'); },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Она не обернулась. И не поправилась.)'},
+    {who:'naya',expr:'talk',text:'(Значит, знала заранее. Значит, спрашивала.)'},
   ]},
 ],
 
@@ -10548,62 +11680,556 @@ libraryDesk: [
   ]},
 ],
 libraryArchive: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Дверь с табличкой «АРХИВ». Заперта, и ручка холодная — сюда давно не заходили.'},
+    {if:()=> C('uniDay') >= 3, then:[
+      {who:'naya',expr:'talk',text:'(Библиотекарь сказала: совсем старое — не здесь. Значит, надо искать другой архив.)'},
+    ], else:[
+      {who:'naya',expr:'normal',text:'(В открытой коллекции только то, что можно выдавать на руки.)'},
+    ]},
+  ]},
+],
+
+/* Библиотекарь: единственный человек в корпусе, который отвечает на
+   прямые вопросы. По дням он говорит разное. */
+librarianTalk: [
+  ()=>{
+    const d = Math.max(1, C('uniDay'));
+    if (d >= 4) return { goto:'librarianDay4' };
+    if (d >= 2) return { goto:'librarianDay2' };
+    return { goto:'librarianDay1' };
+  },
+],
+librarianDay1: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Извините. Я ищу старые материалы театрального отделения. Фотографии, программы.'},
+    {who:'friend',expr:'normal',name:'Библиотекарь',text:'Совсем старые — в архиве. Здесь только открытая коллекция.'},
+    {who:'naya',expr:'normal',text:'А Женевьева Морель давно здесь работает?'},
+    {who:'friend',expr:'normal',name:'Библиотекарь',text:'Давно. Она раньше часто работала со старыми театральными материалами.'},
+    {who:'naya',expr:'talk',text:'Понятно. Спасибо.'},
+  ]},
+  { flag:'libAsked' },
+  ()=>{ Journal.add('libOld'); },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(«Давно» у библиотекарей — это не то же самое, что «давно» у всех остальных.)'},
+  ]},
+],
+librarianDay2: [
+  { dlg:[
+    {who:'friend',expr:'normal',name:'Библиотекарь',text:'Альбомы по годам — крайний стеллаж. Только руками, без телефона, пожалуйста.'},
+    {who:'naya',expr:'normal',text:'А их кто-нибудь берёт?'},
+    {who:'friend',expr:'normal',name:'Библиотекарь',text:'Морель берёт. Раз в семестр, всегда одни и те же годы.'},
+  ]},
+],
+librarianDay4: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Здесь стояли четыре альбома и папка без года. Их нет.'},
+    {who:'friend',expr:'worried',name:'Библиотекарь',text:'Значит, передали в старый архив. Так иногда делают, когда материал ветхий.'},
+    {who:'naya',expr:'talk',text:'Кто передаёт?'},
+    {who:'friend',expr:'normal',name:'Библиотекарь',text:'Тот, у кого есть ключ. У меня его нет.'},
+  ]},
+],
+
+/* Второй день: четыре периода подряд, и на всех четырёх — одно лицо. */
+libraryPeriods: [
   { music:'tense' },
   { dlg:[
-    {who:'naya',expr:'normal',text:'Дверь архива не заперта. Внутри пахнет бумагой и пылью, и очень тихо.'},
-    {who:'naya',expr:'normal',text:'Коробки по годам. Личные дела, программки, списки.'},
-  ]},
-  { sfx:'rune' }, { magic:'#c060ff', dur:1400 },
-  { dlg:[
-    {who:'naya',expr:'shocked',text:'(Кристалл снова дёрнулся. Здесь. Именно на этой коробке.)'},
+    {who:'naya',expr:'normal',text:'(Альбомы по годам. Я раскладываю их на столе в один ряд.)'},
   ]},
   { dlg:[
-    {who:'naya',expr:'talk',text:'(Папка без года. Внутри — семь листов, отпечатанных на машинке.)'},
+    {who:'naya',expr:'normal',text:'ТРИДЦАТЬ ЛЕТ НАЗАД. Старая театральная группа, двадцать человек, все в чёрном.'},
+    {who:'naya',expr:'normal',text:'(Второй ряд, третья слева. Морель.)'},
+  ]},
+  { wait:400 },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'ДВАДЦАТЬ ПЯТЬ. Другая постановка, другие люди.'},
+    {who:'naya',expr:'talk',text:'(И снова она. Тот же поворот головы.)'},
+  ]},
+  { wait:400 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'ПЯТНАДЦАТЬ. Она.'},
+    {who:'naya',expr:'shocked',text:'ПЯТЬ. Она же.'},
+  ]},
+  { sfx:'heart' }, { shake:2 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Я кладу рядом сегодняшнюю программку с её фотографией.)'},
+    {who:'naya',expr:'shocked',text:'(Тридцать лет. Пять снимков. Одно лицо.)'},
+    {who:'naya',expr:'talk',text:'Нет. Так не бывает.'},
+  ]},
+  { flag:'libPeriods' },
+  ()=>{ Journal.add('libPeriods'); },
+  { stats:{ witchAmbition:+4 } },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Одна фотография — совпадение. Пять — это уже что-то другое.)'},
+    {who:'naya',expr:'normal',text:'(Нужны доказательства, а не ощущение. Символ. Он же откуда-то взялся.)'},
+  ]},
+],
+libraryMissing: [
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Крайний стеллаж. Вчера здесь стояли четыре альбома.)'},
+    {who:'naya',expr:'shocked',text:'(Пусто. Не переставлены — именно вынуты: пыль лежит ровным прямоугольником.)'},
+  ]},
+  { flag:'libMissing' },
+  ()=>{ Journal.add('libMissing'); },
+  { dlg:[
+    {who:'naya',expr:'angry',text:'(Кто-то забрал ровно то, что я смотрела.)'},
+    {who:'naya',expr:'talk',text:'(Значит, спрашивать больше некого. Пойду туда, где сидит она сама.)'},
+  ]},
+],
+
+libraryBreak: [
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Слишком много совпадений для одного вечера.)'},
+    {who:'naya',expr:'normal',text:'(Настоящий архив не здесь. Здесь только то, что разрешено выдавать.)'},
+  ]},
+],
+
+/* ---------- день второй: источник символа ---------- */
+propsShield: [
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Декоративный щит из фанеры, обтянутый крашеной мешковиной. Реквизит какой-то забытой постановки.'},
+  ]},
+  { dlg:[
+    {if:()=> !F('symbolPhoto'), then:[
+      {who:'naya',expr:'normal',text:'(Узор в центре. Красивый, но я не понимаю, на что смотрю.)'},
+    ], else:[
+      {who:'naya',expr:'shocked',text:'(В центре — тот же знак. Круг, четыре луча, четыре точки.)'},
+    ]},
+  ]},
+  ()=>{
+    if (!F('symbolPhoto')) return;
+    setFlag('propsSymbol');
+    Journal.add('propsSymbol');
+  },
+  { jump:()=> F('propsSymbol') ? null : 'propsShieldEnd' },
+  { sfx:'rune' }, { magic:'#c060ff', dur:1400 }, { shake:2 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Кристалл отозвался. Здесь, на куске фанеры из подвала.)'},
+    {who:'naya',expr:'talk',text:'Значит, дело не только в Морель.'},
+  ]},
+  { stats:{ witchAmbition:+3 } },
+],
+propsShieldEnd: [
+  { dlg:[{who:'naya',expr:'talk',text:'(Сначала надо понять, где я это уже видела.)'}] },
+],
+propsBoxes: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Коробки с надписью «ТЕАТР. ОБЩЕСТВО». Внутри — программы, фотографии, чьи-то заметки на полях.'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'normal',text:'«Реж. — МОРЕЛЬ». «Костюмы: МОРЕЛЬ». «Восстановление декораций — МОРЕЛЬ Ж.»'},
+    {who:'naya',expr:'shocked',text:'(Программки разных десятилетий. Фамилия одна.)'},
+    {who:'naya',expr:'talk',text:'Ладно. Теперь это уже точно не случайность.'},
+  ]},
+  { flag:'propsMorel' },
+  ()=>{ Journal.add('propsMorel'); },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Надо выйти в коридор и подышать. У меня руки в пыли и в голове каша.)'},
+  ]},
+],
+dressingCostumes: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Вешалки в три ряда. Половина костюмов подписана карандашом прямо по подкладке.'},
+    {if:()=> C('uniDay') >= 3, then:[
+      {who:'naya',expr:'smile',text:'(Платье Элисы висит отдельно, на плечиках, с запиской «НЕ ТРОГАТЬ — СЬЮ».)'},
+      {who:'naya',expr:'smile',text:'(Почерк её. Восклицательный знак — тоже её.)'},
+    ], else:[
+      {who:'naya',expr:'normal',text:'(Костюмы к премьере ещё не разобраны. Пока это просто склад чужой ткани.)'},
+    ]},
+  ]},
+],
+
+/* ---------- день третий: цокольный архив ---------- */
+archiveFolder30: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'ТРИДЦАТЬ ЛЕТ НАЗАД. Папка на завязках, бумага рыжая по краю.'},
+    {who:'naya',expr:'normal',text:'Списки участников театрального общества. Половина фамилий вычеркнута карандашом.'},
+    {who:'naya',expr:'talk',text:'(Одна строка вычеркнута дважды и подписана сверху другой рукой.)'},
+    {who:'naya',expr:'normal',text:'Ниже, в той же коробке, — папка на пять лет моложе. Двадцать пять. Тот же почерк на описи.'},
+  ]},
+  ()=>{ addC('libClues'); },
+],
+archiveFolder15: [
+  async ()=>{ if (gameState.chapter === 3) await Chapters.show(4); },
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'ПЯТНАДЦАТЬ ЛЕТ НАЗАД. Тонкая папка, семь листов, машинописный текст.'},
     {who:'naya',expr:'normal',text:'«...в фольклорной традиции региона — четыре повеления, высеченные в чёрных звёздах...»'},
     {who:'naya',expr:'normal',text:'«Видь сквозь. Подчиняй. Разрушай. Твори.»'},
     {who:'naya',expr:'shocked',text:'(Я знаю эти слова. Я не знаю откуда, но я их знаю.)'},
   ]},
-  { flag:'investigatedUniversity' },
-  { action:0 },
+  { sfx:'rune' }, { magic:'#c060ff', dur:1600 }, { shake:3 },
   { dlg:[
-    {who:'naya',expr:'talk',text:'«...из четверых одна отказалась исполнять третье повеление. В записях она названа Мидеей.»'},
+    {who:'naya',expr:'shocked',text:'(На полях от руки: имя и тот же знак. Круг, четыре луча, четыре точки.)'},
+    {who:'naya',expr:'shocked',text:'«...из четверых одна отказалась исполнять третье повеление. В записях она названа Мидеей.»'},
     {who:'naya',expr:'shocked',text:'...'},
     {who:'naya',expr:'shocked',text:'(Мидея.)'},
-    {who:'naya',expr:'shocked',text:'(Так звали мою мать.)'},
+    {who:'naya',expr:'sad',text:'Мама...'},
   ]},
-  { sfx:'heart' }, { shake:3 }, { glitch:400, strength:.4 },
+  { sfx:'heart' }, { glitch:400, strength:.4 },
   { dlg:[
-    {who:'naya',expr:'shocked',text:'(Не «мама». Не «эта женщина». Не «гнилая». Мидея.)'},
+    {who:'naya',expr:'sad',text:'(Не «эта женщина». Не «гнилая». Мидея.)'},
     {who:'naya',expr:'sad',text:'(Я не слышала это имя пятнадцать лет. Его никто не произносил вслух.)'},
   ]},
   { dlg:[
     {who:'naya',expr:'normal',text:'«...приговорена к смерти за неповиновение. Перед казнью передала свою силу дочери, заключив её в кристалл...»'},
-    {who:'naya',expr:'shocked',text:'(Я опускаю руку и трогаю его через кофту. Он отзывается — впервые не пугающе, а как-то... узнаваемо.)'},
-    {who:'naya',expr:'sad',text:'(Дочери.)'},
-    {who:'naya',expr:'sad',text:'(Мне.)'},
+    {who:'naya',expr:'shocked',text:'(Я трогаю его через кофту. Он отзывается — впервые не пугающе, а узнаваемо.)'},
+    {who:'naya',expr:'sad',text:'(Дочери. Мне.)'},
   ]},
+  { flag:'archiveMedeaFound' },
   { flag:'learnedMedea' },
+  ()=>{ Journal.add('archiveMedea'); },
   { memory:'medeaTruth' },
   { stats:{ witchAmbition:+8 } },
   { music:'sad' },
   { dlg:[
-    {who:'naya',expr:'sad',text:'(Всю жизнь мне говорили, что мать была плохой ведьмой.)'},
-    {who:'naya',expr:'angry',text:'(А она отказалась разрушать. Её убили именно за это.)'},
-    {who:'naya',expr:'shocked',text:'(И я ношу её силу на шее с четырёх лет.)'},
+    {who:'naya',expr:'angry',text:'(Всю жизнь мне говорили, что мать была плохой ведьмой. А она отказалась разрушать.)'},
+    {who:'naya',expr:'talk',text:'(Надо посмотреть остальные папки. Здесь должно быть что-то ещё.)'},
+  ]},
+],
+archiveFolder5: [
+  ()=>{
+    if (!F('archiveMedeaFound')) return { goto:'archiveFolder5Early' };
+  },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'ПЯТЬ ЛЕТ НАЗАД. Опись переданных материалов: кто, что и когда забирал из архива.'},
+    {who:'naya',expr:'shocked',text:'(Против папки с именем Мидеи — подпись. Читается только фамилия.)'},
+    {who:'naya',expr:'shocked',text:'МОРЕЛЬ.'},
+  ]},
+  { sfx:'heart' }, { shake:2 },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'Что ты знала о ней?'},
+  ]},
+  { flag:'archiveMorelFound' },
+  ()=>{ Journal.add('archiveMorel'); },
+  { wait:500 },
+  { sfx:'door' },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Наверху хлопнула дверь. Шаги — ровные, неторопливые, вверх по лестнице.)'},
+    {who:'naya',expr:'talk',text:'(Это она. И она не убегает.)'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Наверх. Через старое крыло, по лестнице, на крышу.)'},
+  ]},
+],
+archiveFolder5Early: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'ПЯТЬ ЛЕТ НАЗАД. Опись выдачи материалов. Столбцы, даты, подписи.'},
+    {who:'naya',expr:'talk',text:'(Пока я не знаю, какую фамилию тут искать.)'},
+  ]},
+],
+archiveDesk: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'Стол архивариуса. Лампа, пустая чашка, стопка карточек выдачи.'},
+    {if:()=> F('archiveMorelFound'), then:[
+      {who:'naya',expr:'sad',text:'(Я сидела за этим столом и узнала, как звали мою мать до того, как её начали звать гнилой.)'},
+    ], else:[
+      {who:'naya',expr:'normal',text:'(Последняя карточка заполнена аккуратным мелким почерком. Тем же, что на полях книг в библиотеке.)'},
+    ]},
+  ]},
+],
+/* Четвёртый день: папка, которой не было ни в библиотеке, ни на полке. */
+archiveMissingFolder: [
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Коробки без описи. Я снимаю их по одной и ставлю на пол.)'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(В третьей — те самые четыре альбома из библиотеки. И тонкая папка сверху.)'},
+    {who:'naya',expr:'normal',text:'(Их не спрятали. Их просто принесли сюда сегодня утром: на коробке нет пыли.)'},
+  ]},
+  { sfx:'rune' }, { magic:'#c060ff', dur:1500 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Внутри — документы, фотографии, заметки. Две фамилии на одном листе.)'},
+    {who:'naya',expr:'shocked',text:'МОРЕЛЬ. МЕДЕЯ.'},
+    {who:'naya',expr:'normal',text:'(Совместная работа. Совместные поездки. Одна подпись под другой, год за годом.)'},
+  ]},
+  { flag:'archiveFolderFound' },
+  ()=>{ Journal.add('folderFound'); },
+  { stats:{ witchAmbition:+4 } },
+  { dlg:[
+    {who:'naya',expr:'angry',text:'Хватит искать по кускам. Теперь она мне всё расскажет.'},
+    {who:'naya',expr:'talk',text:'(Но сначала — Сью. У неё сегодня премьера, и я обещала.)'},
+  ]},
+],
+
+/* ---------- день четвёртый ---------- */
+morelPhoto: [
+  { music:'tense' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Кабинет пуст. Лампа выключена, чашка вымыта и перевёрнута.)'},
+    {who:'naya',expr:'normal',text:'(На стене, между книжной полкой и окном, — старая фотография в тонкой рамке.)'},
+  ]},
+  { wait:500 },
+  { sfx:'rune' }, { magic:'#c060ff', dur:1600 }, { shake:2 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Две женщины у театрального задника. Слева — Морель. Точно такая же, как сегодня.)'},
+    {who:'naya',expr:'shocked',text:'(Справа — женщина, чьё лицо я помню только по одной фотографии из отцовской коробки.)'},
+    {who:'naya',expr:'shocked',text:'(На обороте, карандашом: МОРЕЛЬ и МЕДЕЯ.)'},
+    {who:'naya',expr:'sad',text:'Так вы действительно её знали.'},
+  ]},
+  { flag:'morelPhotoSeen' },
+  ()=>{ Journal.add('morelPhoto'); },
+  { memory:'motherFace' },
+  { dlg:[
+    {choice:{ prompt:'Рамка не прибита. Её можно снять со стены.', options:[
+      { text:'Оставить фотографию на месте.',
+        stats:{humanity:+6, trustSue:+2},
+        then:[
+          {who:'naya',expr:'sad',text:'(Я поправляю рамку и убираю руки.)'},
+          {who:'naya',expr:'talk',text:'(Если я её заберу, разговора не будет. Будет кража.)'},
+        ]},
+      { text:'Сфотографировать и уйти.',
+        stats:{witchAmbition:+4},
+        then:[
+          {who:'naya',expr:'normal',text:'(Снимок на телефон. Плёнка отражает вспышку, но лица видно.)'},
+          {who:'naya',expr:'talk',text:'(Теперь она не скажет, что мне показалось.)'},
+        ]},
+    ]}},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Всё. Надо уходить, пока сюда никто не зашёл.)'},
+  ]},
+],
+
+/* Жалоба сработала: Наю выводят из корпуса. Это не наказание за
+   любопытство, а просто правила, которые до сих пор её не касались. */
+securityBan: [
+  { music:'tense' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'В холле её догоняет преподаватель — тот самый, что объяснял дорогу к четырнадцатой.'},
+    {who:'customer',expr:'normal',name:'Преподаватель',text:'Извините. Вы студентка этого университета?'},
+    {who:'naya',expr:'normal',text:'Нет.'},
+    {who:'customer',expr:'normal',name:'Преподаватель',text:'Тогда вы не можете свободно находиться здесь.'},
+    {who:'naya',expr:'normal',text:'Я жду подругу. Она студентка театрального отделения.'},
+    {who:'customer',expr:'normal',name:'Преподаватель',text:'Вам нужно дождаться её за пределами здания.'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Через полминуты подходит охранник. Не спеша, без интереса.'},
+    {who:'customer',expr:'normal',name:'Охранник',text:'Девушка, вы Ная?'},
+    {who:'naya',expr:'shocked',text:'Да.'},
+    {who:'customer',expr:'normal',name:'Охранник',text:'Нам уже пожаловались, что вы несколько дней ходите по университету, разговариваете со студентами и заходите в служебные помещения.'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Он не злится. Ему просто надо закрыть вопрос.', options:[
+      { text:'«Я ничего не ломала и ничего не брала.»',
+        stats:{humanity:+4},
+        then:[
+          {who:'naya',expr:'normal',text:'Я ничего не ломала и ничего не брала.'},
+          {who:'customer',expr:'normal',name:'Охранник',text:'Я этого и не утверждаю. Но вы не ученица. Вам придётся покинуть здание.'},
+          {who:'naya',expr:'normal',text:'Хорошо.'},
+        ]},
+      { text:'«А кто пожаловался?»',
+        stats:{witchAmbition:+3},
+        then:[
+          {who:'naya',expr:'angry',text:'А кто пожаловался?'},
+          {who:'customer',expr:'normal',name:'Охранник',text:'Этого я не скажу. Пойдёмте.'},
+          {who:'naya',expr:'talk',text:'(Не скажет. Но я и так знаю, чей это почерк.)'},
+        ]},
+      { text:'Молча пойти к выходу.',
+        stats:{humanity:+5, witchAmbition:-1},
+        then:[
+          {who:'naya',expr:'empty',text:'...'},
+          {who:'customer',expr:'normal',name:'Охранник',text:'Вот и правильно. Без обид, работа такая.'},
+          {who:'naya',expr:'empty',text:'(Без обид.)'},
+        ]},
+    ]}},
+  ]},
+  { flag:'universityBanned' },
+  { flag:'universityAccessRestricted' },
+  { flag:'universityWindowRouteUnlocked' },
+  ()=>{ Journal.add('banned'); },
+  { fadeOut:700 },
+  { room:'uniBackYard', x:44, y:244 },
+  { music:'street' },
+  { fadeIn:700 },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Я не стала спорить и не стала уходить далеко. Обошла корпус и встала у торца.)'},
+    {who:'naya',expr:'talk',text:'Ладно. Значит, через главный вход больше нельзя.'},
+    {who:'naya',expr:'normal',text:'(А сегодня вечером у Сью премьера. И я обещала.)'},
+  ]},
+],
+
+/* Премьера: Ная смотрит спектакль из зала, куда попала не через дверь. */
+premiereShow: [
+  { music:'warm' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Зал полный. Свет гаснет, и в темноте кто-то ещё дожёвывает шуршащую конфету.'},
   ]},
   { wait:600 },
   { dlg:[
-    {who:'genevieve',expr:'normal',text:'Я так и думала, что ты дойдёшь до этой папки.'},
-    {who:'naya',expr:'shocked',text:'...сколько вы там стоите?'},
-    {who:'genevieve',expr:'smile',text:'Достаточно.'},
-    {who:'genevieve',expr:'serious',text:'Сядь. Разговор будет длинный, а ты стоишь так, будто сейчас упадёшь.'},
+    {who:'narrator',expr:'normal',name:'',text:'Сью выходит на свет. Костюм, грим, декорация дома, который завтра продадут.'},
+    {who:'sue',expr:'normal',text:'«Мы не обязаны жить в том месте, которое однажды назвали своим домом».'},
+    {who:'sue',expr:'normal',text:'«Но мы можем взять с собой то, что сделало нас теми, кто мы есть».'},
   ]},
-  { dlg:[{who:'naya',expr:'normal',text:'(Она села за стол у окна. И ждёт.)'}] },
-],
-libraryBreak: [
+  { wait:500 },
   { dlg:[
-    {who:'naya',expr:'talk',text:'(Слишком много совпадений для одного вечера.)'},
-    {who:'naya',expr:'normal',text:'(Архив. Он в глубине, за той дверью.)'},
+    {who:'sue',expr:'normal',text:'«И однажды перестать бояться открыть дверь».'},
+    {who:'naya',expr:'sad',text:'(Она играет про дом. А я весь день лазила по чужому подвалу.)'},
+  ]},
+  { sfx:'chime' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Аплодисменты. Спектакль прошёл от начала до конца, без единой остановки.'},
+  ]},
+  { flag:'premiereDone' },
+  ()=>{ Journal.add('premiere'); },
+  { stats:{ trustSue:+8, humanity:+5 } },
+  { wait:500 },
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Ну?'},
+    {who:'naya',expr:'smile',text:'Ты была отличная.'},
+    {who:'sue',expr:'smile',text:'Правда?'},
+    {who:'naya',expr:'smile',text:'Правда.'},
+    {who:'sue',expr:'smile',text:'А ты всё-таки нашла способ попасть внутрь.'},
+    {who:'naya',expr:'smile',text:'Ты же попросила не исчезать.'},
+  ]},
+  { dlg:[
+    {who:'sue',expr:'normal',text:'Тогда всё остальное потом.'},
+    {who:'naya',expr:'normal',text:'Мне нужно ещё кое-куда.'},
+    {who:'sue',expr:'normal',text:'Морель?'},
+    {who:'naya',expr:'normal',text:'Да.'},
+    {who:'sue',expr:'worried',text:'Будь осторожна. Если что — звони.'},
+    {who:'naya',expr:'smile',text:'Обязательно.'},
+  ]},
+  { music:'sad' },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Крыша. Она сказала «завтра», и завтра уже настало.)'},
+  ]},
+],
+
+/* ---------- крыша ---------- */
+roofPromise: [
+  { music:'sad' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Она стоит у парапета и не оборачивается, хотя слышала дверь.)'},
+    {who:'naya',expr:'talk',text:'Вы знали мою мать?'},
+    {who:'genevieve',expr:'normal',text:'Откуда ты взяла это имя?'},
+    {who:'naya',expr:'normal',text:'Из вашего архива.'},
+    {who:'genevieve',expr:'serious',text:'Ты не должна была туда заходить.'},
+    {who:'naya',expr:'angry',text:'Тогда зачем вы оставили там материалы?'},
+    {who:'genevieve',expr:'normal',text:'Я их не оставляла.'},
+    {who:'naya',expr:'normal',text:'Но вы знали, что они там.'},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'genevieve',expr:'sad',text:'Ты очень похожа на неё.'},
+    {who:'naya',expr:'shocked',text:'На Медею?'},
+    {who:'genevieve',expr:'sad',text:'Да.'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'talk',text:'Что вы знаете о моей матери?'},
+    {who:'genevieve',expr:'normal',text:'Сегодня — не всё.'},
+    {who:'naya',expr:'angry',text:'Тогда расскажите то, что знаете.'},
+    {who:'genevieve',expr:'normal',text:'Завтра.'},
+    {who:'naya',expr:'normal',text:'Завтра у меня работа.'},
+    {who:'genevieve',expr:'serious',text:'Тогда тебе придётся решить, что для тебя сейчас важнее.'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Она ждёт ответа. Не уговаривает — просто ждёт.', options:[
+      { text:'«Я приду.»',
+        stats:{witchAmbition:+5},
+        then:[
+          {who:'naya',expr:'normal',text:'Я приду.'},
+          {who:'genevieve',expr:'normal',text:'Хорошо.'},
+        ]},
+      { text:'«Почему не сегодня?»',
+        stats:{witchAmbition:+3, humanity:-1},
+        then:[
+          {who:'naya',expr:'angry',text:'Почему не сегодня? Вы стоите здесь, я стою здесь.'},
+          {who:'genevieve',expr:'sad',text:'Потому что сегодня ты пришла с именем. Завтра придёшь с вопросом.'},
+          {who:'naya',expr:'normal',text:'...Я приду.'},
+          {who:'genevieve',expr:'normal',text:'Хорошо.'},
+        ]},
+    ]}},
+  ]},
+  { flag:'roofPromise' },
+  ()=>{ Journal.add('roofPromise'); },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Она ушла первой. Я осталась смотреть, как внизу гаснут окна.)'},
+    {who:'naya',expr:'normal',text:'(У Сью сегодня генеральная. Я обещала прийти и на неё.)'},
+  ]},
+],
+
+roofTruth: [
+  { music:'sad' },
+  { dlg:[
+    {who:'genevieve',expr:'normal',text:'Ты пришла.'},
+    {who:'naya',expr:'normal',text:'Вы обещали рассказать.'},
+    {who:'genevieve',expr:'normal',text:'Обещала.'},
+    {who:'naya',expr:'normal',text:'Я нашла фотографию. Вас и Медею.'},
+    {who:'genevieve',expr:'sad',text:'Значит, теперь ты понимаешь, что я не могла просто отмахнуться от тебя.'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'angry',text:'Тогда расскажите всё.'},
+    {who:'genevieve',expr:'serious',text:'Твоя мать была ведьмой.'},
+    {who:'naya',expr:'normal',text:'Я знаю.'},
+    {who:'genevieve',expr:'serious',text:'Нет. Ты знаешь только то, что нашла в старых бумагах.'},
+    {who:'naya',expr:'angry',text:'Тогда расскажите настоящее.'},
+  ]},
+  { wait:500 },
+  { sfx:'rune' }, { magic:'#c060ff', dur:1800 },
+  { dlg:[
+    {who:'genevieve',expr:'sad',text:'Мидея была из тех, кого учили ломать. Она отказалась и попробовала отпустить то, что должна была уничтожить.'},
+    {who:'genevieve',expr:'sad',text:'За это её и убили. А силу она не отдала им. Она заперла её.'},
+    {who:'naya',expr:'shocked',text:'Кристалл.'},
+    {who:'genevieve',expr:'normal',text:'Да.'},
+  ]},
+  { dlg:[
+    {who:'naya',expr:'angry',text:'И вы знали об этом всё это время?'},
+    {who:'genevieve',expr:'sad',text:'Я знала Медею. И знала, что однажды её сила может снова проявиться.'},
+    {who:'naya',expr:'angry',text:'Почему вы ничего не сказали?'},
+    {who:'genevieve',expr:'sad',text:'Потому что сначала хотела убедиться, что ты готова услышать правду.'},
+    {who:'naya',expr:'talk',text:'А теперь?'},
+    {who:'genevieve',expr:'smile',text:'Теперь ты четыре дня ходила по университету, нашла архив, обошла запреты охраны и всё равно пришла ко мне.'},
+    {who:'naya',expr:'normal',text:'Звучит так, будто вы меня проверяли.'},
+    {who:'genevieve',expr:'smile',text:'Возможно.'},
+  ]},
+  { flag:'morelTruth' },
+  ()=>{ Journal.add('morelTruth'); },
+  { memory:'reveal' },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'И что теперь?'},
+    {who:'narrator',expr:'normal',name:'',text:'Морель достаёт из кармана небольшой металлический знак. Круг, четыре луча, четыре точки.'},
+    {who:'genevieve',expr:'normal',text:'Теперь ты можешь увидеть тех, кто знает эту историю лучше меня.'},
+    {who:'naya',expr:'normal',text:'Кого?'},
+    {who:'genevieve',expr:'normal',text:'Ведьм.'},
+  ]},
+  ()=>{ setCounter('uniDay', 5); },
+  { goto:'genevieveReveal' },
+],
+
+/* Конец смены на второй, третий и четвёртый день главы. Крис не
+   расспрашивает — он просто отмечает, что Ная зачастила. */
+chrisShiftDay: [
+  ()=>{
+    const d = C('uniDay');
+    if (d >= 4) return { goto:'chrisShiftDay4' };
+    if (d === 3) return { goto:'chrisShiftDay3' };
+  },
+  { dlg:[
+    {who:'chris',expr:'normal',text:'Опять в университет?'},
+    {who:'naya',expr:'normal',text:'Да.'},
+    {who:'chris',expr:'smile',text:'Ты там скоро пропишешься.'},
+    {who:'naya',expr:'smile',text:'Надеюсь, хотя бы без платы за коммуналку.'},
+  ]},
+],
+chrisShiftDay3: [
+  { dlg:[
+    {who:'chris',expr:'normal',text:'Сегодня тоже расследование?'},
+    {who:'naya',expr:'normal',text:'Сегодня хочу проверить одну вещь.'},
+    {who:'chris',expr:'smile',text:'Удачи.'},
+    {who:'naya',expr:'smile',text:'Спасибо.'},
+  ]},
+],
+chrisShiftDay4: [
+  { dlg:[
+    {who:'chris',expr:'normal',text:'Я за тебя вышел, а ты всё равно тут.'},
+    {who:'naya',expr:'smile',text:'Я на две минуты. Кофе и ушла.'},
+    {who:'chris',expr:'normal',text:'Иди уже. И скажи Сью «ни пуха».'},
   ]},
 ],
 
@@ -10664,6 +12290,8 @@ genevieveReveal: [
   ]},
   { flag:'learnedWitches' },
   { flag:'foundGenevieve' },
+  { flag:'communeInvite' },
+  ()=>{ Journal.add('communeInvite'); },
   { act:2 },
   { memory:'reveal' },
   { dlg:[
@@ -10735,7 +12363,7 @@ cafeScene: [
   { dlg:[
     {who:'sue',expr:'smile',text:'Всё, я побежала, у меня прогон. Зайдёшь за мной после смены?'},
     {who:'naya',expr:'normal',text:'Зайду.'},
-    {who:'sue',expr:'smile',text:'Университет, коридор, четырнадцатая. Не пугай первокурсников.'},
+    {who:'sue',expr:'smile',text:'Университет, театральное крыло, репетиционный зал. Не пугай первокурсников.'},
   ]},
   { dlg:[{who:'naya',expr:'normal',text:'(До конца смены — четыре часа и очередь у стойки.)'}] },
   { shift:true },
@@ -10992,24 +12620,29 @@ securityEject: [
 ],
 
 /* Обходной путь: створка на первом этаже старого крыла, со двора. */
+/* Обходной путь: низкое окно старого крыла, подпёртое книгой. Ведёт не
+   в само крыло, а в служебный коридор цоколя — тот самый, который Ная
+   могла заметить изнутри раньше. */
 uniWindowEntry: [
   { dlg:[
-    {who:'naya',expr:'normal',text:'(Двор с торца. Отсюда корпус выглядит совсем не парадно: трубы, ящики, чей-то велосипед.)'},
-    {who:'naya',expr:'talk',text:'(И створка на первом этаже, которую подпёрли книгой, чтобы не хлопала.)'},
+    {who:'naya',expr:'normal',text:'(Створка держится на книге, чтобы не хлопала. Кто-то курит здесь по вечерам и не хочет ходить кругом.)'},
   ]},
   { sfx:'door' },
   { dlg:[
-    {who:'naya',expr:'shocked',text:'(Подоконник высокий. Ну и ладно.)'},
+    {who:'naya',expr:'shocked',text:'(Подоконник низкий, но узкий. Ну и ладно.)'},
   ]},
   { shake:3 },
   { fadeOut:500 },
-  { room:'uniOldWing' },
+  { room:'uniBasement', x:250, y:162 },
   { fadeIn:600 },
-  { dlg:[
-    {who:'naya',expr:'normal',text:'(Старое крыло. Пыль, чехлы на партах, никого.)'},
-    {who:'naya',expr:'talk',text:'(Отсюда до учебного коридора — два поворота. И мимо охраны.)'},
-  ]},
   { flag:'oldWingOpen' },
+  { flag:'backWindowUsed' },
+  { flag:'knowsServiceRoute' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Служебный коридор. Трубы, запах горячей пыли, ни одной камеры.)'},
+    {who:'naya',expr:'talk',text:'(Отсюда — цоколь, а из цоколя лестница наверх. Мимо охраны.)'},
+  ]},
+  ()=>{ Journal.add('serviceRoute'); },
 ],
 
 /* Ная возвращается на ту самую площадку. Эмоция должна возникнуть из
@@ -13181,6 +14814,37 @@ function showStatus() {
       sub.innerHTML = `<span style="opacity:.7">${g.s}</span><span></span>`;
       rows.appendChild(sub);
     }
+    rows.appendChild(document.createElement('hr'));
+  }
+  /* ЖУРНАЛ: главная цель расследования и всё, что Ная уже выяснила. */
+  const facts = Journal.entries();
+  if (facts.length) {
+    const jh = document.createElement('div');
+    jh.className = 'statRow';
+    jh.innerHTML = '<span style="color:#e8d8a0">ЖУРНАЛ</span>' +
+                   `<span style="opacity:.6">${facts.length}</span>`;
+    rows.appendChild(jh);
+    const main = facts.filter(f => f.main), rest = facts.filter(f => !f.main);
+    main.forEach(f => {
+      const r = document.createElement('div');
+      r.className = 'statRow';
+      r.innerHTML = `<span style="color:#f0e4c0">${f.t}</span><span></span>`;
+      rows.appendChild(r);
+    });
+    let day = 0;
+    rest.forEach(f => {
+      if (f.d !== day) {
+        day = f.d;
+        const d = document.createElement('div');
+        d.className = 'statRow';
+        d.innerHTML = `<span style="color:#9a8f76">День ${day}</span><span></span>`;
+        rows.appendChild(d);
+      }
+      const r = document.createElement('div');
+      r.className = 'statRow';
+      r.innerHTML = `<span style="opacity:.82">• ${f.t}</span><span></span>`;
+      rows.appendChild(r);
+    });
     rows.appendChild(document.createElement('hr'));
   }
   const data = [

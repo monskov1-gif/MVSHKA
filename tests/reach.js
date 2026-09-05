@@ -9,7 +9,10 @@ const ENTRY = {
   uniStage:[120,262], uniLibrary:[120,258],
   uniHallMain:[190,300], uniCorridorTheatre:[340,216], uniCorridorLib:[398,216],
   uniFloor2:[320,240], playgroundNow:[150,268],
-  uniCanteen:[170,268], uniOldWing:[470,150],
+  uniCanteen:[170,268], uniOldWing:[470,208],
+  uniRehearsal:[34,286], uniDressing:[40,236], uniProps:[44,254],
+  uniMorelOffice:[40,220], uniBasement:[58,186], uniArchive:[40,220],
+  uniRoof:[52,202], uniBackYard:[44,244],
   forestEdge:[196,140], communeRoad:[30,180], communeYard:[40,220], trialRoom:[130,230],
   hellStreet:[60,220],
 };
