@@ -664,8 +664,32 @@ const Assets = {
       g.fillRect(1,2,2,2); g.fillRect(4,2,2,2); g.fillRect(3,2,1,2);   // wings + knot
       g.fillStyle = '#fff'; g.globalAlpha = .45; g.fillRect(1,2,1,1); g.fillRect(5,2,1,1); g.globalAlpha = 1;
     }
+    // головные уборы кладутся поверх волос: соломенная шляпа с полями,
+    // ведьминская остроконечная и фуражка с козырьком
+    if (opts.hat) {
+      const hc = opts.hatColor || '#2a2630', ht = opts.hatTrim || hc;
+      if (opts.hat === 'straw') {
+        g.fillStyle = hc; g.fillRect(1,2,14,1); g.fillRect(3,0,10,2);
+        g.fillStyle = ht; g.fillRect(3,1,10,1);
+      } else if (opts.hat === 'witch') {
+        g.fillStyle = hc; g.fillRect(1,3,14,1); g.fillRect(3,1,10,2); g.fillRect(2,0,6,1);
+        g.fillStyle = ht; g.fillRect(10,2,2,1);                       // роза на тулье
+      } else if (opts.hat === 'cap') {
+        g.fillStyle = hc; g.fillRect(3,0,10,2); g.fillRect(2,3,12,1); // тулья и козырёк
+        g.fillStyle = ht; g.fillRect(3,2,10,1);
+      }
+    }
     g.fillStyle = eyeColor; g.fillRect(6,6,1,2); g.fillRect(9,6,1,2);
     if (opts.glowEye) { g.fillStyle = opts.glowEye; g.fillRect(6,6,1,1); g.fillRect(9,6,1,1); }
+    if (opts.glasses) {                                               // оправа: верхний ободок,
+      g.fillStyle = opts.glasses;                                     // дужки по краям и переносица
+      g.fillRect(5,5,6,1);
+      g.fillRect(4,6,1,2); g.fillRect(11,6,1,2); g.fillRect(8,6,1,1);
+    }
+    if (opts.fringe) {                                                // чёлка, закрывающая один глаз
+      g.fillStyle = opts.fringe;
+      g.fillRect(9,4,3,3); g.fillRect(11,3,2,4);
+    }
     // torso, then a slightly wider skirt, then socks / boots
     if (opts.child) {
       g.fillStyle = bodyColor; g.fillRect(5,10,6,4);
@@ -686,6 +710,20 @@ const Assets = {
     g.fillStyle = bodyColor;
     if (opts.child) { g.fillRect(4,11,1,3); g.fillRect(11,11,1,3); }
     else { g.fillRect(3,11,1,4); g.fillRect(12,11,1,4); }
+    if (opts.sleeves) {                                  // широкие рукава-колокола
+      g.fillStyle = opts.sleeves;
+      g.fillRect(2,12,2,4); g.fillRect(12,12,2,4);
+      g.fillRect(3,15,1,1); g.fillRect(12,15,1,1);
+    }
+    if (opts.glove) { g.fillStyle = opts.glove; g.fillRect(3,12,1,4); }   // перчатка на одной руке
+    if (opts.strap) {                                    // ремень сумки через плечо
+      g.fillStyle = opts.strap;
+      g.fillRect(6,10,1,1); g.fillRect(7,11,1,1); g.fillRect(8,12,1,1); g.fillRect(9,13,1,2);
+    }
+    if (opts.stripes) {                                  // полосатые чулки
+      g.fillStyle = opts.stripes;
+      g.fillRect(4,18,3,1); g.fillRect(9,18,3,1);
+    }
     return c;
   },
 
@@ -870,6 +908,21 @@ const Assets = {
       g.fillRect(10,5,5,5);
       g.fillStyle = '#fff'; g.globalAlpha = .4; g.fillRect(5,4,4,2); g.fillRect(16,4,4,2); g.globalAlpha = 1;
     }
+    if (opts.hat) {
+      const hc = opts.hatColor || '#2a2630', ht = opts.hatTrim || hc;
+      if (opts.hat === 'straw') {
+        g.fillStyle = hc; g.fillRect(0,12,64,5); g.fillRect(16,0,32,13);
+        g.fillStyle = ht; g.fillRect(16,9,32,4);
+      } else if (opts.hat === 'witch') {
+        g.fillStyle = hc;
+        g.fillRect(0,14,64,5);
+        g.beginPath(); g.moveTo(14,15); g.lineTo(44,15); g.lineTo(20,0); g.closePath(); g.fill();
+        g.fillStyle = ht; g.fillRect(23,7,8,6);                       // роза на тулье
+      } else if (opts.hat === 'cap') {
+        g.fillStyle = hc; g.fillRect(13,1,38,11); g.fillRect(9,15,46,4);
+        g.fillStyle = ht; g.fillRect(13,11,38,4);
+      }
+    }
     const eye = opts.glowEye || '#000';
     g.fillStyle = eye;
     if (expression === 'shocked') {
@@ -891,6 +944,18 @@ const Assets = {
       g.fillStyle = '#6a5a60'; g.fillRect(22,28,5,3); g.fillRect(37,28,5,3);
     } else {
       g.fillRect(22,28,4,3); g.fillRect(38,28,4,3);
+    }
+    if (opts.glasses) {                                               // круглая оправа
+      g.fillStyle = opts.glasses;
+      g.fillRect(19,24,12,1); g.fillRect(19,33,12,1);
+      g.fillRect(19,25,1,8);  g.fillRect(30,25,1,8);
+      g.fillRect(33,24,12,1); g.fillRect(33,33,12,1);
+      g.fillRect(33,25,1,8);  g.fillRect(44,25,1,8);
+      g.fillRect(31,28,2,1);
+    }
+    if (opts.fringe) {                                                // чёлка через один глаз
+      g.fillStyle = opts.fringe;
+      g.fillRect(34,20,12,9); g.fillRect(40,20,8,14); g.fillRect(31,18,6,6);
     }
     g.fillStyle = '#8a3040';
     if (expression === 'smile') g.fillRect(27,40,10,2);
@@ -924,6 +989,30 @@ const Assets = {
                    skirt:'#100e14', accent:'#3a3440', legs:'#1a1620', shoes:'#0c0a10'};
     const LILI  = {hair:'long', horns:'#3a2432', hornEdge:'#9a7a8e', glowEye:'#c04a46', cape:'#221a20',
                    skirt:'#7d3c3a', accent:'#7d3c3a', legs:'#1a1418'};
+    /* Ещё четыре референса:
+       Крис        — растрёпанные почти чёрные волосы, чёлка через глаз, круглые очки,
+                     чёрная водолазка под серо-фиолетовой курткой, перчатка, высокие берцы;
+       Мидея-мама  — соломенная шляпа с красной лентой, длинные волнистые розово-русые
+                     волосы, белая блузка с красной лентой на шее, сумка через плечо,
+                     тёмно-синие брюки;
+       Мидея-ведьма— та же причёска (это один человек), чёрная шляпа с розой,
+                     чёрное платье, цепочки, полосатые чулки;
+       Подруга Сью — чёрная фуражка, длинные карамельные волосы, чёрный топ с широкими
+                     рукавами, красные глаза. */
+    const CHRIS_C = {body:'#6b5f78', hair:'#2b2530', sheen:'#443c4e',
+                     accent:'#100e14', skirt:'#4a4256', legs:'#26242e', shoes:'#0e0c12',
+                     glasses:'#c8c4d0', fringe:'#221d28', glove:'#0c0a10', eye:'#2a2430'};
+    const MEDEA_H = {body:'#eeeced', hair:'#e6c2ca', sheen:'#f6dee4',
+                     accent:'#a8323c', skirt:'#d8d4d4', legs:'#3a3f52', shoes:'#22242c',
+                     hat:'straw', hatColor:'#d6bb8c', hatTrim:'#b04a52', strap:'#4a4650'};
+    const MEDEA_W = {body:'#232028', hair:'#e6c2ca', sheen:'#f6dee4',
+                     accent:'#77707f', skirt:'#141218', legs:'#4a4552', shoes:'#0c0a10',
+                     hat:'witch', hatColor:'#2a2630', hatTrim:'#8a4a60',
+                     stripes:'#1c1a22', sleeves:'#1a181e'};
+    const SFRIEND = {body:'#2a262e', hair:'#b98a5a', sheen:'#d6a874',
+                     accent:'#4a4450', skirt:'#1c1a20', legs:'#33303a', shoes:'#d8ced4',
+                     hat:'cap', hatColor:'#141218', hatTrim:'#2c2832',
+                     sleeves:'#232028', glowEye:'#b0384a'};
 
     this.images.naya      = this.makeChibi('#3f5c8a', '#dcc09c', NAYA);
     this.images.nayaDark  = this.makeChibi('#232a3d', '#b5996f',
@@ -940,7 +1029,8 @@ const Assets = {
                               Object.assign({}, NAYA, {band:'#5a5060', streak:'#8a2440',
                               skirt:'#08070a', accent:'#2a2030', legs:'#4a4450',
                               shoes:'#08070a', glowEye:'#ff2a40', aura:'#8a0020'}));
-    this.images.chris     = this.makeChibi('#3050a0', '#402010', {hair:'short', skirt:'#2a3450', legs:'#2a2a30'});
+    this.images.chris     = this.makeChibi(CHRIS_C.body, CHRIS_C.hair,
+                              Object.assign({}, CHRIS_C, {hair:'short'}));
     this.images.drizella  = this.makeChibi('#4a3f5a', '#e8dcae',        // мачеха
       {hair:'long', sheen:'#f2ecc8', glowEye:'#3f7a52', accent:'#9a8ab0',
        skirt:'#2f2838', legs:'#4a4450', shoes:'#241f2c'});
@@ -968,13 +1058,17 @@ const Assets = {
       {hair:'short', accent:'#6a7460', skirt:'#3a4238', legs:'#33383a', shoes:'#242628'});
     this.images.neighbor  = this.makeChibi('#6a5a64', '#a89a90',        // соседка в платке
       {hair:'short', band:'#c05a6a', accent:'#8a7a84', skirt:'#544750', legs:'#5a5254', shoes:'#332f34'});
-    this.images.friend    = this.makeChibi('#c06a90', '#8a5a30',        // подруга Сью с йоги
+    this.images.friend    = this.makeChibi(SFRIEND.body, SFRIEND.hair,   // подруга Сью с йоги
+                              Object.assign({}, SFRIEND, {hair:'long'}));
+    this.images.student   = this.makeChibi('#c06a90', '#8a5a30',        // безымянные студентки в коридорах
       {hair:'long', sheen:'#a87848', accent:'#f0c0d0', skirt:'#9a5070', legs:'#e8dcd0', shoes:'#c090a8'});
     this.images.imp       = this.makeChibi('#6a1420', '#2a0c14',        // житель ада
       {hair:'short', horns:'#c07050', hornEdge:'#e8b090', glowEye:'#ffa020',
        aura:'#8a1810', skirt:'#4a0c14', legs:'#2a0810', shoes:'#160408'});
-    this.images.mother    = this.makeChibi('#4a3040', '#2f2028',        // Медея, во флэшбеках
-      {hair:'long', sheen:'#5a4450', accent:'#6a4a58', skirt:'#3a2632', legs:'#2a1e26'});
+    this.images.mother      = this.makeChibi(MEDEA_H.body, MEDEA_H.hair,   // Мидея-мама, во флэшбеках
+                                Object.assign({}, MEDEA_H, {hair:'long'}));
+    this.images.motherWitch = this.makeChibi(MEDEA_W.body, MEDEA_W.hair,   // Мидея-ведьма, в легенде
+                                Object.assign({}, MEDEA_W, {hair:'long'}));
     // the prologue: five-year-old Sue and four-year-old Naya
     this.images.sueChild  = this.makeChibi('#d8a03c', '#2a2634',
       {hair:'long', sheen:'#4c4660', child:true, accent:'#f0e0c0',
@@ -1003,7 +1097,11 @@ const Assets = {
       {hair:'long', sheen:'#6a6a7a', bow:'#9a90a0', collar:'#c8c8d0', skin:'#c8c8d0', bg:'#141420'});
     P('nayaHell',  '#161a26','#8a7a5e', ['normal','empty','serious','angry'], '#ff2a40',
       {hair:'bob', band:'#5a5060', streak:'#8a2440', collar:'#2a2030', glowEye:'#ff2a40', bg:'#0e0810', aura:'#8a0020'});
-    P('chris',     '#3050a0','#402010', ['normal','angry','sad'], '#3050a0', {hair:'short'});
+    P('chris',     '#6b5f78','#2b2530', ['normal','talk','angry','sad','serious'], '#8a7f96',
+      {hair:'short', sheen:'#443c4e', collar:'#100e14', glasses:'#c8c4d0', fringe:'#221d28', bg:'#1e1a24'});
+    P('friend',    '#2a262e','#b98a5a', ['normal','smile','talk','worried'], '#8a6a4a',
+      {hair:'long', sheen:'#d6a874', collar:'#4a4450', hat:'cap', hatColor:'#141218',
+       hatTrim:'#2c2832', glowEye:'#b0384a', bg:'#2a2228'});
     P('drizella',  '#4a3f5a','#e8dcae', ['normal','serious','angry','smile'], '#9a8ab0',
       {hair:'long', sheen:'#f2ecc8', collar:'#9a8ab0', glowEye:'#3f7a52', bg:'#2a2434'});
     P('stacy',     '#c07a9a','#f0e4b8', ['normal','smile','angry'], '#f0b8ca',
@@ -1022,7 +1120,12 @@ const Assets = {
     P('neighbor',  '#5a5a4a','#8a8a80', ['normal'], '#8a8a70');
     P('acolyte',   '#38604a','#2a2018', ['normal','worried'], '#50a070');
     P('imp',       '#701020','#300810', ['normal','smile'], '#c04020', {glowEye:'#ffa020', bg:'#200408'});
-    P('mother',    '#4a3040','#2a1a20', ['empty','angry'], '#6a4050', {bg:'#14101a'});
+    P('mother',    '#e8e6e6','#e6c2ca', ['normal','smile','talk','sad','empty','angry'], '#a8323c',
+      {hair:'long', sheen:'#f6dee4', collar:'#a8323c', hat:'straw', hatColor:'#d6bb8c',
+       hatTrim:'#b04a52', bg:'#2c2630'});
+    P('motherWitch','#232028','#e6c2ca', ['normal','serious','sad','empty'], '#8a5a70',
+      {hair:'long', sheen:'#f6dee4', collar:'#4a4450', hat:'witch', hatColor:'#2a2630',
+       hatTrim:'#8a4a60', bg:'#191420'});
     P('sueChild',  '#d8a03c','#2a2634', ['normal','smile','shocked'], '#e8b050',
       {hair:'long', sheen:'#4c4660', collar:'#f0e0c0', bg:'#3a2c22'});
     P('nayaChild', '#6a5a80','#dcc09c', ['normal','shocked','smile'], '#8a7aa0',
@@ -3995,7 +4098,7 @@ cafe: {
       dialogue:()=> Scene.play('cafeScene') },
     { x:152,y:212, sprite:'friend', name:'Подруга',
       when:()=> F('metSue') && !F('cafeSceneComplete'),
-      dialogue:()=> Dialogue.start([{who:'sue',expr:'smile',name:'Подруга',text:'Привет! Сью столько про тебя рассказывала.'}]) },
+      dialogue:()=> Dialogue.start([{who:'friend',expr:'smile',text:'Привет! Сью столько про тебя рассказывала.'}]) },
     { x:256,y:268, sprite:'chris', name:'Крис',
       when:()=> F('metSue') && !F('cafeSceneComplete'),
       dialogue:()=> Dialogue.start([{who:'chris',expr:'normal',text:'Ная. Нам надо поговорить. Сядь со мной на минуту.'}]) },
@@ -6393,7 +6496,7 @@ uniCourtyard: {
       }},
   ],
   npcs: [
-    { x:120,y:250, sprite:'friend', name:'Студентка', speed:0.34,
+    { x:120,y:250, sprite:'student', name:'Студентка', speed:0.34,
       path:[[120,250],[280,248],[290,276],[110,278]],
       when:()=> !F('sueDead'),
       dialogue:()=> {
@@ -6622,7 +6725,7 @@ uniCorridorTheatre: {
       }},
   ],
   npcs: [
-    { x:220, y:274, sprite:'friend', name:'Студентка', speed:0.40,
+    { x:220, y:274, sprite:'student', name:'Студентка', speed:0.40,
       path:[[220,274],[520,272],[520,304],[180,304]],
       when:()=> !F('sueDead'),
       dialogue:()=> {
@@ -7194,7 +7297,7 @@ const Dialogue = {
         chris:'Крис', charlotte:'Шарлотта', lilith:'Лиллит', genevieve:'Женевьева',
         witch1:'Мадлен', witch2:'Роза', witch3:'Старшая', acolyte:'Ученица',
         neighbor:'Соседка', imp:'Житель ада', customer:'Посетитель',
-        mother:'Медея', dorothy:'Дороти', narrator:''
+        mother:'Мидея', motherWitch:'Мидея', friend:'Подруга', dorothy:'Дороти', narrator:''
       };
       document.getElementById('speakerName').textContent =
         (line.name !== undefined) ? line.name : (nameMap[line.who] || '');
@@ -7484,6 +7587,23 @@ const Prologue = {
     this.butterfly = null; this.glow = 0; this.floatSue = 0;
   },
   addStar(i) { this.stars.push({ i, t:0 }); Audio.beep(140 + i*40, .5, 'sine', .1); },
+
+  /* Мидея в легенде — её собственная модель, увеличенная втрое и уведённая
+     в тень: на таком масштабе открытое лицо читается светлым пятном,
+     а силуэт в шляпе узнаётся сразу. Строится один раз. */
+  medeaFigure() {
+    if (this._medea !== undefined) return this._medea;
+    const src = Assets.images.motherWitch;
+    if (!src) return (this._medea = null);
+    const k = 3.4, c = document.createElement('canvas');
+    c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(src, 0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = 'rgba(34,22,44,.58)'; g.fillRect(0, 0, c.width, c.height);
+    return (this._medea = c);
+  },
   crackStar(i) { const st = this.stars.find(s => s.i === i); if (st) st.cracked = true; },
 
   /* four black stars hanging over the hall, each with its command */
@@ -7530,20 +7650,23 @@ const Prologue = {
       ctx.fillRect(113, 110, 3, 2); ctx.fillRect(124, 110, 3, 2);
     }
     if (this.showMedea) {
-      const a = .55 + .2 * Math.sin(t/600);
+      const a = .92 + .06 * Math.sin(t/600);
+      ctx.save();
+      ctx.globalAlpha = a * .45;                     // тёмный ореол под фигурой
+      ctx.fillStyle = '#241a2a';
+      ctx.beginPath(); ctx.ellipse(70, 212, 25, 46, 0, 0, Math.PI*2); ctx.fill();
       ctx.globalAlpha = a;
-      ctx.fillStyle = '#3a2a3e';
-      ctx.beginPath(); ctx.moveTo(70, 176); ctx.lineTo(54, 250); ctx.lineTo(86, 250); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.arc(70, 170, 9, 0, Math.PI*2); ctx.fill();
-      ctx.globalAlpha = 1;
+      const fig = this.medeaFigure();
+      if (fig) { ctx.imageSmoothingEnabled = false; ctx.drawImage(fig, 70 - fig.width/2, 250 - fig.height); }
+      ctx.restore();
       if (this.crystalGlow > 0) {
         const cg = this.crystalGlow * (.7 + .3 * Math.sin(t/220));
-        const gr = ctx.createRadialGradient(70, 190, 0, 70, 190, 34 * cg);
+        const gr = ctx.createRadialGradient(70, 228, 0, 70, 228, 34 * cg);
         gr.addColorStop(0, `rgba(200,120,255,${(.7*cg).toFixed(2)})`);
         gr.addColorStop(1, 'rgba(200,120,255,0)');
-        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(70, 190, 34*cg, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#e8c0ff'; ctx.fillRect(68, 188, 4, 5);
-        if (Math.random() < .5) FX.spawn(70, 190, 1, {color:'#c060ff', spread:12, rise:-.4, life:50});
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(70, 228, 34*cg, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#e8c0ff'; ctx.fillRect(68, 226, 4, 5);
+        if (Math.random() < .5) FX.spawn(70, 228, 1, {color:'#c060ff', spread:12, rise:-.4, life:50});
       }
     }
   },
