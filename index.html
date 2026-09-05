@@ -3547,6 +3547,29 @@ function roomNPCs(room) { return (room.npcs || []).filter(n => !n.when || n.when
 /* Фоновые NPC ходят по заранее заданным точкам: сложный AI ради трёх
    студентов не нужен, а коридор от этого сразу становится живым.
    Маршруты замкнутые, поэтому персонаж может ходить по кругу бесконечно. */
+/* Кристалл рядом с ведьмой.
+
+   Не компас: он не говорит «ведьма рядом» и не показывает направление.
+   Просто изредка вздрагивает искрой и коротко звенит, когда в комнате
+   есть та, на кого он отзывается. Вывод делает игрок, а не подсказка. */
+const CrystalSense = {
+  t:0, next:0,
+  WITCHES:['genevieve','witch1','witch2','witch3','acolyte','charlotte','lilith'],
+  update(dt, room) {
+    if (!gameState || Game.mode !== 'explore') return;
+    if (!hasItem('Кристалл')) return;
+    const near = (room.npcs || []).some(n =>
+      this.WITCHES.includes(n.sprite) && (!n.when || n.when()) &&
+      Math.hypot(n.x - Player.x, n.y - Player.y) < 90);
+    if (!near) { this.next = 0; return; }
+    this.t += dt;
+    if (this.t < this.next) return;
+    this.next = this.t + 2600 + Math.random() * 3400;
+    FX.spawn(Player.x + 2, Player.y - 12, 2, { color:'#c88cff', spread:5, rise:-.25, life:44 });
+    Audio.beep(880 + Math.random() * 120, .10, 'sine', .022);
+  },
+};
+
 const Patrol = {
   update(dt, room) {
     if (Game.mode === 'menu' || Game.montage) return;
@@ -5417,7 +5440,7 @@ forestEdge: {
         FX.spawn(Player.x, Player.y-10, 8, {color:'#c060ff', spread:8, rise:-0.3, life:50});
         Dialogue.start([
           {who:'naya',expr:'empty',text:'Он всё ещё работает.'},
-          {who:'naya',expr:'empty',text:'Тусклый, но тёплый. Как будто ничего не произошло.'},
+          {who:'naya',expr:'empty',text:'Тусклый, но внутри всё так же дрожит. Как будто ничего не произошло.'},
         ]);
       }},
     { x:24,y:266,w:52,h:30, name:'leave', prompt:'Уйти по тропе', action(){ Scene.play('evilGoHome'); }},
@@ -8242,7 +8265,7 @@ const Memories = {
         g.strokeStyle='#ff4030';g.stroke();
         g.fillStyle='#8a0020';g.fillRect(92,86,16,30);
         g.fillStyle='#ff2a40';g.fillRect(95,92,3,3);g.fillRect(102,92,3,3); } },
-    { key:'motherCrystal', title:'Кристалл', text:'Мне было пять, когда мне его отдали. Я не помню, кто именно вложил его мне в руку.\n\nОн тёплый. Он всегда тёплый — и это единственное, что он умеет.\n\nДвенадцать лет он пролежал в нижнем ящике под тетрадями, в доме, где о моей матери говорили «та женщина».',
+    { key:'motherCrystal', title:'Кристалл', text:'Мне было пять, когда мне его отдали. Я не помню, кто именно вложил его мне в руку.\n\nВнутри него что-то живёт: слабое дрожание света, которое не совпадает ни с чем снаружи. И это единственное, что он умеет.\n\nДвенадцать лет он пролежал в нижнем ящике под тетрадями, в доме, где о моей матери говорили «та женщина».',
       draw:(g)=>{ g.fillStyle='#1a1620';g.fillRect(0,0,200,120);
         g.fillStyle='#3a2c1e';g.fillRect(40,64,120,44);
         g.fillStyle='#4f3d2c';g.fillRect(44,68,112,36);
@@ -8769,7 +8792,7 @@ pastFrank: [
     {who:'nayaTeen',expr:'normal',name:'Ная',text:'Я стою.'},
     {who:'frank',expr:'sad',text:'...ну стой.'},
   ]},
-  { wait:500 },
+  { wait:400 },
   { dlg:[
     {who:'frank',expr:'worried',text:'Я знаю, что тебе тут было... непросто.'},
     {who:'frank',expr:'sad',text:'Дризелла — она не со зла. У неё характер. Ты повзрослеешь и поймёшь.'},
@@ -8777,35 +8800,83 @@ pastFrank: [
   ]},
   { dlg:[
     {choice:{ prompt:'Он смотрит в телевизор, а не на неё.', options:[
-      { text:'«Ты ни разу за меня не заступился.»',
-        stats:{witchAmbition:+8, humanity:-2},
+      { text:'«Ты всё видел.»',
+        stats:{witchAmbition:+7},
         then:[
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Ты всё видел. Каждый раз.'},
+          {who:'frank',expr:'worried',text:'Я знал, что вам было непросто...'},
+          {who:'nayaTeen',expr:'angry',name:'Ная',text:'Нет. Не «вам». Стейси было прекрасно.'},
           {who:'frank',expr:'sad',text:'...'},
-          {who:'frank',expr:'worried',text:'Я пытался. По-своему.'},
-          {who:'nayaTeen',expr:'angry',name:'Ная',text:'По-своему — это молча?'},
-          {who:'frank',expr:'sad',text:'Ная.'},
-          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Вот и весь разговор. Он и сейчас не встал.)'},
         ]},
-      { text:'«Всё нормально, пап.»',
-        stats:{humanity:+4, trustSue:+2},
+      { text:'«Скажи хоть раз вслух, что это было несправедливо.»',
+        stats:{humanity:+6, witchAmbition:+3},
         then:[
-          {who:'frank',expr:'sad',text:'Правда?'},
-          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Нет. Но тебе так будет легче, а мне уже всё равно.'},
-          {who:'frank',expr:'worried',text:'...'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Скажи один раз вслух. Что это было несправедливо.'},
+          {who:'frank',expr:'worried',text:'Ная, всё было сложнее, чем тебе кажется.'},
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Мне не кажется. Я там жила.'},
+          {who:'frank',expr:'sad',text:'...было. Было несправедливо. Доволен?'},
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Двенадцать лет ради одного слова, сказанного с раздражением.)'},
+        ]},
+      { text:'«Почему ты ни разу не вмешался?»',
+        stats:{witchAmbition:+5, humanity:+2},
+        then:[
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Почему ты ни разу не вмешался?'},
+          {who:'frank',expr:'worried',text:'Я не хотел, чтобы всё стало ещё хуже.'},
+          {who:'nayaTeen',expr:'angry',name:'Ная',text:'Хуже?'},
+          {who:'frank',expr:'sad',text:'Ная...'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Ты решил, что молчать — дешевле. И оказался прав. Для себя.'},
+        ]},
+    ]}},
+  ]},
+  { wait:300 },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Я пытался. По-своему.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Приведи пример.'},
+    {who:'frank',expr:'sad',text:'Я... покупал тебе тетради, когда она говорила, что обойдёшься прошлогодними.'},
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'Тетради.'},
+    {who:'frank',expr:'sad',text:'Я не мог устроить войну в собственном доме. У меня работа. У меня давление.'},
+    {who:'nayaTeen',expr:'talk',name:'Ная',text:'У тебя была дочь.'},
+    {who:'frank',expr:'shocked',text:'...'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Он молчит дольше, чем за все двенадцать лет.', options:[
+      { text:'«Ты не был злым. Ты был удобным. Это не одно и то же, но мне от этого не легче.»',
+        stats:{humanity:+9, witchAmbition:-3},
+        then:[
+          {who:'nayaTeen',expr:'sad',name:'Ная',text:'Ты не был злым, пап. Ты был удобным.'},
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Это не одно и то же. Но мне от этого ни разу не стало легче.'},
+          {who:'frank',expr:'sad',text:'Я не знаю, что на это ответить.'},
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Я и не жду ответа. Я хотела, чтобы ты это услышал.'},
+        ]},
+      { text:'«Я уезжаю. Не спрашиваю разрешения — сообщаю.»',
+        stats:{witchAmbition:+9, humanity:+2},
+        then:[
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Я уезжаю. Это не вопрос, это сообщение.'},
+          {who:'frank',expr:'shocked',text:'Куда? На что?'},
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Разберусь. Двенадцать лет как-то разбиралась.'},
+          {who:'frank',expr:'sad',text:'Ты могла бы сказать раньше.'},
+          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Мог бы спросить раньше.)'},
         ]},
       { text:'«Расскажи про маму.»',
         stats:{witchAmbition:+5},
         then:[
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Тогда расскажи хотя бы про маму. Ты и это двенадцать лет откладывал.'},
           {who:'frank',expr:'worried',text:'Ная, мы это уже...'},
-          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Мы это никогда. Ни разу за двенадцать лет.'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Мы это никогда. Ни разу.'},
           {who:'frank',expr:'sad',text:'Её звали Мидея. Она была... не отсюда.'},
           {who:'frank',expr:'sad',text:'Соседи её боялись. Потом стали говорить всякое. Потом её не стало.'},
           {who:'nayaTeen',expr:'shocked',name:'Ная',text:'«Не стало» — это как?'},
           {who:'frank',expr:'sad',text:'Ная. Не надо.'},
-          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(И он снова прибавил звук.)'},
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Опять «не надо». У тебя на всё один ответ.'},
           {action(){ setFlag('motherMemory'); Memories.unlock('mother'); }},
         ]},
     ]}},
+  ]},
+  { wait:300 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Ты злишься.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Да. И это, кажется, единственное, что я вынесу отсюда целым.'},
+    {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Он прибавил звук. Разговор окончен — как всегда, не мной.)'},
   ]},
   { flag:'pastFrankDone' },
   { jump:()=> 'pastCheck' },
@@ -8820,7 +8891,7 @@ pastCrystalScene: [
   { dlg:[
     {who:'nayaTeen',expr:'sad',name:'Ная',text:'Кристалл. Единственное, что осталось от матери, кроме фамилии.'},
     {who:'nayaTeen',expr:'normal',name:'Ная',text:'(Мне было пять, когда мне его отдали. Я не помню, кто именно.)'},
-    {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Он тёплый. Он всегда тёплый, и это единственное, что он умеет.)'},
+    {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Внутри что-то дрожит. Едва заметно, но не останавливается — и это единственное, что он умеет.)'},
   ]},
   { flag:'pastCrystal' },
   { memory:'motherCrystal' },
@@ -9065,7 +9136,7 @@ libraryArchive: [
   ]},
   { dlg:[
     {who:'naya',expr:'normal',text:'«...приговорена к смерти за неповиновение. Перед казнью передала свою силу дочери, заключив её в кристалл...»'},
-    {who:'naya',expr:'shocked',text:'(Я опускаю руку и трогаю его через кофту. Он тёплый — впервые не пугающе, а как-то... узнаваемо.)'},
+    {who:'naya',expr:'shocked',text:'(Я опускаю руку и трогаю его через кофту. Он отзывается — впервые не пугающе, а как-то... узнаваемо.)'},
     {who:'naya',expr:'sad',text:'(Дочери.)'},
     {who:'naya',expr:'sad',text:'(Мне.)'},
   ]},
@@ -9246,33 +9317,37 @@ chrisAfter: [
 homeTalkWithSue: [
   { music:'sad' },
   { dlg:[
-    {who:'naya',expr:'sad',text:'Сью... мне плохо. По-настоящему плохо.'},
-    {who:'sue',expr:'worried',text:'Расскажи.'},
-    {who:'naya',expr:'angry',text:'Я ревную. К каждому, с кем ты говоришь. Даже к девочке с йоги, которую вижу первый раз.'},
-    {who:'naya',expr:'sad',text:'Это ненормально. Я знаю, что ненормально.'},
-    {who:'sue',expr:'sad',text:'Почему ты никогда об этом не говорила?'},
+    {who:'sue',expr:'normal',text:'Ты чего такая тихая весь вечер?'},
+    {who:'naya',expr:'normal',text:'Ничего.'},
+    {who:'sue',expr:'worried',text:'Ты опять говоришь «ничего», когда явно что-то есть.'},
+    {who:'naya',expr:'sad',text:'...Ладно. Мне сегодня показалось, что ты про меня забыла.'},
+    {who:'sue',expr:'shocked',text:'Я?'},
+    {who:'naya',expr:'normal',text:'Понимаю, что звучит глупо. Но мне всё равно было неприятно, и врать я не буду.'},
+    {who:'sue',expr:'sad',text:'Почему ты раньше не сказала?'},
   ]},
   { dlg:[
     {choice:{ prompt:'Она ждёт. Впервые за много лет — по-настоящему ждёт.', options:[
-      { text:'«Потому что боюсь, что ты уйдёшь, если узнаешь, какая я.»',
+      { text:'«Потому что это выглядит некрасиво. А мне не хочется быть некрасивой при тебе.»',
         stats:{trustSue:+12, humanity:+6},
         then:[
-          {who:'naya',expr:'sad',text:'Потому что боюсь, что ты уйдёшь, если узнаешь, какая я на самом деле.'},
-          {who:'sue',expr:'sad',text:'Ная. Я знаю, какая ты. Я знаю тебя с девяти лет.'},
+          {who:'naya',expr:'sad',text:'Потому что это выглядит некрасиво. А мне не хочется быть некрасивой при тебе.'},
+          {who:'sue',expr:'sad',text:'Ная. Я тебя с девяти лет знаю. Я видела тебя всякой.'},
           {who:'sue',expr:'smile',text:'И я всё ещё здесь.'},
+          {who:'naya',expr:'normal',text:'Знаю. Поэтому и говорю.'},
         ]},
-      { text:'«Потому что это неважно. Я справлюсь.»',
+      { text:'«Потому что это моё дело, а не твоё.»',
         stats:{trustSue:-4, witchAmbition:+5},
         then:[
-          {who:'naya',expr:'normal',text:'Это неважно. Я справлюсь сама.'},
-          {who:'sue',expr:'worried',text:'Ты всегда так говоришь. И никогда не справляешься.'},
+          {who:'naya',expr:'normal',text:'Потому что это моё дело. Разберусь.'},
+          {who:'sue',expr:'worried',text:'Ты всегда так говоришь. И потом три дня ходишь тихая.'},
+          {who:'naya',expr:'normal',text:'Значит, у меня будет три тихих дня.'},
         ]},
       { text:'«Потому что ты бы всё равно не поняла.»',
         stats:{trustSue:-9, witchAmbition:+7, humanity:-4},
         then:[
           {who:'naya',expr:'angry',text:'Потому что ты бы не поняла. У тебя всё легко. У тебя всегда всё было легко.'},
           {who:'sue',expr:'shocked',text:'...это неправда.'},
-          {who:'naya',expr:'sad',text:'(Это правда. И я только что сказала это вслух.)'},
+          {who:'naya',expr:'sad',text:'(Это правда. И я только что сказала это вслух — уже перебор.)'},
         ]},
     ]}},
   ]},
@@ -9282,7 +9357,7 @@ homeTalkWithSue: [
     {who:'naya',expr:'shocked',text:'Куда угодно. Хоть в ад.'},
     {who:'sue',expr:'smile',text:'Ха. А что если правда — в ад? Только без меня, я туда пас.'},
     {who:'naya',expr:'normal',text:'...в ад.'},
-    {who:'naya',expr:'shocked',text:'(Кристалл. Он весь вечер гудит под рукой, как провод. Может быть...)'},
+    {who:'naya',expr:'shocked',text:'(Кристалл. Он весь вечер отзывается под рукой на каждое её слово. Может быть...)'},
     {who:'sue',expr:'worried',text:'Ная? Ная, что ты делаешь?'},
   ]},
   { flag:'homeTalkDone' },
@@ -9730,7 +9805,7 @@ firstAmuletScene: [
   { memory:'amulet1' },
   { stats:{ witchAmbition:+12, humanity:-12, hellAffinity:+8 } },
   { dlg:[
-    {who:'naya',expr:'shocked',text:'(Готово. Оно у меня. Оно тёплое, как кристалл.)'},
+    {who:'naya',expr:'shocked',text:'(Готово. Оно у меня. Оно отзывается на руку — так же, как кристалл.)'},
     {who:'witch1',expr:'shocked',name:'Мадлен',text:'Кто вы? Что вы делаете в моём доме? Кто вы такие?!'},
     {who:'sue',expr:'shocked',text:'Ная, она нас не узнаёт. Мы же пять минут назад пили с ней чай.'},
     {who:'naya',expr:'talk',text:'Это шок. Пройдёт. Уходим.'},
@@ -10387,7 +10462,7 @@ evilRecognition: [
   { fadeIn:600 },
   { wait:900 },
   { dlg:[
-    {who:'nayaHell',expr:'empty',name:'Ная',text:'(Кристалл больше не греется. Он холодный — потому что тепло теперь внутри меня.)'},
+    {who:'nayaHell',expr:'empty',name:'Ная',text:'(Кристалл больше не отзывается. Он замер — потому что то, что в нём дрожало, теперь дрожит во мне.)'},
     {who:'charlotte',expr:'normal',text:'Теперь ты действительно похожа на неё.'},
     {who:'nayaHell',expr:'empty',name:'Ная',text:'Нет.'},
   ]},
@@ -11391,7 +11466,7 @@ function tick(t) {
     Dialogue.update(dt);
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
-    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); }
+    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); }
     drawRoom();
   }
   requestAnimationFrame(tick);

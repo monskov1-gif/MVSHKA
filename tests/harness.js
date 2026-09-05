@@ -82,7 +82,7 @@ async function opening(page, picks, tag) {
   // пролог, часть вторая: дом отца, прощание, кристалл
   await step(page, 'npc', 'Дризелла', [0], tag);
   await step(page, 'npc', 'Стейси', [], tag);
-  await step(page, 'npc', 'Фрэнк', [2], tag);
+  await step(page, 'npc', 'Фрэнк', [2, 2], tag);   // два выбора: почему не вмешался, затем про маму
   await step(page, 'obj', 'toAttic', [], tag);
   await step(page, 'obj', 'deskPast', [], tag);
   await step(page, 'obj', 'toLiving', [], tag);
