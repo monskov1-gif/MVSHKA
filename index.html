@@ -733,6 +733,27 @@ const Assets = {
       g.fillStyle = opts.fringe;
       g.fillRect(9,4,3,3); g.fillRect(11,3,2,4);
     }
+    if (opts.messy) {                     // растрёпанные пряди, торчащие вверх и вбок
+      g.fillStyle = opts.messy;
+      g.fillRect(2,1,2,2); g.fillRect(4,0,2,2); g.fillRect(10,0,2,2); g.fillRect(12,1,2,2);
+      g.fillRect(1,3,1,3); g.fillRect(14,3,1,3);
+    }
+    if (opts.updo) {                      // высокий пучок с бусинами сверху
+      g.fillStyle = opts.updo;
+      g.fillRect(5,-1,6,3); g.fillRect(6,-3,4,3);
+      g.fillRect(3,0,2,2); g.fillRect(11,0,2,2);
+    }
+    if (opts.tufts) {                     // две пряди-рожка по бокам макушки
+      g.fillStyle = opts.tufts;
+      g.fillRect(3,-1,2,3); g.fillRect(11,-1,2,3);
+      g.fillRect(2,1,1,2); g.fillRect(13,1,1,2);
+    }
+    if (opts.stride) {                    // одна нога вынесена вперёд — фигура в движении
+      g.fillStyle = opts.legs || '#222';
+      g.fillRect(11,16,3,4);
+      g.fillStyle = opts.shoes || opts.legs || '#222';
+      g.fillRect(11,19,4,1);
+    }
     // torso, then a slightly wider skirt, then socks / boots
     if (opts.child) {
       g.fillStyle = bodyColor; g.fillRect(5,10,6,4);
@@ -753,6 +774,12 @@ const Assets = {
     g.fillStyle = bodyColor;
     if (opts.child) { g.fillRect(4,11,1,3); g.fillRect(11,11,1,3); }
     else { g.fillRect(3,11,1,4); g.fillRect(12,11,1,4); }
+    if (opts.ruffle) {                                   // фестончатый подол платья
+      g.fillStyle = opts.ruffle;
+      g.fillRect(2, 16, 12, 2);
+      for (let x = 2; x < 14; x += 2) g.fillRect(x, 18, 1, 1);
+      g.fillRect(3, 15, 10, 1);
+    }
     if (opts.sleeves) {                                  // широкие рукава-колокола
       g.fillStyle = opts.sleeves;
       g.fillRect(2,12,2,4); g.fillRect(12,12,2,4);
@@ -1215,12 +1242,18 @@ const Assets = {
     this.images.witch3    = this.makeChibi('#2f4460', '#7d7d88',        // Старшая — строгая, высокий ворот
       {hair:'bob', sheen:'#9a9aa6', accent:'#5f7590', skirt:'#26374e', legs:'#2a2f3a', shoes:'#1c2028',
        hat:'cap', hatColor:'#1e2c40', hatTrim:'#3c526e'});
-    this.images.witch4    = this.makeChibi('#4a6a52', '#5a3a28',        // Ирма — травница, вечно в земле
-      {hair:'long', sheen:'#7a5238', accent:'#c8d8b8', skirt:'#3d5a44', legs:'#6a5a44', shoes:'#33291f',
-       hat:'straw', hatColor:'#c2a870', hatTrim:'#6a8a52', strap:'#5a4830'});
-    this.images.witch5    = this.makeChibi('#7a4658', '#2e2a34',        // Люси — младшая из старших, в бусах
-      {hair:'long', sheen:'#4e4858', accent:'#e0a8b8', skirt:'#5f3646', legs:'#4a4048', shoes:'#2a2430',
-       sleeves:'#6a3c4c'});
+    /* Агата, Беатрис и Руби собраны по присланным силуэтам: у первой
+       растрёпанные пряди и фестончатый подол, у второй высокий пучок и
+       рукава-колокола, у третьей две пряди-рожка и многослойная юбка. */
+    this.images.witch4    = this.makeChibi('#4a4450', '#2b2730',        // Агата
+      {hair:'short', sheen:'#3d3844', messy:'#2b2730', accent:'#8a8296',
+       skirt:'#3a3540', ruffle:'#4e4854', legs:'#33303a', shoes:'#1e1c24'});
+    this.images.witch5    = this.makeChibi('#5a4656', '#3a3038',        // Беатрис
+      {hair:'long', sheen:'#4e4048', updo:'#3a3038', accent:'#c0a8b8',
+       skirt:'#4a3a46', ruffle:'#5e4c58', sleeves:'#523f4c', legs:'#3e3440', shoes:'#26202a'});
+    this.images.witch6    = this.makeChibi('#6a3a44', '#4a2c32',        // Руби
+      {hair:'long', sheen:'#5e3a40', tufts:'#4a2c32', accent:'#d09aa4',
+       skirt:'#5a2f38', ruffle:'#70414a', legs:'#42323a', shoes:'#241c22'});
     this.images.acolyte   = this.makeChibi('#4a7a58', '#5a4030',        // ученица коммуны
       {hair:'long', accent:'#cfe0c0', skirt:'#3a5a44', legs:'#6a5a4a', shoes:'#3a3028'});
     this.images.customer  = this.makeChibi('#4a5548', '#3f3228',        // прохожий в пальто
@@ -1237,7 +1270,7 @@ const Assets = {
     this.images.mother      = this.makeChibi(MEDEA_H.body, MEDEA_H.hair,   // Мидея-мама, во флэшбеках
                                 Object.assign({}, MEDEA_H, {hair:'long'}));
     this.images.motherWitch = this.makeChibi(MEDEA_W.body, MEDEA_W.hair,   // Мидея-ведьма, в легенде
-                                Object.assign({}, MEDEA_W, {hair:'long'}));
+                                Object.assign({}, MEDEA_W, {hair:'long', ruffle:'#2a2630', stride:true}));
     // the prologue: five-year-old Sue and four-year-old Naya
     this.images.sueChild  = this.makeChibi('#d8a03c', '#2a2634',
       {hair:'long', sheen:'#4c4660', child:true, accent:'#f0e0c0',
@@ -1287,11 +1320,12 @@ const Assets = {
     P('witch2',    '#603020','#301020', ['normal','worried','angry'], '#a06040', {hair:'short'});
     P('witch3',    '#204060','#203040', ['normal','serious','angry'], '#4080c0',
       {hair:'bob', hat:'cap', hatColor:'#1e2c40', hatTrim:'#3c526e', collar:'#5f7590'});
-    P('witch4',    '#4a6a52','#5a3a28', ['normal','smile','worried'], '#7a9a68',
-      {hair:'long', sheen:'#7a5238', hat:'straw', hatColor:'#c2a870', hatTrim:'#6a8a52',
-       collar:'#c8d8b8', bg:'#26301f'});
-    P('witch5',    '#7a4658','#2e2a34', ['normal','smile','sad'], '#c07a90',
-      {hair:'long', sheen:'#4e4858', collar:'#e0a8b8', bg:'#2e2028'});
+    P('witch4',    '#4a4450','#2b2730', ['normal','smile','worried'], '#8a8296',
+      {hair:'short', sheen:'#3d3844', collar:'#8a8296', bg:'#232028'});
+    P('witch5',    '#5a4656','#3a3038', ['normal','smile','sad'], '#c0a8b8',
+      {hair:'long', sheen:'#4e4048', collar:'#c0a8b8', bg:'#2a222c'});
+    P('witch6',    '#6a3a44','#4a2c32', ['normal','smile','serious'], '#d09aa4',
+      {hair:'long', sheen:'#5e3a40', collar:'#d09aa4', bg:'#2c1e22'});
     P('neighbor',  '#5a5a4a','#8a8a80', ['normal'], '#8a8a70');
     P('acolyte',   '#38604a','#2a2018', ['normal','worried'], '#50a070');
     P('imp',       '#701020','#300810', ['normal','smile'], '#c04020', {glowEye:'#ffa020', bg:'#200408'});
@@ -6499,32 +6533,44 @@ communeYard: {
           {who:'witch2',expr:'smile',name:'Роза',text:'Вот и Женевьева так говорит. Сорок лет говорит, а я всё недосаливаю.'},
         ]);
       }},
-    { x:206,y:216, sprite:'witch4', name:'Ирма', speed:0.30,
+    { x:206,y:216, sprite:'witch4', name:'Агата', speed:0.30,
       path:[[206,216],[206,238],[178,240],[178,214]],
       when:()=> F('communeIntro') && !F('sueLeftDead'),
       dialogue:()=> {
         if (F('communeWarded')) return Dialogue.start([
-          {who:'witch4',expr:'worried',name:'Ирма',text:'Я развесила полынь на всех окнах. Толку, наверное, никакого.'},
-          {who:'witch4',expr:'sad',name:'Ирма',text:'Но руки хоть чем-то заняты.'},
+          {who:'witch4',expr:'worried',name:'Агата',text:'Я развесила полынь на всех окнах. Толку, наверное, никакого.'},
+          {who:'witch4',expr:'sad',name:'Агата',text:'Но руки хоть чем-то заняты.'},
         ]);
         return Dialogue.start([
-          {who:'witch4',expr:'normal',name:'Ирма',text:'Осторожно, не наступи. Тут молодая крапива, я её третий год уговариваю.'},
-          {who:'witch4',expr:'smile',name:'Ирма',text:'Хочешь совет? Ничего не бери у ведьмы в первый же день. Даже чай.'},
+          {who:'witch4',expr:'normal',name:'Агата',text:'Осторожно, не наступи. Тут молодая крапива, я её третий год уговариваю.'},
+          {who:'witch4',expr:'smile',name:'Агата',text:'Хочешь совет? Ничего не бери у ведьмы в первый же день. Даже чай.'},
           {who:'naya',expr:'normal',text:'(Поздно.)'},
         ]);
       }},
-    { x:148,y:236, sprite:'witch5', name:'Люси', speed:0.34,
+    { x:96,y:200, sprite:'witch6', name:'Руби',
+      when:()=> F('communeIntro') && !F('sueLeftDead'),
+      dialogue:()=> {
+        if (F('communePanic')) return Dialogue.start([
+          {who:'witch6',expr:'serious',name:'Руби',text:'Я говорила Старшей запереть двор. Она сказала, что мы не тюрьма.'},
+          {who:'witch6',expr:'sad',name:'Руби',text:'Мы и не тюрьма. Мы просто шесть женщин, которые никого не удержат.'},
+        ]);
+        return Dialogue.start([
+          {who:'witch6',expr:'normal',name:'Руби',text:'Новенькая. Я Руби. Я всегда опаздываю, так что знакомимся последними.'},
+          {who:'witch6',expr:'smile',name:'Руби',text:'Совет: если Агата даст тебе банку — не открывай её в доме.'},
+        ]);
+      }},
+    { x:148,y:236, sprite:'witch5', name:'Беатрис', speed:0.34,
       path:[[148,236],[196,240],[196,258],[132,256]],
       when:()=> F('communeIntro') && !F('sueLeftDead'),
       dialogue:()=> {
         if (F('communePanic')) return Dialogue.start([
-          {who:'witch5',expr:'sad',name:'Люси',text:'Старшая говорит, это была болезнь. Ирма говорит, это была не болезнь.'},
-          {who:'witch5',expr:'normal',name:'Люси',text:'А ты как думаешь?'},
+          {who:'witch5',expr:'sad',name:'Беатрис',text:'Старшая говорит, это была болезнь. Агата говорит, это была не болезнь.'},
+          {who:'witch5',expr:'normal',name:'Беатрис',text:'А ты как думаешь?'},
           {who:'naya',expr:'empty',text:'...я не знаю.'},
         ]);
         return Dialogue.start([
-          {who:'witch5',expr:'smile',name:'Люси',text:'Ты с Женевьевой пришла? Значит, тебя уже проверили.'},
-          {who:'witch5',expr:'normal',name:'Люси',text:'Я тут самая младшая. Мне пятьдесят четыре. Привыкай.'},
+          {who:'witch5',expr:'smile',name:'Беатрис',text:'Ты с Женевьевой пришла? Значит, тебя уже проверили.'},
+          {who:'witch5',expr:'normal',name:'Беатрис',text:'Я тут самая младшая. Мне пятьдесят четыре. Привыкай.'},
         ]);
       }},
   ],
@@ -8558,7 +8604,7 @@ const Dialogue = {
         sue:'Сью', sueGhost:'Сью',
         chris:'Крис', charlotte:'Шарлотта', lilith:'Лиллит', genevieve:'Женевьева',
         witch1:'Мадлен', witch2:'Роза', witch3:'Старшая', acolyte:'Ученица',
-        witch4:'Ирма', witch5:'Люси',
+        witch4:'Агата', witch5:'Беатрис', witch6:'Руби',
         neighbor:'Соседка', imp:'Житель ада', customer:'Посетитель',
         mother:'Мидея', motherWitch:'Мидея', friend:'Подруга', dorothy:'Дороти', narrator:''
       };
@@ -8830,6 +8876,11 @@ const Scene = {
     if (cmd.zoom !== undefined) { Game.zoomTo = cmd.zoom; if (cmd.ms) await wait(cmd.ms); return; }
     if (cmd.castWalk) { await Prologue.castWalk(cmd.castWalk.name, cmd.castWalk.to, cmd.castWalk.ms || 1200); return; }
     if (cmd.spark)  { const k = cmd.spark; FX.spawn(k.x, k.y, k.n || 8, k); return; }
+    if (cmd.creature) {
+      if (cmd.creature === 'gone') { Prologue.creature = null; return; }
+      await Prologue.startCreature(cmd.creature, cmd.ms || 1600); return;
+    }
+    if (cmd.medeaFall) { await Prologue.startFall(cmd.medeaFall); return; }
     if (cmd.swingOff) { Prologue.stopSwing(); return; }
     if (cmd.montage){ await Montage.run(cmd.montage); return; }
     if (cmd.goto)   { return { goto: cmd.goto }; }
@@ -8855,8 +8906,84 @@ const Prologue = {
     this.crystalGlow = 0; this.stones = []; this.stonesT = 0;
     this.butterfly = null; this.glow = 0; this.floatSue = 0;
     this.swing = null; Player.lift = 0;
+    this.creature = null; this.fall = 0; this.fallResolve = null;
   },
   addStar(i) { this.stars.push({ i, t:0 }); Audio.beep(140 + i*40, .5, 'sine', .1); },
+
+  /* СОЗДАНИЕ И ГИБЕЛЬ МИДЕИ.
+
+     Сказ нельзя только читать. Игрок должен увидеть, как из искалеченных
+     душ собирается существо — и как оно оказывается безвредным; а потом
+     увидеть, как за это её казнят.
+
+     creature: 'gather' — души слетаются к её ладоням;
+               'form'   — из них складывается маленькое светлое существо;
+               'free'   — существо уходит вверх, живое и целое.
+     fall: 0..1 — Мидея оседает и растворяется.                            */
+  creature: null, fall: 0,
+
+  startCreature(phase, ms) {
+    const c = this.creature || (this.creature = { phase:'gather', t:0, dur:1, souls:[], x:70, y:246 });
+    c.phase = phase; c.t = 0; c.dur = ms;
+    if (phase === 'gather') {
+      c.souls = [];
+      for (let i = 0; i < 9; i++)
+        c.souls.push({ a: (i / 9) * 6.28, r: 46 + (i % 3) * 14, sp: .4 + (i % 4) * .12, y: 208 + (i % 5) * 12 });
+    }
+    return new Promise(res => { c.resolve = res; });
+  },
+  startFall(ms) {
+    this.fallDur = ms; this.fallT = 0;
+    return new Promise(res => { this.fallResolve = res; });
+  },
+
+  updateLegend(dt) {
+    const c = this.creature;
+    if (c && c.resolve) {
+      c.t += dt;
+      const k = Math.min(1, c.t / c.dur);
+      if (c.phase === 'gather') c.souls.forEach(s => { s.a += s.sp * dt / 900; s.r += (10 - s.r) * (dt / 2600); });
+      if (c.phase === 'free')   c.y = 246 - k * 120;
+      if (k >= 1) { const r = c.resolve; c.resolve = null; r(); }
+    }
+    if (this.fallResolve) {
+      this.fallT += dt;
+      this.fall = Math.min(1, this.fallT / this.fallDur);
+      if (this.fall >= 1) { const r = this.fallResolve; this.fallResolve = null; r(); }
+    }
+  },
+
+  drawCreature(ctx, t) {
+    const c = this.creature;
+    if (!c) return;
+    ctx.save();
+    if (c.phase === 'gather' || c.phase === 'form') {
+      c.souls.forEach(s => {                       // искалеченные души: рваные бледные огоньки
+        const x = c.x + Math.cos(s.a) * s.r, y = s.y + Math.sin(s.a) * s.r * .4;
+        ctx.globalAlpha = .55 + .35 * Math.sin(t / 300 + s.a);
+        ctx.fillStyle = '#b8a0d8'; ctx.fillRect(Math.round(x), Math.round(y), 2, 3);
+        ctx.fillStyle = '#e0d0ff'; ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      });
+    }
+    if (c.phase === 'form' || c.phase === 'free') {
+      const k = c.phase === 'form' ? Math.min(1, c.t / c.dur) : 1;
+      const cy = c.y - 26;
+      ctx.globalAlpha = .9;
+      const gl = ctx.createRadialGradient(c.x, cy, 0, c.x, cy, 22 * k);
+      gl.addColorStop(0, 'rgba(230,214,255,.85)'); gl.addColorStop(1, 'rgba(180,140,255,0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(c.x, cy, 22 * k, 0, 6.3); ctx.fill();
+      // само существо: круглое, мягкое, без единой острой линии — оно безвредно
+      ctx.fillStyle = '#e8dcff';
+      ctx.beginPath(); ctx.ellipse(c.x, cy, 8 * k, 7 * k, 0, 0, 6.3); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x - 6 * k, cy + 3 * k, 3 * k, 3 * k, 0, 0, 6.3); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(c.x + 6 * k, cy + 3 * k, 3 * k, 3 * k, 0, 0, 6.3); ctx.fill();
+      ctx.fillStyle = '#6a4a8a';
+      ctx.fillRect(Math.round(c.x - 3 * k), Math.round(cy - 1), Math.max(1, 2 * k), Math.max(1, 2 * k));
+      ctx.fillRect(Math.round(c.x + 2 * k), Math.round(cy - 1), Math.max(1, 2 * k), Math.max(1, 2 * k));
+      if (Math.random() < .3) FX.spawn(c.x, cy, 1, { color:'#d8c0ff', spread:8, rise:-.3, life:44 });
+    }
+    ctx.restore();
+  },
 
   /* Мидея в легенде — её собственная модель, увеличенная втрое и уведённая
      в тень: на таком масштабе открытое лицо читается светлым пятном,
@@ -8914,10 +9041,20 @@ const Prologue = {
       ctx.globalAlpha = a * .45;                     // тёмный ореол под фигурой
       ctx.fillStyle = '#241a2a';
       ctx.beginPath(); ctx.ellipse(70, 212, 25, 46, 0, 0, Math.PI*2); ctx.fill();
-      ctx.globalAlpha = a;
+      const f = this.fall || 0;
+      ctx.globalAlpha = a * (1 - f * .85);
       const fig = this.medeaFigure();
-      if (fig) { ctx.imageSmoothingEnabled = false; ctx.drawImage(fig, 70 - fig.width/2, 250 - fig.height); }
+      if (fig) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(70, 250);
+        ctx.rotate(f * .22);                       // казнь: фигура кренится и растворяется
+        ctx.translate(0, f * 14);
+        ctx.drawImage(fig, -fig.width/2, -fig.height);
+      }
       ctx.restore();
+      if (f > 0 && f < 1 && Math.random() < .5)
+        FX.spawn(70 + (Math.random()-.5)*26, 210 + Math.random()*40, 1,
+                 { color:'#c060ff', spread:8, rise:-.4, life:60 });
       if (this.crystalGlow > 0) {
         const cg = this.crystalGlow * (.7 + .3 * Math.sin(t/220));
         const gr = ctx.createRadialGradient(70, 228, 0, 70, 228, 34 * cg);
@@ -8950,112 +9087,138 @@ const Prologue = {
     });
   },
 
-  /* ЛИЛИТ В ПРОЛОГЕ.
+  /* ЛИЛИТ В ПРОЛОГЕ — по присланному силуэту.
 
-     Раньше на её месте стоял треугольник с кружком — читалось как пирамида.
-     Теперь это человеческая фигура: голова, плечи, разведённые руки, корпус
-     и подол, расходящийся книзу. Силуэт остаётся чёрным, но контровой свет
-     сзади обводит его по краю, поэтому в темноте видно именно человека, а
-     не геометрию. Она заметно выше всех: это и есть её главная реплика.    */
+     Читаемые формы референса: рогатая корона из нескольких тонких рогов,
+     длинные волнистые волосы ниже пояса, поднятая вуаль за головой,
+     разведённые в стороны руки с когтистыми кистями, широкие рукава с
+     рваными языками по низу, узкий лиф, юбка колоколом и разлетающиеся
+     полы плаща, оканчивающиеся такими же языками.
+
+     Всё чёрное; читаемость даёт контровой свет по краю.                   */
   drawLilith(ctx, t) {
-    const CX = 120, FOOT = 252, HEAD = 84;      // от макушки до пола — 168 px
+    const CX = 120, FOOT = 258, HEAD = 78;
     const br = 1 + Math.sin(t / 900) * .06;
+    const sway = Math.sin(t / 1300) * 3;
+    const ink = '#120610';   // не абсолютно чёрный: иначе силуэт тонет в тёмном зале
 
     ctx.save();
-    // контровой свет и дым из-за спины
-    const back = ctx.createRadialGradient(CX, 150, 10, CX, 150, 96);
-    back.addColorStop(0, `rgba(190,30,44,${(.30 * br).toFixed(2)})`);
+    const back = ctx.createRadialGradient(CX, 150, 10, CX, 150, 104);
+    back.addColorStop(0, `rgba(210,40,54,${(.44 * br).toFixed(2)})`);
     back.addColorStop(1, 'rgba(120,10,26,0)');
-    ctx.fillStyle = back; ctx.beginPath(); ctx.arc(CX, 150, 96, 0, 6.3); ctx.fill();
+    ctx.fillStyle = back; ctx.beginPath(); ctx.arc(CX, 150, 104, 0, 6.3); ctx.fill();
 
-    const ink = '#0a0206';
-    // подол: расходится книзу, а не сходится в остриё
+    /* язык ткани: повторяющийся мотив рваного края из референса */
+    const flame = (x, y, dir, len, w) => {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + dir * w, y + len * .5, x + dir * (w * .3), y + len);
+      ctx.quadraticCurveTo(x + dir * w * .9, y + len * .55, x - dir * w * .2, y);
+      ctx.closePath(); ctx.fill();
+    };
+
     ctx.fillStyle = ink;
+    /* --- юбка колоколом и разлетающиеся полы --- */
     ctx.beginPath();
-    ctx.moveTo(CX - 13, 150); ctx.lineTo(CX + 13, 150);
-    ctx.bezierCurveTo(CX + 26, 196, CX + 38, 232, CX + 44, FOOT);
-    ctx.lineTo(CX - 44, FOOT);
-    ctx.bezierCurveTo(CX - 38, 232, CX - 26, 196, CX - 13, 150);
+    ctx.moveTo(CX - 12, 148); ctx.lineTo(CX + 12, 148);
+    ctx.bezierCurveTo(CX + 30, 200, CX + 44, 236, CX + 52, FOOT);
+    ctx.lineTo(CX - 52, FOOT);
+    ctx.bezierCurveTo(CX - 44, 236, CX - 30, 200, CX - 12, 148);
     ctx.closePath(); ctx.fill();
-    // корпус и плечи
+    [-1, 1].forEach(d => {                       // отлетающая пола плаща
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 14, 168);
+      ctx.quadraticCurveTo(CX + d * 58, 206, CX + d * 70, FOOT - 8);
+      ctx.quadraticCurveTo(CX + d * 46, 240, CX + d * 30, FOOT);
+      ctx.lineTo(CX + d * 16, FOOT);
+      ctx.closePath(); ctx.fill();
+      flame(CX + d * 68, FOOT - 10, d, 14, 7);    // язык на конце полы
+      flame(CX + d * 44, FOOT - 2, d, 11, 5);
+    });
+    /* --- лиф и плечи --- */
     ctx.beginPath();
-    ctx.moveTo(CX - 10, 112); ctx.lineTo(CX + 10, 112);
-    ctx.lineTo(CX + 15, 152); ctx.lineTo(CX - 15, 152);
+    ctx.moveTo(CX - 9, 108); ctx.lineTo(CX + 9, 108);
+    ctx.lineTo(CX + 13, 150); ctx.lineTo(CX - 13, 150);
     ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(CX, 112, 21, 8, 0, 0, 6.3); ctx.fill();
-    // руки разведены в стороны — поза царицы, показывающей власть
+    ctx.beginPath(); ctx.ellipse(CX, 108, 19, 7, 0, 0, 6.3); ctx.fill();
+    /* --- руки в стороны и широкие рукава с языками --- */
     [-1, 1].forEach(d => {
       ctx.beginPath();
-      ctx.moveTo(CX + d * 16, 110);
-      ctx.quadraticCurveTo(CX + d * 44, 116, CX + d * 60, 100);
-      ctx.lineTo(CX + d * 60, 107);
-      ctx.quadraticCurveTo(CX + d * 44, 126, CX + d * 16, 120);
+      ctx.moveTo(CX + d * 14, 106);
+      ctx.quadraticCurveTo(CX + d * 44, 108, CX + d * 62, 96);
+      ctx.lineTo(CX + d * 62, 102);
+      ctx.quadraticCurveTo(CX + d * 44, 118, CX + d * 14, 118);
       ctx.closePath(); ctx.fill();
-      // рукав, свисающий с разведённой руки
+      for (let i = 0; i < 3; i++) {               // когтистые пальцы
+        ctx.beginPath();
+        ctx.moveTo(CX + d * (62 + i * 2), 97 + i * 2);
+        ctx.lineTo(CX + d * (72 + i * 2), 94 + i * 3);
+        ctx.lineTo(CX + d * (62 + i * 2), 100 + i * 2);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.beginPath();                            // рукав-колокол
+      ctx.moveTo(CX + d * 26, 112); ctx.lineTo(CX + d * 50, 104);
+      ctx.quadraticCurveTo(CX + d * 52, 132, CX + d * 44, 150);
+      ctx.lineTo(CX + d * 24, 142);
+      ctx.closePath(); ctx.fill();
+      flame(CX + d * 44, 148, d, 16, 6);
+      flame(CX + d * 30, 142, d, 12, 5);
+    });
+    /* --- шея, волосы, вуаль, голова --- */
+    ctx.fillRect(CX - 4, 98, 8, 12);
+    ctx.fillStyle = '#080308';                    // вуаль за головой
+    ctx.beginPath();
+    ctx.moveTo(CX - 16, HEAD + 6);
+    ctx.quadraticCurveTo(CX - 26, HEAD + 30, CX - 18, HEAD + 46);
+    ctx.lineTo(CX + 18, HEAD + 46);
+    ctx.quadraticCurveTo(CX + 26, HEAD + 30, CX + 16, HEAD + 6);
+    ctx.closePath(); ctx.fill();
+    [-1, 1].forEach(d => {                        // длинные волнистые волосы
       ctx.beginPath();
-      ctx.moveTo(CX + d * 30, 120); ctx.lineTo(CX + d * 52, 112);
-      ctx.lineTo(CX + d * 48, 150); ctx.lineTo(CX + d * 28, 142);
+      ctx.moveTo(CX + d * 3, HEAD - 4);
+      ctx.quadraticCurveTo(CX + d * 22, HEAD + 10, CX + d * 17, 128);
+      ctx.quadraticCurveTo(CX + d * (24 + sway * d), 152, CX + d * 11, 176);
+      ctx.lineTo(CX + d * 3, 168);
+      ctx.quadraticCurveTo(CX + d * 12, 142, CX + d * 6, HEAD + 12);
       ctx.closePath(); ctx.fill();
     });
-    // шея и голова
-    ctx.fillRect(CX - 4, 100, 8, 12);
-    // длинные волосы: падают ниже плеч и слегка шевелятся — без них
-    // силуэт читался лысым черепом
-    const sway = Math.sin(t / 1100) * 2.5;
-    ctx.fillStyle = '#120309';
-    [-1, 1].forEach(d => {
-      ctx.beginPath();
-      ctx.moveTo(CX + d * 3, HEAD - 2);
-      ctx.quadraticCurveTo(CX + d * 17, HEAD + 6, CX + d * 15, 120);
-      ctx.quadraticCurveTo(CX + d * (13 + sway * d), 146, CX + d * 8, 158);
-      ctx.lineTo(CX + d * 2, 150);
-      ctx.quadraticCurveTo(CX + d * 7, 126, CX + d * 5, HEAD + 8);
-      ctx.closePath(); ctx.fill();
-    });
     ctx.fillStyle = ink;
-    ctx.beginPath(); ctx.ellipse(CX, HEAD + 10, 11, 13, 0, 0, 6.3); ctx.fill();
-    ctx.fillStyle = '#120309';                  // копна над лбом
-    ctx.beginPath(); ctx.ellipse(CX, HEAD + 3, 12, 7, 0, 0, 6.3); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(CX, HEAD + 12, 11, 14, 0, 0, 6.3); ctx.fill();
+    ctx.fillStyle = '#080308';
+    ctx.beginPath(); ctx.ellipse(CX, HEAD + 4, 12, 8, 0, 0, 6.3); ctx.fill();
+    /* --- корона из нескольких тонких рогов --- */
     ctx.fillStyle = ink;
-    // рогатая корона: крупные рога, иначе на общем плане их просто не видно
-    [-1, 1].forEach(d => {
+    [[-1, 20, 30], [-1, 12, 40], [1, 12, 40], [1, 20, 30], [-1, 4, 34], [1, 4, 34]].forEach(([d, off, up]) => {
       ctx.beginPath();
-      ctx.moveTo(CX + d * 4, HEAD + 4);
-      ctx.quadraticCurveTo(CX + d * 24, HEAD - 6, CX + d * 21, HEAD - 26);
-      ctx.quadraticCurveTo(CX + d * 15, HEAD - 12, CX + d * 2, HEAD - 2);
+      ctx.moveTo(CX + d * off, HEAD + 4);
+      ctx.quadraticCurveTo(CX + d * (off + 10), HEAD - up * .5, CX + d * (off + 3), HEAD - up);
+      ctx.quadraticCurveTo(CX + d * (off + 4), HEAD - up * .45, CX + d * (off - 3), HEAD + 4);
       ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = `rgba(220,70,70,${(.42 * br).toFixed(2)})`;
-      ctx.beginPath();
-      ctx.moveTo(CX + d * 4, HEAD + 4);
-      ctx.quadraticCurveTo(CX + d * 24, HEAD - 6, CX + d * 21, HEAD - 26);
-      ctx.stroke();
     });
 
-    // обводка контровым светом: в темноте читается именно фигура
-    ctx.strokeStyle = `rgba(220,70,70,${(.34 * br).toFixed(2)})`;
-    ctx.lineWidth = 1;
+    /* --- контровой свет по краю: в темноте читается именно фигура --- */
+    ctx.strokeStyle = `rgba(240,110,105,${(.62 * br).toFixed(2)})`;
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(CX - 44, FOOT);
-    ctx.bezierCurveTo(CX - 38, 232, CX - 26, 196, CX - 13, 150);
-    ctx.lineTo(CX - 15, 152); ctx.lineTo(CX - 10, 112);
-    ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(CX, HEAD + 10, 11, 13, 0, 0, 6.3); ctx.stroke();
-    [-1, 1].forEach(d => {                      // подсвеченная прядь по краю
-      ctx.beginPath();
-      ctx.moveTo(CX + d * 3, HEAD - 2);
-      ctx.quadraticCurveTo(CX + d * 17, HEAD + 6, CX + d * 15, 120);
-      ctx.quadraticCurveTo(CX + d * (13 + sway * d), 146, CX + d * 8, 158);
-      ctx.stroke();
-    });
+    ctx.moveTo(CX - 52, FOOT);
+    ctx.bezierCurveTo(CX - 44, 236, CX - 30, 200, CX - 12, 148);
+    ctx.lineTo(CX - 13, 150); ctx.lineTo(CX - 9, 108); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(CX, HEAD + 12, 11, 14, 0, 0, 6.3); ctx.stroke();
     [-1, 1].forEach(d => {
       ctx.beginPath();
-      ctx.moveTo(CX + d * 16, 110);
-      ctx.quadraticCurveTo(CX + d * 44, 116, CX + d * 60, 100);
-      ctx.stroke();
+      ctx.moveTo(CX + d * 14, 106);
+      ctx.quadraticCurveTo(CX + d * 44, 108, CX + d * 62, 96); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 3, HEAD - 4);
+      ctx.quadraticCurveTo(CX + d * 22, HEAD + 10, CX + d * 17, 128);
+      ctx.quadraticCurveTo(CX + d * (24 + sway * d), 152, CX + d * 11, 176); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 20, HEAD + 4);
+      ctx.quadraticCurveTo(CX + d * 30, HEAD - 15, CX + d * 23, HEAD - 30); ctx.stroke();
     });
 
     ctx.fillStyle = `rgba(255,42,48,${(.85 * br).toFixed(2)})`;
-    ctx.fillRect(CX - 6, HEAD + 8, 3, 2); ctx.fillRect(CX + 3, HEAD + 8, 3, 2);
+    ctx.fillRect(CX - 6, HEAD + 10, 3, 2); ctx.fillRect(CX + 3, HEAD + 10, 3, 2);
     ctx.restore();
   },
 
@@ -9809,13 +9972,39 @@ prologue: [
   { crackStar:2 }, { sfx:'scare' }, { shake:4 },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Она дерзнула ослушаться, солгала своей повелительнице.'},
-    {who:'narrator',expr:'normal',name:'',text:'Там, где должна была появиться чудовищная тварь из искалеченных душ, она попыталась соединить их, исцелить и отпустить.'},
-    {who:'narrator',expr:'normal',name:'',text:'Её создание оказалось безвредным, почти добрым. Но именно в этом и открылся её обман.'},
+  ]},
+  /* Сказ нельзя только читать: игрок видит, как из искалеченных душ
+     собирается существо — и что оно оказывается безобидным. */
+  { zoom:1.18, ms:600 },
+  { creature:'gather', ms:2200 },
+  { sfx:'rune' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Там, где должна была появиться чудовищная тварь, она собрала искалеченные души в ладонях.'},
+  ]},
+  { creature:'form', ms:1600 },
+  { sfx:'chime' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Она соединила их, исцелила — и то, что получилось, было круглым, тихим и совершенно безвредным.'},
+  ]},
+  { creature:'free', ms:2000 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Мидея отпустила его. Оно ушло вверх, живое и целое.'},
+  ]},
+  { creature:'gone' },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Но именно в этом и открылся её обман.'},
   ]},
   { sfx:'heart' }, { shake:6 }, { flash:'#ff2a30', dur:420, peak:.7 },
+  { lilithFig:true },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Гнев Лилит был страшен. Она приговорила предательницу к смерти.'},
   ]},
+  { sfx:'low' }, { shake:8 }, { flash:'#ff2a30', dur:700, peak:.85 },
+  { medeaFall:2400 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Мидея не сопротивлялась. Она успела только одно.'},
+  ]},
+  { zoom:1, ms:800 },
   { crystalGlow:1 }, { sfx:'chime' },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Но прежде чем кара настигла её, Мидея вложила всю свою силу в сверкающий кристалл и передала его в руки дочери.'},
@@ -10874,8 +11063,9 @@ communeIntroScene: [
     {x:158,y:222, sprite:'sue',       name:'Сью'},
     {x:214,y:206, sprite:'witch1',    name:'Мадлен'},
     {x:262,y:240, sprite:'witch2',    name:'Роза'},
-    {x:300,y:222, sprite:'witch4',    name:'Ирма'},
-    {x:88,y:240,  sprite:'witch5',    name:'Люси'},
+    {x:300,y:222, sprite:'witch4',    name:'Агата'},
+    {x:88,y:240,  sprite:'witch5',    name:'Беатрис'},
+    {x:64,y:214,  sprite:'witch6',    name:'Руби'},
   ]},
   { dlg:[
     {who:'genevieve',expr:'normal',text:'Вот и коммуна. Не пугайся, тут нет ничего страшного.'},
@@ -10887,9 +11077,9 @@ communeIntroScene: [
     {who:'witch1',expr:'normal',name:'Мадлен',text:'Здравствуй, деточка. Какая тоненькая.'},
     {who:'genevieve',expr:'normal',text:'А это Роза. Ей восемьдесят два, и она до сих пор недосаливает суп.'},
     {who:'witch2',expr:'smile',name:'Роза',text:'Женевьева, я тебя переживу назло.'},
-    {who:'genevieve',expr:'normal',text:'Ирма — травы. Люси — младшая, ей пятьдесят четыре.'},
-    {who:'witch4',expr:'smile',name:'Ирма',text:'Не стой на клумбе, милая.'},
-    {who:'witch5',expr:'normal',name:'Люси',text:'Она всем это говорит. Даже Женевьеве.'},
+    {who:'genevieve',expr:'normal',text:'Агата — травы. Беатрис — младшая из старших, ей пятьдесят четыре. И Руби, она вечно опаздывает.'},
+    {who:'witch4',expr:'smile',name:'Агата',text:'Не стой на клумбе, милая.'},
+    {who:'witch5',expr:'normal',name:'Беатрис',text:'Она всем это говорит. Даже Женевьеве.'},
   ]},
   { dlg:[
     {who:'genevieve',expr:'normal',text:'У каждой из нас есть амулет. Мы называем его именем. Он и есть имя.'},
@@ -12759,6 +12949,7 @@ function drawRoom() {
   if (room.prologue) {
     ctx.save(); ctx.translate(-camX, -camY);
     Prologue.drawStars(ctx); Prologue.drawFigures(ctx);
+    Prologue.drawCreature(ctx, Date.now());
     Prologue.drawStones(ctx); Prologue.drawButterfly(ctx);
     ctx.restore();
   }
@@ -12879,7 +13070,7 @@ function tick(t) {
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
     if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true); Cam.update(dt);
-                 Prologue.updateSwing(dt); }
+                 Prologue.updateSwing(dt); Prologue.updateLegend(dt); }
     drawRoom();
   }
   requestAnimationFrame(tick);
