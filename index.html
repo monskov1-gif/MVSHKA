@@ -1598,7 +1598,7 @@ function woodGrain(g, x, y, w, h, col) {
     [[8,5,4],[13,10,3]].forEach(([x,y,r]) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI*2); g.fill(); });
     box34(g, 4, 17, 12, 4, 7, '#8a5a3a', '#6a4028');
   });
-  D('painting', {w:22,h:18,ax:11,ay:9,foot:null}, g => {
+  D('painting', {w:22,h:18,ax:11,ay:9,foot:null, wall:true}, g => {
     g.fillStyle = '#4a3524'; g.fillRect(0, 0, 22, 18);
     g.fillStyle = '#c9a05a'; g.fillRect(1, 1, 20, 16);
     g.fillStyle = '#6a7a8a'; g.fillRect(3, 3, 16, 12);
@@ -1612,7 +1612,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#55636f'; g.fillRect(3, 3, 12, 5);
     g.fillStyle = '#1a1c22'; g.fillRect(13, 15, 4, 3); g.fillRect(9, 17, 12, 2);
   });
-  D('clock', {w:14,h:14,ax:7,ay:7,foot:null}, g => {
+  D('clock', {w:14,h:14,ax:7,ay:7,foot:null, wall:true}, g => {
     g.fillStyle = '#4a3524'; g.beginPath(); g.arc(7, 7, 7, 0, Math.PI*2); g.fill();
     g.fillStyle = '#e0d8c8'; g.beginPath(); g.arc(7, 7, 5, 0, Math.PI*2); g.fill();
     g.fillStyle = '#2a2018'; g.fillRect(6.5, 3, 1, 4.5); g.fillRect(7, 7, 3, 1);
@@ -1631,19 +1631,19 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#5a4530'; g.fillRect(5, 5, 18, 12); g.fillRect(5, 20, 18, 12);
     g.fillStyle = '#c9a05a'; g.fillRect(22, 19, 3, 3);
   });
-  D('window_in', {w:34,h:28,ax:17,ay:14,foot:null}, g => {
+  D('window_in', {w:34,h:28,ax:17,ay:14,foot:null, wall:true}, g => {
     g.fillStyle = '#3f352e'; g.fillRect(0, 0, 34, 28);
     g.fillStyle = '#2b3444'; g.fillRect(3, 3, 28, 22);
     g.fillStyle = '#3d4a5e'; g.fillRect(3, 3, 28, 8);
     g.fillStyle = '#3f352e'; g.fillRect(16, 3, 2, 22); g.fillRect(3, 12, 28, 2);
     g.fillStyle = '#8a7660'; g.fillRect(0, 25, 34, 3);
   });
-  D('photo_frame', {w:16,h:18,ax:8,ay:9,foot:null}, g => {
+  D('photo_frame', {w:16,h:18,ax:8,ay:9,foot:null, wall:true}, g => {
     g.fillStyle = '#3a2c22'; g.fillRect(0, 0, 16, 18);
     g.fillStyle = '#6a5a50'; g.fillRect(2, 2, 12, 14);
     g.fillStyle = '#8a7a72'; g.fillRect(5, 5, 6, 7);
   });
-  D('poster', {w:20,h:26,ax:10,ay:13,foot:null}, g => {
+  D('poster', {w:20,h:26,ax:10,ay:13,foot:null, wall:true}, g => {
     g.fillStyle = '#e0d8c8'; g.fillRect(0, 0, 20, 26);
     g.fillStyle = '#9a4a5a'; g.fillRect(1, 1, 18, 24);
     g.fillStyle = '#e8d0a0'; g.fillRect(3, 3, 14, 10);
@@ -2093,7 +2093,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#6f5940'; g.fillRect(0, 8, 52, 1);
     legs(g, 3, 17, 46, 3, '#3b2a1c');
   });
-  D('blackboard', {w:70,h:34,ax:35,ay:17,foot:null}, g => {
+  D('blackboard', {w:70,h:34,ax:35,ay:17,foot:null, wall:true}, g => {
     g.fillStyle = '#4a3524'; g.fillRect(0, 0, 70, 34);
     g.fillStyle = '#2b3a30'; g.fillRect(3, 3, 64, 26);
     g.fillStyle = '#3a4a3e'; g.fillRect(3, 3, 64, 6);
@@ -2103,7 +2103,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#6b533c'; g.fillRect(3, 29, 64, 3);
     g.fillStyle = '#e8e4dc'; g.fillRect(10, 29, 5, 2); g.fillRect(20, 29, 4, 2);
   });
-  D('stage_curtain', {w:56,h:70,ax:28,ay:35,foot:null}, g => {
+  D('stage_curtain', {w:56,h:70,ax:28,ay:35,foot:null, wall:true}, g => {
     g.fillStyle = '#5a1024'; g.fillRect(0, 0, 56, 70);
     g.fillStyle = '#7a1830';
     for (let i=0;i<7;i++) g.fillRect(i*8, 0, 5, 70);
@@ -2111,7 +2111,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#c9a05a'; g.fillRect(0, 0, 56, 4);
     g.fillStyle = '#8a6a34'; g.fillRect(0, 4, 56, 2);
   });
-  D('spotlight', {w:16,h:20,ax:8,ay:10,foot:null, light:{dy:34,r:56,c:'#ffe6b0',i:.7}}, g => {
+  D('spotlight', {w:16,h:20,ax:8,ay:10,foot:null, wall:true, light:{dy:34,r:56,c:'#ffe6b0',i:.7}}, g => {
     g.fillStyle = '#2b2830'; g.fillRect(6, 0, 4, 6);
     g.fillStyle = '#3d3a44'; g.fillRect(1, 5, 14, 10);
     g.fillStyle = '#fff2c8'; g.fillRect(3, 13, 10, 4);
@@ -2141,7 +2141,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#e0d8c4'; g.fillRect(5, 8, 14, 4);
     g.fillStyle = '#6a5a44'; g.fillRect(6, 9, 12, 1);
   });
-  D('notice_board', {w:44,h:32,ax:22,ay:16,foot:null}, g => {
+  D('notice_board', {w:44,h:32,ax:22,ay:16,foot:null, wall:true}, g => {
     g.fillStyle = '#4a3524'; g.fillRect(0, 0, 44, 32);
     g.fillStyle = '#8a6a44'; g.fillRect(2, 2, 40, 28);
     const cols = ['#e8e2d4','#dcd0b8','#e8d0c8','#d8dce4'];
@@ -2181,7 +2181,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#1a1820'; for (let i=0;i<12;i++) g.fillRect(6+i*3, 10, 1, 3);
     g.fillStyle = '#3d3944'; g.fillRect(0, 0, 46, 2);
   });
-  D('mask_pair', {w:24,h:18,ax:12,ay:9,foot:null}, g => {
+  D('mask_pair', {w:24,h:18,ax:12,ay:9,foot:null, wall:true}, g => {
     g.fillStyle = '#d8cfae'; g.beginPath(); g.ellipse(7, 9, 6, 8, 0, 0, Math.PI*2); g.fill();
     g.fillStyle = '#2a2420'; g.fillRect(4, 6, 2, 2); g.fillRect(9, 6, 2, 2);
     g.fillRect(5, 12, 5, 1); g.fillRect(4, 11, 1, 1); g.fillRect(10, 11, 1, 1);
@@ -2360,7 +2360,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#ff8a4c'; g.fillRect(9, 27, 7, 3); g.fillRect(48, 27, 7, 3);
     g.fillStyle = '#0a0407'; g.fillRect(8, 26, 9, 1); g.fillRect(47, 26, 9, 1);
   });
-  D('black_star', {w:30,h:30,ax:15,ay:15,foot:null}, g => {
+  D('black_star', {w:30,h:30,ax:15,ay:15,foot:null, wall:true}, g => {
     g.fillStyle = '#08060c';
     g.beginPath();
     for (let k = 0; k < 10; k++) {
@@ -2371,7 +2371,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.strokeStyle = '#5a2040'; g.stroke();
     g.fillStyle = '#8a2440'; g.fillRect(14, 14, 2, 2);
   });
-  D('chain_hook', {w:12,h:44,ax:6,ay:6,foot:null}, g => {
+  D('chain_hook', {w:12,h:44,ax:6,ay:6,foot:null, wall:true}, g => {
     g.strokeStyle = '#57545e'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(6, 0); g.lineTo(6, 30); g.stroke(); g.lineWidth = 1;
     g.fillStyle = '#6e6a74'; for (let y = 2; y < 30; y += 5) g.fillRect(4, y, 4, 3);
@@ -2569,7 +2569,7 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#a8506a'; g.fillRect(25, 10, 6, 4);
     g.strokeStyle = '#7d848c'; g.strokeRect(0.5, 1.5, 33, 14);
   });
-  D('menu_board', {w:30,h:36,ax:15,ay:17,foot:null}, g => {
+  D('menu_board', {w:30,h:36,ax:15,ay:17,foot:null, wall:true}, g => {
     g.fillStyle = '#4a3524'; g.fillRect(0, 0, 30, 36);
     g.fillStyle = '#2b3a30'; g.fillRect(3, 3, 24, 30);
     g.fillStyle = '#cfd8cc';
@@ -4043,7 +4043,7 @@ cafe: {
     { t:'table_round', x:60,  y:182 }, { t:'chair_wood', x:36, y:186 }, { t:'chair_wood', x:84, y:186 },
     { t:'table_round', x:198, y:176 }, { t:'chair_wood', x:174, y:180 }, { t:'chair_wood', x:222, y:180 },
     { t:'table_round', x:60,  y:256 }, { t:'chair_wood', x:36, y:260 }, { t:'chair_wood', x:84, y:260 },
-    { t:'table_round', x:140, y:214 }, { t:'chair_wood', x:116, y:218 },
+    { t:'table_round', x:140, y:214 }, { t:'chair_wood', x:116, y:218 }, { t:'chair_wood', x:164, y:218 },
     { t:'sofa_old', x:226, y:258 },
     { t:'rug_warm', x:200, y:238 },
     { t:'plant_pot', x:274, y:200 }, { t:'plant_pot', x:22, y:214 },
@@ -4093,10 +4093,10 @@ cafe: {
       }},
   ],
   npcs: [
-    { x:126,y:212, sprite:'sue', name:'Сью',
+    { x:116,y:224, sprite:'sue', name:'Сью',
       when:()=> F('metSue') && !F('cafeSceneComplete'),
       dialogue:()=> Scene.play('cafeScene') },
-    { x:152,y:212, sprite:'friend', name:'Подруга',
+    { x:164,y:224, sprite:'friend', name:'Подруга',
       when:()=> F('metSue') && !F('cafeSceneComplete'),
       dialogue:()=> Dialogue.start([{who:'friend',expr:'smile',text:'Привет! Сью столько про тебя рассказывала.'}]) },
     { x:256,y:268, sprite:'chris', name:'Крис',
@@ -4875,7 +4875,7 @@ nightSpot: {
       }},
   ],
   npcs: [
-    { x:222,y:284, sprite:'sue', name:'Сью',
+    { x:206,y:290, sprite:'sue', name:'Сью',
       when:()=> !F('thirdAmulet'),
       dialogue:()=> Dialogue.start([
         {who:'sue',expr:'worried',text:'Ная. Последний раз спрашиваю по-человечески. Что мы здесь делаем?'},
@@ -10990,14 +10990,25 @@ function drawRoom() {
   // 2. anything the room wants to animate underneath the actors
   if (room.underPaint) { ctx.save(); ctx.translate(-camX, -camY); room.underPaint(ctx); ctx.restore(); }
 
-  // 3. props, NPCs and the player, sorted by depth so you walk behind things
-  // flat decals (rugs, puddles, leaf piles) belong to the floor, not to the
-  // depth-sorted layer — otherwise they get drawn over whoever stands on them
+  // 3. props, NPCs and the player, sorted by depth so you walk behind things.
+  // Три слоя вместо одного, потому что у предметов разная связь с полом:
+  //   flat  — половые декали (ковры, лужи, кучи листьев): их топчут;
+  //   wall  — то, что висит на стене (картины, часы, окна, доски, афиши):
+  //           у них нет точки контакта с полом, поэтому глубина для них
+  //           не определена — они всегда позади всех, кто ходит;
+  //   остальное сортируется по нижней кромке рисунка, а не по точке
+  //   привязки: у части мебели спрайт спускается на несколько пикселей
+  //   ниже якоря, и без поправки ноги персонажа уезжали под неё.
   const props = World.objectsOf(room);
-  for (const o of props) if (Art.meta(o.t) && Art.meta(o.t).flat) Art.drawAt(ctx, o, camX, camY);
+  for (const o of props) { const m = Art.meta(o.t); if (m && m.flat) Art.drawAt(ctx, o, camX, camY); }
+  for (const o of props) { const m = Art.meta(o.t); if (m && m.wall) Art.drawAt(ctx, o, camX, camY); }
 
   const draws = [];
-  for (const o of props) { const m = Art.meta(o.t); if (m && m.flat) continue; draws.push({ y:o.y, obj:o }); }
+  for (const o of props) {
+    const m = Art.meta(o.t);
+    if (m && (m.flat || m.wall)) continue;
+    draws.push({ y:o.y + (m ? Math.max(0, m.h - m.ay) : 0), obj:o });
+  }
   for (const n of roomNPCs(room)) draws.push({ y:n.y, npc:n });
   for (const n of roomCast()) draws.push({ y:n.y, npc:n });
   if (!room.cinematic) draws.push({ y:Player.y, player:true });
