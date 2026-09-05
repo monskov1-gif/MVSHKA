@@ -86,12 +86,21 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
       }));
     }
 
-    // §14: на стене коридора ничто не должно налезать на соседа
+    // §14: на стене коридора ничто не должно налезать на соседа —
+    // и в горизонтальных раскладках, и в вертикальных стенах крыльев
     const walls = [];
-    for (const [name, L] of Object.entries({ UNI_LIB_WALL, UNI_F2_WALL, UNI_THEATRE_WALL })) {
+    for (const [name, L] of Object.entries({ UNI_C2_WALL, UNI_OLD_WALL })) {
       const it = L.items;
       for (let i = 1; i < it.length; i++) {
         const gap = it[i].x - (it[i-1].x + it[i-1].w);
+        if (gap < 10) walls.push({ name, a:it[i-1].label || it[i-1].k, b:it[i].label || it[i].k, gap });
+      }
+    }
+    for (const [name, L] of Object.entries({ UNI_W1_LEFT, UNI_W1_RIGHT, UNI_E1_LEFT, UNI_E1_RIGHT,
+                                             UNI_W2_LEFT, UNI_W2_RIGHT, UNI_E2_LEFT, UNI_E2_RIGHT })) {
+      const it = L.items;
+      for (let i = 1; i < it.length; i++) {
+        const gap = it[i].y - (it[i-1].y + it[i-1].h);
         if (gap < 10) walls.push({ name, a:it[i-1].label || it[i-1].k, b:it[i].label || it[i].k, gap });
       }
     }
