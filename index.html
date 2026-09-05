@@ -268,6 +268,15 @@
     text-shadow:0 0 20px #6a0020;
   }
   #titleFlash.show { display:flex; }
+  /* подсказка появляется не сразу: сначала карточку надо дочитать */
+  #titleHint {
+    position:absolute; left:0; right:0; bottom:calc(52px + env(safe-area-inset-bottom));
+    text-align:center; color:#c8a8b8; font-size:11px; letter-spacing:2px;
+    z-index:82; display:none; animation:hintPulse 1.6s ease-in-out infinite;
+    pointer-events:none;
+  }
+  #titleHint.show { display:block; }
+  @keyframes hintPulse { 0%,100% { opacity:.45 } 50% { opacity:1 } }
 
   #pauseMenu { background:rgba(5,3,10,.93); z-index:70; }
 
@@ -342,6 +351,7 @@
   <div id="flashOverlay"></div>
   <div id="toast"></div>
   <div id="titleFlash"></div>
+  <div id="titleHint">нажмите, чтобы продолжить</div>
 
   <!-- ===== Main menu ===== -->
   <div class="screen show" id="mainMenu">
@@ -902,6 +912,40 @@ const Assets = {
      Набор опций тот же, что и раньше: hair, sheen, streak, band, bow,
      horns/hornEdge, glowEye, collar, skin, bg, aura, hat/hatColor/hatTrim,
      glasses, fringe. */
+  /* Рассказчик — не персонаж. Раньше ему рисовали обычное лицо тёмными
+     красками, и он выглядел как Сью, переодетая в чёрное. Теперь это
+     безликий силуэт в капюшоне: видно голову и плечи, лица нет. */
+  makeNarratorPortrait() {
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    const g = c.getContext('2d');
+    const bg = g.createRadialGradient(32, 30, 4, 32, 34, 40);
+    bg.addColorStop(0, '#221a24'); bg.addColorStop(1, '#0c080e');
+    g.fillStyle = bg; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = 'rgba(120,80,120,.10)';               // дымка за спиной
+    for (let i = 0; i < 14; i++) g.fillRect((i * 23) % 64, (i * 37) % 64, 2, 2);
+
+    g.fillStyle = '#070409';                            // капюшон и плечи одной массой
+    g.beginPath();
+    g.moveTo(32, 8);
+    g.bezierCurveTo(48, 8, 52, 26, 48, 40);
+    g.bezierCurveTo(56, 44, 60, 54, 62, 64);
+    g.lineTo(2, 64);
+    g.bezierCurveTo(4, 54, 8, 44, 16, 40);
+    g.bezierCurveTo(12, 26, 16, 8, 32, 8);
+    g.closePath(); g.fill();
+    g.fillStyle = '#0e0812';                            // провал капюшона вместо лица
+    g.beginPath(); g.ellipse(32, 28, 11, 14, 0, 0, 6.28); g.fill();
+    g.strokeStyle = 'rgba(150,110,160,.28)'; g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(16, 40); g.bezierCurveTo(12, 26, 16, 8, 32, 8);
+    g.bezierCurveTo(48, 8, 52, 26, 48, 40); g.stroke();
+    g.strokeStyle = 'rgba(150,110,160,.16)';
+    g.beginPath(); g.ellipse(32, 28, 11, 14, 0, 0, 6.28); g.stroke();
+    g.strokeStyle = '#4a3a52'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, 63, 63);
+    return c;
+  },
+
   makePortrait(bodyColor, hairColor, expression='normal', accent='#c0304d', opts={}) {
     const c = document.createElement('canvas');
     c.width = 64; c.height = 64;
@@ -1261,7 +1305,9 @@ const Assets = {
       {hair:'long', sheen:'#4c4660', collar:'#f0e0c0', bg:'#3a2c22'});
     P('nayaChild', '#6a5a80','#dcc09c', ['normal','shocked','smile'], '#8a7aa0',
       {hair:'bob', collar:'#8a7aa0', bg:'#2a2434'});
-    P('narrator',  '#333',   '#111',    ['normal'], '#666');
+    const narr = this.makeNarratorPortrait();
+    this.portraits['narrator_normal'] = narr;
+    this.portraitURL['narrator_normal'] = narr.toDataURL();
     const catP = this.makeCatPortrait();
     this.portraits['dorothy_normal'] = catP;
     this.portraitURL['dorothy_normal'] = catP.toDataURL();
@@ -2204,10 +2250,10 @@ function woodGrain(g, x, y, w, h, col) {
     g.strokeStyle = '#8d949c'; g.lineWidth = 1;                // chains
     [20, 44].forEach(x => { g.beginPath(); g.moveTo(x-5, 11); g.lineTo(x-5, 34);
                             g.moveTo(x+5, 11); g.lineTo(x+5, 34); g.stroke(); });
-    g.fillStyle = '#3f5c8a'; g.fillRect(13, 34, 14, 4);        // seats
+    // сиденье здесь только одно: второе рисуется анимацией качелей,
+    // иначе на раме оказывалось три сиденья вместо двух
+    g.fillStyle = '#3f5c8a'; g.fillRect(13, 34, 14, 4);
     g.fillStyle = '#4e6d9c'; g.fillRect(13, 34, 14, 1);
-    g.fillStyle = '#8a4a52'; g.fillRect(37, 36, 14, 4);
-    g.fillStyle = '#9c5a60'; g.fillRect(37, 36, 14, 1);
   });
   /* Горка — полноценная конструкция, а не наклонная плоскость: лестница со
      ступенями, поручни, верхняя площадка с бортиком, скат с боковыми
@@ -3480,12 +3526,35 @@ function fadeIn(dur=500) {
     setTimeout(res, dur);
   });
 }
-async function flashTitle(text, dur=1500) {
+/* Карточка на экране.
+
+   hold:true — карточка не уходит сама: через несколько секунд под ней
+   появляется «нажмите, чтобы продолжить», и дальше решает игрок. Так
+   сделана цитата после сказа о Мидее: её надо успеть дочитать. */
+async function flashTitle(text, dur=1500, hold=false) {
   const el = document.getElementById('titleFlash');
+  const hint = document.getElementById('titleHint');
   el.textContent = text;
   el.classList.add('show');
+  if (!hold) {
+    await new Promise(r => setTimeout(r, dur));
+    el.classList.remove('show');
+    return;
+  }
   await new Promise(r => setTimeout(r, dur));
-  el.classList.remove('show');
+  hint.classList.add('show');
+  await new Promise(resolve => {
+    const go = () => {
+      window.removeEventListener('pointerdown', go);
+      window.removeEventListener('keydown', go);
+      hint.classList.remove('show');
+      el.classList.remove('show');
+      Audio.click();
+      resolve();
+    };
+    window.addEventListener('pointerdown', go);
+    window.addEventListener('keydown', go);
+  });
 }
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -7881,9 +7950,17 @@ uniCorridorLib: {
       action: async ()=> await changeRoom('uniHallMain', 346, 114) },
     { x:UNI_LIB_WALL.at('lib')+2,y:200,w:46,h:36, name:'toLib', prompt:'Библиотека',
       action: async ()=> await changeRoom('uniLibrary', 120, 258) },
+    /* Четырнадцатая открывается только тогда, когда Сью попросила её тут
+       подождать. Раньше в неё можно было войти сразу с первого визита и
+       перепрыгнуть через полглавы. */
     { x:UNI_LIB_WALL.at('aud14'),y:200,w:48,h:36, name:'aud14', prompt:'Аудитория 14', action(){
-        if (!F('metGenevieveUni')) { Scene.play('meetGenevieveUni'); return; }
-        Dialogue.start([{who:'naya',expr:'normal',text:'Дверь закрыта. Расписание на ней: «История театра. Морель Ж.»'}]);
+        if (F('metGenevieveUni'))
+          return Dialogue.start([{who:'naya',expr:'normal',text:'Дверь закрыта. Расписание на ней: «История театра. Морель Ж.»'}]);
+        if (!F('waitingAtAud')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Четырнадцатая. Внутри идёт занятие — слышно голос.'},
+          {who:'naya',expr:'talk',text:'(Мне туда незачем. Я вообще не за этим пришла.)'},
+        ]);
+        Scene.play('meetGenevieveUni');
       }},
     { x:UNI_LIB_WALL.at('office'),y:200,w:38,h:36, name:'office', prompt:'Кабинет Морель', action(){
         if (!F('metGenevieveUni')) return Dialogue.start([
@@ -8414,6 +8491,7 @@ async function changeRoom(roomKey, x, y) {
   unstickPlayer();
   gameState.playerX = Player.x; gameState.playerY = Player.y;
   FX.particles.length = 0; FX.fogA = 0; FX.magic = null;
+  Game.zoom = 1; Game.zoomTo = 1;
   Game.cast = [];
   const room = Rooms[roomKey];
   Patrol.reset(room);
@@ -8716,7 +8794,7 @@ const Scene = {
     if (cmd.fadeOut !== undefined) { await fadeOut(cmd.fadeOut); return; }
     if (cmd.fadeIn  !== undefined) { await fadeIn(cmd.fadeIn);  return; }
     if (cmd.wait)   { await wait(cmd.wait); return; }
-    if (cmd.title)  { await flashTitle(cmd.title, cmd.dur || 1500); return; }
+    if (cmd.title)  { await flashTitle(cmd.title, cmd.dur || 1500, !!cmd.hold); return; }
     if (cmd.room)   { await changeRoom(cmd.room, cmd.x||120, cmd.y||210); return; }
     if (cmd.flag)   { setFlag(cmd.flag, cmd.value === undefined ? true : cmd.value); FX.refreshCorruption(); return; }
     if (cmd.act !== undefined) { gameState.act = cmd.act; return; }
@@ -8749,6 +8827,9 @@ const Scene = {
     if (cmd.checkpoint) { saveCheckpoint(cmd.checkpoint); return; }
     if (cmd.shift)  { await Shift.run(); return; }
     if (cmd.swing)  { await Prologue.startSwing(cmd.swing, cmd.ms || 900); return; }
+    if (cmd.zoom !== undefined) { Game.zoomTo = cmd.zoom; if (cmd.ms) await wait(cmd.ms); return; }
+    if (cmd.castWalk) { await Prologue.castWalk(cmd.castWalk.name, cmd.castWalk.to, cmd.castWalk.ms || 1200); return; }
+    if (cmd.spark)  { const k = cmd.spark; FX.spawn(k.x, k.y, k.n || 8, k); return; }
     if (cmd.swingOff) { Prologue.stopSwing(); return; }
     if (cmd.montage){ await Montage.run(cmd.montage); return; }
     if (cmd.goto)   { return { goto: cmd.goto }; }
@@ -8847,6 +8928,26 @@ const Prologue = {
         if (Math.random() < .5) FX.spawn(70, 228, 1, {color:'#c060ff', spread:12, rise:-.4, life:50});
       }
     }
+  },
+
+  /* Актёр сцены доходит до места сам. Нужен там, где персонаж обязан
+     появиться в кадре, а не возникнуть из воздуха. */
+  castWalk(name, to, ms) {
+    const n = (Game.cast || []).find(c => c.name === name);
+    if (!n) return Promise.resolve();
+    const x0 = n.x, y0 = n.y, t0 = performance.now();
+    n.moving = true;
+    return new Promise(res => {
+      const step = () => {
+        const k = Math.min(1, (performance.now() - t0) / ms);
+        const e = k * k * (3 - 2 * k);
+        n.x = x0 + (to[0] - x0) * e;
+        n.y = y0 + (to[1] - y0) * e;
+        if (k < 1) requestAnimationFrame(step);
+        else { n.moving = false; res(); }
+      };
+      requestAnimationFrame(step);
+    });
   },
 
   /* ЛИЛИТ В ПРОЛОГЕ.
@@ -8969,7 +9070,7 @@ const Prologue = {
      Сью — это сам игрок, поэтому фазы двигают Player. Подъём над землёй
      идёт через Player.lift, чтобы столкновения не поехали.                 */
   swing: null,
-  SEAT: { x:150, y:150, len:30 },          // ось качелей и длина подвеса
+  SEAT: { x:162, y:143, len:25 },          // ось и длина подвеса правого сиденья рамы
 
   startSwing(phase, ms) {
     const st = this.swing || (this.swing = { a:0, amp:0, seatA:0, t:0, phase:'sit', dur:1, done:true });
@@ -9057,8 +9158,8 @@ const Prologue = {
     ctx.strokeStyle = '#5a4a38'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(S.x - 7, S.y); ctx.lineTo(sx - 6, sy); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(S.x + 7, S.y); ctx.lineTo(sx + 6, sy); ctx.stroke();
-    ctx.fillStyle = '#6b5334'; ctx.fillRect(Math.round(sx) - 8, Math.round(sy), 16, 3);
-    ctx.fillStyle = '#8a6c46'; ctx.fillRect(Math.round(sx) - 8, Math.round(sy), 16, 1);
+    ctx.fillStyle = '#8a4a52'; ctx.fillRect(Math.round(sx) - 7, Math.round(sy), 14, 4);
+    ctx.fillStyle = '#9c5a60'; ctx.fillRect(Math.round(sx) - 7, Math.round(sy), 14, 1);
   },
 
   /* pebbles lifting off the ground around little Naya */  /* pebbles lifting off the ground around little Naya */
@@ -9734,7 +9835,7 @@ prologue: [
 
   /* ---- chapter card ---- */
   { chapter:1, dur:2600 },
-  { title:'«Два самых важных дня в твоей жизни:\nдень, когда ты появился на свет,\nи день, когда понял, зачем.»\n— Марк Твен', dur:4200 },
+  { title:'«Два самых важных дня в твоей жизни:\nдень, когда ты появился на свет,\nи день, когда понял, зачем.»\n— Марк Твен', dur:5000, hold:true },
 
   /* ---- the playground, twelve years ago ---- */
   { flag:'prologPlayground' },          // сначала подменяем героя, потом показываем
@@ -9778,22 +9879,32 @@ prologSwing: [
   { sfx:'low' },
   async ()=>{ Prologue.showMedea = false; },
   { swing:'hold', ms:520 },                        // 5: магия останавливает
+  { shake:5 },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'И время... останавливается.'},
   ]},
   { magic:'#c060ff', dur:1600 },
   { swing:'float', ms:1 },                         // 6-7: зависание и частицы
+  { zoom:1.55, ms:900 },                           // камера подъезжает: магию надо разглядеть
   { dlg:[
     {who:'sueChild',expr:'shocked',name:'Сью',text:'...'},
     {who:'narrator',expr:'normal',name:'',text:'Сью открывает глаза. Она висит в воздухе, над утоптанной землёй.'},
     {who:'narrator',expr:'normal',name:'',text:'Вокруг неё мерцающее облако. В воздухе медленно кружатся фиолетовые искры.'},
   ]},
+  /* Ная не возникает из воздуха: она выбегает из-за деревьев слева, и её
+     видно всю дорогу. Пока она бежит, вокруг Сью идут искры. */
+  { cast:[{x:6, y:236, sprite:'nayaChild', name:'Девочка'}] },
+  { castWalk:{ name:'Девочка', to:[96, 224], ms:1100 } },
+  { castWalk:{ name:'Девочка', to:[126, 214], ms:700 } },
   { flag:'prologNayaSeen' },
+  { spark:{ x:126, y:210, n:14, color:'#c060ff', spread:16, rise:-.3, life:70 } },
   { dlg:[
-    {who:'narrator',expr:'normal',name:'',text:'В нескольких шагах стоит девочка. Года четыре, худенькая, с огромными глазами.'},
-    {who:'narrator',expr:'normal',name:'',text:'Она стоит с вытянутыми ладонями. Искры идут от неё.'},
-    {who:'narrator',expr:'normal',name:'',text:'Она очень сосредоточена — так сосредоточена, что забыла дышать.'},
+    {who:'narrator',expr:'normal',name:'',text:'Из-за деревьев выбегает девочка. Года четыре, худенькая, с огромными глазами.'},
+    {who:'narrator',expr:'normal',name:'',text:'Она останавливается в нескольких шагах и вытягивает ладони. Искры идут от неё.'},
+    {who:'narrator',expr:'normal',name:'',text:'Её трясёт. Она очень сосредоточена — так сосредоточена, что забыла дышать.'},
   ]},
+  { shake:3 },
+  { spark:{ x:126, y:206, n:10, color:'#e0b0ff', spread:12, rise:-.5, life:60 } },
   { sfx:'chime' },
   { swing:'land', ms:1100 },                       // Сью опускается, а не оказывается на земле
   { dlg:[
@@ -9831,8 +9942,10 @@ prologSwing: [
     {who:'narrator',expr:'normal',name:'',text:'Дует ветер. Позади них качается пустое сиденье.'},
   ]},
   { butterfly:{ from:[152,206], to:[118,132], ms:2200 } },   // 11: бабочка успевает улететь
-  { wait:2300 },
+  { zoom:1, ms:1400 },                             // камера отъезжает обратно
+  { wait:1400 },
   { swingOff:true },
+  { uncast:true },
   { music:'none' },
   { fadeOut:2000 },                                // 12: и только теперь затемнение
   { resetProlog:true },
@@ -12565,22 +12678,29 @@ function drawRoom() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, CONFIG.VIEW_W, CONFIG.VIEW_H);
 
-  let camX = clamp(Player.x - CONFIG.VIEW_W/2, 0, Math.max(0, room.w - CONFIG.VIEW_W));
-  let camY = clamp(Player.y - CONFIG.VIEW_H/2, 0, Math.max(0, room.h - CONFIG.VIEW_H));
+  /* Зум камеры. Кадр остаётся тем же, меняется его охват: при zoom 1.6 в
+     кадр влезает вдвое меньше комнаты, и всё, что рисуется через camX/camY,
+     автоматически становится крупнее. Нужен катсценам, где важно разглядеть
+     детали — например, магии на площадке. */
+  const Z = Game.zoom || 1;
+  const VW = CONFIG.VIEW_W / Z, VH = CONFIG.VIEW_H / Z;
+  let camX = clamp(Player.x - VW/2, 0, Math.max(0, room.w - VW));
+  let camY = clamp(Player.y - VH/2, 0, Math.max(0, room.h - VH));
   // Г-образные комнаты: пока игрок в одном рукаве, камере нечего показывать
   // в другом — иначе полкадра занимает глухая стена за поворотом
   if (room.camLimit) {
     const lim = room.camLimit(Player.x, Player.y);
-    if (lim) camY = clamp(camY, lim.top || 0, Math.max(lim.top || 0, (lim.bottom || room.h) - CONFIG.VIEW_H));
+    if (lim) camY = clamp(camY, lim.top || 0, Math.max(lim.top || 0, (lim.bottom || room.h) - VH));
   }
-  if (room.w <= CONFIG.VIEW_W) camX = (room.w - CONFIG.VIEW_W) / 2;
-  if (room.h <= CONFIG.VIEW_H) camY = (room.h - CONFIG.VIEW_H) / 2;
+  if (room.w <= VW) camX = (room.w - VW) / 2;
+  if (room.h <= VH) camY = (room.h - VH) / 2;
   if (FX.shake > 0) {
     camX += (Math.random()-.5) * FX.shake;
     camY += (Math.random()-.5) * FX.shake;
   }
   camX = Math.round(camX); camY = Math.round(camY);
   Game.cam.x = camX; Game.cam.y = camY;
+  if (Z !== 1) { ctx.setTransform(Z, 0, 0, Z, 0, 0); }
 
   // 1. static background (painted once, then blitted)
   ctx.drawImage(World.background(gameState.currentRoom), -camX, -camY);
@@ -12684,6 +12804,7 @@ function drawRoom() {
   Weather.drawLeaves(ctx);
   Lighting.draw(ctx, room, camX, camY);
   Weather.drawFog(ctx);
+  if (Z !== 1) ctx.setTransform(1, 0, 0, 1, 0, 0);   // интерфейс рисуется без зума
 
   // 6a. таймер погони — поверх любой комнаты, а не только улицы
   if (Game.chase && Game.chase.active) {
@@ -12718,6 +12839,17 @@ function drawRoom() {
   FX.drawOverlay(ctx);
 }
 
+/* Зум едет плавно: резкий скачок читается как баг, а не как приём. */
+const Cam = {
+  update(dt) {
+    if (Game.zoom === undefined) Game.zoom = 1;
+    if (Game.zoomTo === undefined) Game.zoomTo = 1;
+    const k = 1 - Math.pow(0.004, dt / 1000);
+    Game.zoom += (Game.zoomTo - Game.zoom) * k;
+    if (Math.abs(Game.zoomTo - Game.zoom) < .004) Game.zoom = Game.zoomTo;
+  },
+};
+
 function tick(t) {
   if (!Game.running) { return; }
   const dt = Math.min(50, (Game.lastT ? t - Game.lastT : 16));
@@ -12746,7 +12878,7 @@ function tick(t) {
     Dialogue.update(dt);
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
-    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true);
+    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true); Cam.update(dt);
                  Prologue.updateSwing(dt); }
     drawRoom();
   }

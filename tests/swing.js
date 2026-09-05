@@ -16,8 +16,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   let g=0;
   while (g++ < 900) {
     const st = await p.evaluate(()=>({ room: gameState && gameState.currentRoom, dlg: Dialogue.active,
-      scene: Scene.active, mode: Game.mode, n: document.querySelectorAll('#choiceOptions .choiceOpt').length }));
+      scene: Scene.active, mode: Game.mode, n: document.querySelectorAll('#choiceOptions .choiceOpt').length,
+      hint: document.getElementById('titleHint').classList.contains('show') }));
     if (st.room === 'playground' && !st.scene && st.mode === 'explore') break;
+    if (st.hint) { await p.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerdown'))); await p.waitForTimeout(140); continue; }
     if (st.n) { await p.evaluate(()=>document.querySelectorAll('#choiceOptions .choiceOpt')[0].click()); await p.waitForTimeout(150); continue; }
     if (st.dlg) { await p.evaluate(()=>Dialogue.advance()); await p.waitForTimeout(10); continue; }
     await p.waitForTimeout(60);
@@ -27,7 +29,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   await p.evaluate(()=>{ const r=Rooms.playground; const o=r.interactables.find(x=>x.name==='swing');
     Player.x=o.x+o.w/2; Player.y=o.y+o.h/2+6; doInteract(); });
   const t0 = Date.now();
-  while (Date.now() - t0 < 26000) {
+  while (Date.now() - t0 < 45000) {
     const s = await p.evaluate(()=>({
       ph: Prologue.swing ? Prologue.swing.phase : null,
       done: Prologue.swing ? Prologue.swing.done : null,

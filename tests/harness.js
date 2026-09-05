@@ -12,10 +12,17 @@ async function pump(page, picks, tag) {
       dlg: Dialogue.active, choice: Dialogue.awaitingChoice, scene: Scene.active,
       mode: Game.mode, ending: Game.endingShown, montage: Game.montage,
       shift: document.getElementById('shiftScreen').classList.contains('show'),
+      hint: document.getElementById('titleHint').classList.contains('show'),
       n: document.querySelectorAll('#choiceOptions .choiceOpt').length,
       texts: [...document.querySelectorAll('#choiceOptions .choiceOpt')].map(b => b.textContent.slice(0, 46)),
     }));
     if (st.ending) return 'ending';
+    // карточка, которая ждёт игрока (цитата после сказа о Мидее)
+    if (st.hint) {
+      await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerdown')));
+      await page.waitForTimeout(120);
+      continue;
+    }
     // смена в кафе: харнесс отрабатывает её как обычный игрок — читает рецепт
     // со экрана и жмёт следующий по порядку ингредиент
     if (st.shift) {
