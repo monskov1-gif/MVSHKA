@@ -8524,7 +8524,24 @@ const Prologue = {
     });
     // шея и голова
     ctx.fillRect(CX - 4, 100, 8, 12);
+    // длинные волосы: падают ниже плеч и слегка шевелятся — без них
+    // силуэт читался лысым черепом
+    const sway = Math.sin(t / 1100) * 2.5;
+    ctx.fillStyle = '#120309';
+    [-1, 1].forEach(d => {
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 3, HEAD - 2);
+      ctx.quadraticCurveTo(CX + d * 17, HEAD + 6, CX + d * 15, 120);
+      ctx.quadraticCurveTo(CX + d * (13 + sway * d), 146, CX + d * 8, 158);
+      ctx.lineTo(CX + d * 2, 150);
+      ctx.quadraticCurveTo(CX + d * 7, 126, CX + d * 5, HEAD + 8);
+      ctx.closePath(); ctx.fill();
+    });
+    ctx.fillStyle = ink;
     ctx.beginPath(); ctx.ellipse(CX, HEAD + 10, 11, 13, 0, 0, 6.3); ctx.fill();
+    ctx.fillStyle = '#120309';                  // копна над лбом
+    ctx.beginPath(); ctx.ellipse(CX, HEAD + 3, 12, 7, 0, 0, 6.3); ctx.fill();
+    ctx.fillStyle = ink;
     // рогатая корона: крупные рога, иначе на общем плане их просто не видно
     [-1, 1].forEach(d => {
       ctx.beginPath();
@@ -8548,6 +8565,13 @@ const Prologue = {
     ctx.lineTo(CX - 15, 152); ctx.lineTo(CX - 10, 112);
     ctx.stroke();
     ctx.beginPath(); ctx.ellipse(CX, HEAD + 10, 11, 13, 0, 0, 6.3); ctx.stroke();
+    [-1, 1].forEach(d => {                      // подсвеченная прядь по краю
+      ctx.beginPath();
+      ctx.moveTo(CX + d * 3, HEAD - 2);
+      ctx.quadraticCurveTo(CX + d * 17, HEAD + 6, CX + d * 15, 120);
+      ctx.quadraticCurveTo(CX + d * (13 + sway * d), 146, CX + d * 8, 158);
+      ctx.stroke();
+    });
     [-1, 1].forEach(d => {
       ctx.beginPath();
       ctx.moveTo(CX + d * 16, 110);
