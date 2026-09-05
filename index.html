@@ -2771,7 +2771,10 @@ function woodGrain(g, x, y, w, h, col) {
   });
 
   /* ---- жилые мелочи ---- */
-  D('tv_stand', {w:38,h:34,ax:19,ay:32,foot:{x:-19,y:-16,w:38,h:18}}, g => {
+  /* Телевизор считается включённым: у него есть собственный холодный свет,
+     а рябь на экране и отблеск на полу рисует комната в overPaint. */
+  D('tv_stand', {w:38,h:34,ax:19,ay:32,foot:{x:-19,y:-16,w:38,h:18},
+                 light:{dy:-14,r:52,c:'#9fc0e0',i:.5,flicker:true}}, g => {
     shadowEllipse(g, 19, 33, 16, 3, .24);
     g.fillStyle = '#4a3a30'; g.fillRect(2, 18, 34, 12);         // тумба
     g.fillStyle = '#5a4638'; g.fillRect(2, 18, 34, 3);
@@ -4348,37 +4351,37 @@ function paintPlayground(ctx, worn) {
    берут координаты и художник фона, и точки взаимодействия — поэтому
    табличка на двери и её кликабельная зона не могут разъехаться. */
 const UNI_LIB_WALL = wallLayout(640, [
-  { k:'win' },
+  { k:'win', id:'win0' },
   { k:'door', label:'12' },
-  { k:'win' },
+  { k:'win', id:'win1' },
   { k:'door', label:'14', w:48, id:'aud14', style:'glass' },
-  { k:'win' },
+  { k:'win', id:'win2' },
   { k:'door', label:'13' },
   { k:'door', label:'БИБЛИОТЕКА', w:52, id:'lib', style:'heavy' },
-  { k:'win' },
+  { k:'win', id:'win3' },
   { k:'door', label:'15' },
   { k:'door', label:'МОРЕЛЬ Ж.', w:42, id:'office', style:'office' },
 ]);
 const UNI_F2_WALL = wallLayout(560, [
-  { k:'win' },
+  { k:'win', id:'win0' },
   { k:'door', label:'АРХИВ', w:48, id:'archive', style:'heavy' },
-  { k:'win' },
+  { k:'win', id:'win1' },
   { k:'door', label:'201', w:44, id:'a201' },
-  { k:'win' },
+  { k:'win', id:'win2' },
   { k:'door', label:'204', w:44, id:'a204' },
-  { k:'win' },
+  { k:'win', id:'win3' },
 ]);
 const UNI_THEATRE_WALL = wallLayout(640, [
-  { k:'win' },
+  { k:'win', id:'win0' },
   { k:'door', label:'101' },
   { k:'door', label:'102' },
-  { k:'win' },
+  { k:'win', id:'win1' },
   { k:'door', label:'103' },
   { k:'door', label:'СЦЕНА', w:56, id:'stage', style:'stage' },
-  { k:'win' },
+  { k:'win', id:'win2' },
   { k:'door', label:'105' },
   { k:'door', label:'106' },
-  { k:'win' },
+  { k:'win', id:'win3' },
   { k:'door', label:'107' },
 ]);
 
@@ -4409,13 +4412,13 @@ nayaRoom: {
     { t:'window_in',  x:120, y:34 },
     // --- Sue's corner, left: bright, cluttered, lived in ---
     { t:'bed_single', x:38,  y:150 },
-    { t:'poster',     x:36,  y:64 },
+    { t:'poster',     x:36,  y:36 },
     { t:'desk',       x:40,  y:216 },
     { t:'chair_wood', x:70,  y:226 },
-    { t:'photo_frame',x:64,  y:60 },
+    { t:'photo_frame',x:64,  y:40 },
     // --- Naya's corner, right: spare, dark ---
     { t:'bed_single', x:202, y:150 },
-    { t:'painting',   x:200, y:62 },
+    { t:'painting',   x:200, y:40 },
     { t:'wardrobe',   x:206, y:238 },
     { t:'mirror_tall',x:170, y:110 },
     // --- shared middle ---
@@ -4630,8 +4633,8 @@ corridor1: {
   objects: [
     { t:'coat_rack', x:238, y:238 },
     { t:'boots', x:44, y:252 },
-    { t:'painting', x:238, y:76 },
-    { t:'photo_frame', x:44, y:74 },
+    { t:'painting', x:238, y:38 },
+    { t:'photo_frame', x:44, y:38 },
     { t:'plant_pot', x:246, y:290 },
     { t:'lamp_floor', x:38, y:216 },
     { t:'chest', x:242, y:180 },
@@ -4643,7 +4646,7 @@ corridor1: {
     { x:118,y:44,w:44,h:32, name:'toRoom', prompt:'Комната Наи',
       action: async ()=> await changeRoom('nayaRoom', 120, 258) },
     { x:14,y:90,w:36,h:52, name:'toKitchen', prompt:'Кухня',
-      action: async ()=> await changeRoom('kitchen', 118, 226) },
+      action: async ()=> await changeRoom('kitchen', 100, 194) },
     { x:14,y:178,w:36,h:52, name:'toBath', prompt:'Ванная',
       action: async ()=> await changeRoom('bathroom', 94, 186) },
     { x:232,y:114,w:38,h:52, name:'toBalcony', prompt:'Балкон',
@@ -4914,20 +4917,20 @@ street: {
       }},
   ],
   npcs: [
-    { x:236,y:268, sprite:'customer', name:'Прохожий',
+    { x:246,y:274, sprite:'customer', name:'Прохожий',
       when:()=> !F('lonerChase') && !F('sueDead'),
       dialogue:()=> {
         if (F('communeWarded')) return Dialogue.start([{who:'customer',expr:'normal',name:'Прохожий',text:'Мне кажется, в этом городе что-то происходит. Жена смеётся, а я вот не смеюсь.'}]);
         if (F('communePanic')) return Dialogue.start([{who:'customer',expr:'normal',name:'Прохожий',text:'Слыхали? Женщину нашли мёртвой. Вчера тут полиция стояла.'}]);
         return Dialogue.start([{who:'customer',expr:'normal',name:'Прохожий',text:'Холодает. Ты бы куртку надела.'}]);
       }},
-    { x:520,y:268, sprite:'acolyte', name:'Девушка с зонтом',
+    { x:412,y:272, sprite:'acolyte', name:'Девушка с зонтом',
       when:()=> !F('lonerChase') && !F('sueDead') && F('metSue'),
       dialogue:()=> {
         if (F('communeWarded')) return Dialogue.start([{who:'acolyte',expr:'worried',name:'Девушка',text:'Мама велела возвращаться до темноты. Впервые за десять лет.'}]);
         return Dialogue.start([{who:'acolyte',expr:'normal',name:'Девушка',text:'В парке сейчас красиво. Правда, мокро — но красиво.'}]);
       }},
-    { x:330,y:270, sprite:'neighbor', name:'Женщина с собакой',
+    { x:352,y:276, sprite:'neighbor', name:'Женщина с собакой',
       when:()=> !F('lonerChase') && !F('sueDead') && F('metSue'),
       dialogue:()=> {
         if (F('firstWitchDead')) return Dialogue.start([{who:'neighbor',expr:'normal',name:'Женщина',text:'Собака вторую ночь скулит и не хочет идти мимо того дома. Животные ведь чувствуют, да?'}]);
@@ -5415,7 +5418,7 @@ communeHall: {
     // стулья вдоль стен: их выносят в круг на собрание и убирают обратно
     { t:'chair_wood', x:36, y:236 }, { t:'chair_wood', x:36, y:264 },
     { t:'chair_wood', x:264, y:236 }, { t:'chair_wood', x:264, y:264 },
-    { t:'coat_rack', x:104, y:262 },
+    { t:'coat_rack', x:36, y:242 },
     { t:'plant_pot', x:20, y:276 }, { t:'plant_pot', x:222, y:272 },
   ],
   walls: [
@@ -5746,7 +5749,7 @@ witch2House: {
       }},
   ],
   npcs: [
-    { x:74,y:262, sprite:'sue', name:'Сью',
+    { x:130,y:306, sprite:'sue', name:'Сью',
       when:()=> !F('secondAmulet'),
       dialogue:()=> {
         const d = C('witch2Distract');
@@ -6427,8 +6430,8 @@ communeYard: {
           {who:'witch2',expr:'smile',name:'Роза',text:'Вот и Женевьева так говорит. Сорок лет говорит, а я всё недосаливаю.'},
         ]);
       }},
-    { x:302,y:246, sprite:'witch4', name:'Ирма', speed:0.30,
-      path:[[302,246],[302,262],[276,264],[276,244]],
+    { x:206,y:216, sprite:'witch4', name:'Ирма', speed:0.30,
+      path:[[206,216],[206,238],[178,240],[178,214]],
       when:()=> F('communeIntro') && !F('sueLeftDead'),
       dialogue:()=> {
         if (F('communeWarded')) return Dialogue.start([
@@ -6691,51 +6694,52 @@ parkWalk: {
 
 /* ---------------------------------------------------------------- */
 kitchen: {
-  name:"Кухня", music:'home', w:246, h:268,
+  /* Кухня в съёмном доме, а не зал: рабочая стена «тумба — мойка — плита —
+     холодильник» вплотную, стол на двоих по центру и место для миски. */
+  name:"Кухня", music:'home', w:210, h:230,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 }, light:{ tint:'#1c1820', dark:.22 },
-  lights:[{x:140,y:150,r:60,c:'#ffdca0',i:.4},{x:52,y:70,r:36,c:'#9ab4cc',i:.2}],
-  sun:{ x:52, y:56, w:34, len:110, tilt:.24, a:.10 },
+  lights:[{x:104,y:130,r:54,c:'#ffdca0',i:.4},{x:44,y:60,r:32,c:'#9ab4cc',i:.2}],
+  sun:{ x:44, y:48, w:30, len:92, tilt:.24, a:.10 },
   bgPaint(ctx) {
-    paintInterior(ctx, 246, 268, { wall:'#4c4048', wall2:'#413740', floor:'#7d7a76', floor2:'#6e6b68', wallH:54, tiles:true });
+    paintInterior(ctx, 210, 230, { wall:'#4c4048', wall2:'#413740', floor:'#7d7a76', floor2:'#6e6b68', wallH:50, tiles:true });
     // фартук над рабочей поверхностью
-    ctx.fillStyle = '#5f6a75'; ctx.fillRect(56, 22, 138, 32);
+    ctx.fillStyle = '#5f6a75'; ctx.fillRect(46, 18, 122, 30);
     ctx.fillStyle = '#6c7883';
-    for (let y=22;y<54;y+=8) for (let x=56;x<194;x+=8) ctx.fillRect(x+1, y+1, 6, 6);
-    ctx.fillStyle = '#4c555e'; ctx.fillRect(56, 22, 138, 2);
-    // мойка стоит в разрыве между тумбами и читается как часть ряда
-    ctx.fillStyle = '#4f4c48'; ctx.fillRect(98, 70, 44, 22);
-    ctx.fillStyle = '#5f5c56'; ctx.fillRect(98, 70, 44, 8);
-    ctx.fillStyle = '#6e6a62'; ctx.fillRect(98, 70, 44, 1);
-    ctx.fillStyle = '#3a3835'; ctx.fillRect(98, 90, 44, 2);
-    ctx.fillStyle = '#8d949c'; ctx.fillRect(105, 72, 30, 5);
-    ctx.fillStyle = '#6a7078'; ctx.fillRect(107, 73, 26, 3);
-    ctx.fillStyle = '#a8aeb6'; ctx.fillRect(118, 64, 3, 8);
-    ctx.fillRect(118, 64, 9, 3); ctx.fillRect(125, 66, 2, 4);
-    ctx.fillStyle = '#3a3835'; ctx.fillRect(103, 80, 15, 1); ctx.fillRect(122, 80, 15, 1);
-    paintDoor(ctx, 108, 254);
+    for (let y=18;y<48;y+=8) for (let x=46;x<168;x+=8) ctx.fillRect(x+1, y+1, 6, 6);
+    ctx.fillStyle = '#4c555e'; ctx.fillRect(46, 18, 122, 2);
+    // мойка в разрыве между тумбами
+    ctx.fillStyle = '#4f4c48'; ctx.fillRect(84, 64, 42, 22);
+    ctx.fillStyle = '#5f5c56'; ctx.fillRect(84, 64, 42, 8);
+    ctx.fillStyle = '#6e6a62'; ctx.fillRect(84, 64, 42, 1);
+    ctx.fillStyle = '#3a3835'; ctx.fillRect(84, 84, 42, 2);
+    ctx.fillStyle = '#8d949c'; ctx.fillRect(90, 66, 30, 5);
+    ctx.fillStyle = '#6a7078'; ctx.fillRect(92, 67, 26, 3);
+    ctx.fillStyle = '#a8aeb6'; ctx.fillRect(103, 58, 3, 8);
+    ctx.fillRect(103, 58, 9, 3); ctx.fillRect(110, 60, 2, 4);
+    ctx.fillStyle = '#3a3835'; ctx.fillRect(89, 76, 14, 1); ctx.fillRect(107, 76, 14, 1);
+    paintDoor(ctx, 90, 216);
   },
   objects: [
-    { t:'window_in', x:46, y:34 },
-    { t:'counter', x:78, y:90 }, { t:'counter', x:158, y:90 },
-    { t:'stove', x:190, y:92 },
-    { t:'fridge', x:220, y:104 },
-    { t:'coffee_machine', x:170, y:93 },
-    { t:'cabinet', x:22, y:110 },
-    { t:'table_wood', x:118, y:172 },
-    { t:'chair_wood', x:84, y:178 }, { t:'chair_wood', x:152, y:178 },
-    { t:'rug_warm', x:118, y:190 },
-    { t:'cat_bed', x:40, y:224 },
-    { t:'bin', x:222, y:224 },
-    { t:'plant_pot', x:24, y:176 },
-    { t:'clock', x:200, y:26 },
+    { t:'window_in', x:42, y:30 },
+    { t:'counter', x:66, y:82 }, { t:'counter', x:136, y:82 },
+    { t:'stove', x:166, y:84 },
+    { t:'fridge', x:190, y:96 },
+    { t:'coffee_machine', x:148, y:85 },
+    { t:'cabinet', x:20, y:98 },
+    { t:'table_wood', x:100, y:150 },
+    { t:'chair_wood', x:70, y:156 }, { t:'chair_wood', x:130, y:156 },
+    { t:'rug_warm', x:100, y:166 },
+    { t:'cat_bed', x:30, y:194 },
+    { t:'bin', x:190, y:194 },
+    { t:'clock', x:176, y:22 },
   ],
-  ambient() { if (Math.random() < 0.02) FX.spawn(130,74,1,{color:'#8a8a90', rise:-0.3, life:60, spread:6}); },
+  ambient() { if (Math.random() < 0.02) FX.spawn(105,68,1,{color:'#8a8a90', rise:-0.3, life:60, spread:6}); },
   walls: [
-    {x:0,y:0,w:246,h:54},{x:0,y:0,w:8,h:268},{x:238,y:0,w:8,h:268},{x:0,y:263,w:246,h:5},
+    {x:0,y:0,w:210,h:50},{x:0,y:0,w:8,h:230},{x:202,y:0,w:8,h:230},{x:0,y:225,w:210,h:5},
   ],
   interactables: [
-    { x:100,y:226,w:42,h:34, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('corridor1', 34, 116) },
-    { x:200,y:88,w:44,h:32, name:'fridge', prompt:'Холодильник', action(){
+    { x:84,y:190,w:40,h:32, name:'exit', prompt:'В коридор', action: async ()=> await changeRoom('corridor1', 34, 116) },
+    { x:172,y:80,w:38,h:30, name:'fridge', prompt:'Холодильник', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Её йогурты. Срок годности — через неделю.'},
           {who:'naya',expr:'empty',text:'Они переживут её. Об этом почему-то невозможно перестать думать.'},
@@ -6746,20 +6750,20 @@ kitchen: {
           {who:'naya',expr:'smile',text:'Всякий случай наступает примерно каждый вечер.'},
         ]);
       }},
-    { x:170,y:72,w:42,h:32, name:'hob', prompt:'Плита', action(){
+    { x:148,y:62,w:38,h:30, name:'hob', prompt:'Плита', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Одна конфорка не работает с зимы. Я привыкла и уже не считаю это поломкой.'}]);
       }},
-    { x:150,y:62,w:42,h:32, name:'kettle', prompt:'Кофеварка', action(){
+    { x:130,y:56,w:38,h:28, name:'kettle', prompt:'Кофеварка', action(){
         if (F('silenceDone') && !F('reflectionDone')) return Dialogue.start([
           {who:'naya',expr:'sad',text:'Поставить кофе. Просто поставить кофе, как будто это что-то решает.'},
           {who:'naya',expr:'sad',text:'Я ставлю. Она шумит. В комнате всё ещё тихо.'},
         ]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Гудит так, что соседка стучит. Мы со Сью специально доводили её до свиста. Один раз.'}]);
       }},
-    { x:98,y:66,w:44,h:32, name:'sink', prompt:'Мойка', action(){
+    { x:84,y:58,w:42,h:30, name:'sink', prompt:'Мойка', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Посуда за два дня. Раньше было за неделю — это, наверное, прогресс.'}]);
       }},
-    { x:96,y:152,w:46,h:28, name:'mugs', prompt:'Кружки', action(){
+    { x:78,y:130,w:44,h:28, name:'mugs', prompt:'Кружки', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Жёлтая. Она сама её купила и сама подписала маркером, чтобы я «не перепутала».'},
           {who:'naya',expr:'sad',text:'Я ни разу не перепутала.'},
@@ -6770,14 +6774,14 @@ kitchen: {
           {who:'naya',expr:'talk',text:'Формально это моя квартира. Фактически — у неё тут своя кружка, свои тапки и своё мнение о шторах.'},
         ]);
       }},
-    { x:26,y:96,w:38,h:32, name:'cupboard', prompt:'Буфет', action(){
+    { x:14,y:84,w:36,h:30, name:'cupboard', prompt:'Буфет', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Сервиз, доставшийся от хозяйки. Мы им ни разу не пользовались — боимся.'}]);
       }},
-    { x:28,y:14,w:38,h:34, name:'kwindow', prompt:'Окно', action(){
+    { x:26,y:14,w:36,h:32, name:'kwindow', prompt:'Окно', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Во дворе кто-то выгуливает собаку. Половина восьмого. Всё как всегда.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Окно во двор. Утром сюда попадает солнце ровно на двадцать минут.'}]);
       }},
-    { x:22,y:204,w:38,h:32, name:'catSpot', prompt:'Миска Дороти', action(){
+    { x:14,y:174,w:36,h:30, name:'catSpot', prompt:'Миска Дороти', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([{who:'naya',expr:'empty',text:'Миска полная. Дороти не ест третий день.'}]);
         Dialogue.start([{who:'naya',expr:'smile',text:'Миска Дороти. Пустая. Как всегда через десять минут после того, как я её наполнила.'}]);
       }},
@@ -6807,16 +6811,16 @@ bathroom: {
     for (let y=48;y<132;y+=9) for (let x=8;x<62;x+=9) ctx.fillRect(x+1, y+1, 7, 7);
     ctx.fillStyle = '#3b4650'; ctx.fillRect(8, 128, 54, 4);
     // полотенце на крючке рядом с раковиной
-    ctx.fillStyle = '#8d949c'; ctx.fillRect(156, 52, 3, 3);
-    ctx.fillStyle = '#c8d0d8'; ctx.fillRect(150, 54, 14, 22);
-    ctx.fillStyle = '#dde3e9'; ctx.fillRect(152, 56, 10, 18);
+    ctx.fillStyle = '#8d949c'; ctx.fillRect(138, 12, 3, 3);
+    ctx.fillStyle = '#c8d0d8'; ctx.fillRect(132, 14, 14, 22);
+    ctx.fillStyle = '#dde3e9'; ctx.fillRect(134, 16, 10, 18);
     paintDoor(ctx, 80, 196, 28, 14);
   },
   objects: [
     { t:'bathtub',     x:34,  y:126 },   // вдоль левой стены
     { t:'sink',        x:112, y:74  },   // на дальней стене
     { t:'mirror_tall', x:112, y:64  },   // над раковиной
-    { t:'toilet',      x:164, y:92  },   // в углу
+    { t:'toilet',      x:166, y:106 },   // в дальнем углу, под полотенцем ничего не стоит
     { t:'cabinet',     x:34,  y:186 },   // у двери
     { t:'plant_pot',   x:166, y:180 },
   ],
@@ -6847,7 +6851,7 @@ bathroom: {
         if (F('firstWitchDead')) return Dialogue.start([{who:'naya',expr:'empty',text:'Я мою руки чаще, чем раньше. Заметно чаще.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Две зубные щётки в одном стакане. Мы про это тоже никогда не говорили.'}]);
       }},
-    { x:148,y:74,w:36,h:30, name:'washer', prompt:'Корзина для белья', action(){
+    { x:148,y:86,w:36,h:30, name:'washer', prompt:'Корзина для белья', action(){
         if (F('firstWitchDead')) return Dialogue.start([{who:'naya',expr:'empty',text:'Куртка отстиралась. Полностью. Я почему-то надеялась, что нет.'}]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Корзина переполнена. Обе виноваты, обе делают вид, что не замечают.'}]);
       }},
@@ -6972,9 +6976,9 @@ stairwell: {
   },
   objects: [
     { t:'stairs_up', x:44, y:152 },
-    { t:'window_in', x:196, y:44 },
-    { t:'painting', x:150, y:70 },
-    { t:'photo_frame', x:118, y:70 },
+    { t:'window_in', x:196, y:36 },
+    { t:'painting', x:150, y:40 },
+    { t:'photo_frame', x:118, y:40 },
     { t:'dresser',   x:118, y:132 },
     { t:'vase_flowers', x:118, y:118 },
     { t:'coat_rack', x:172, y:158 },
@@ -7195,7 +7199,9 @@ oldHouse: {
   name:"Дом отца. Гостиная", music:'sad', w:320, h:300,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 },
   light:{ tint:'#1c1a24', dark:.22 },
-  lights:[{x:160,y:150,r:64,c:'#e8dcc0',i:.42},{x:262,y:60,r:44,c:'#9fc0e0',i:.24}],
+  lights:[{x:200,y:170,r:60,c:'#e8dcc0',i:.34},{x:266,y:48,r:44,c:'#9fc0e0',i:.24}],
+  /* телевизор шипит: тихо, но постоянно — это и есть фон всего разговора */
+  ambient() { if (Math.random() < 0.05) Audio.beep(90 + Math.random() * 60, .09, 'sawtooth', .012); },
   sun:{ x:262, y:62, w:40, len:130, tilt:-.28, a:.10 },
   bgPaint(ctx) {
     const W = 320, H = 300;
@@ -7226,21 +7232,39 @@ oldHouse: {
     paintDoor(ctx, 145, 285);
   },
   objects: [
-    { t:'window_in', x:262, y:44 },
-    { t:'painting', x:160, y:30 }, { t:'painting', x:206, y:30 },
-    { t:'photo_frame', x:110, y:30 }, { t:'photo_frame', x:130, y:30 },
-    { t:'clock', x:60, y:28 },
-    { t:'sofa_modern', x:160, y:246 },
-    { t:'table_round', x:160, y:206 },
-    { t:'vase_flowers', x:160, y:196 },
-    { t:'armchair', x:96, y:216 }, { t:'armchair', x:230, y:216 },
-    { t:'dresser', x:288, y:150 },
-    { t:'tv_stand', x:100, y:132 },
-    { t:'bookshelf', x:212, y:118 },
-    { t:'lamp_floor', x:262, y:190 },
-    { t:'plant_pot', x:294, y:262 }, { t:'plant_pot', x:24, y:272 },
-    { t:'coat_rack', x:100, y:274 },
+    { t:'window_in', x:266, y:26 },
+    { t:'painting', x:196, y:26 }, { t:'painting', x:222, y:26 },
+    { t:'photo_frame', x:116, y:26 }, { t:'photo_frame', x:136, y:26 },
+    { t:'clock', x:80, y:24 },
+    // телевизор у стены, кресло отца прямо перед ним
+    { t:'tv_stand', x:158, y:118 },
+    { t:'armchair', x:158, y:196 },        // Фрэнк
+    { t:'armchair', x:246, y:214 },        // Дризелла
+    { t:'sofa_modern', x:100, y:238 },     // Стейси
+    { t:'table_round', x:214, y:170 },
+    { t:'vase_flowers', x:214, y:160 },
+    { t:'bookshelf', x:280, y:118 },
+    { t:'dresser', x:100, y:150 },
+    { t:'lamp_floor', x:296, y:186 },
+    { t:'plant_pot', x:296, y:268 }, { t:'plant_pot', x:24, y:272 },
+    { t:'coat_rack', x:40, y:198 },
   ],
+  /* рябь телевизора и его отблеск на паркете */
+  overPaint(ctx) {
+    const t = Date.now();
+    const f = .55 + Math.random() * .45;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(150,190,230,${(.16 * f).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(146, 106); ctx.lineTo(170, 106); ctx.lineTo(206, 214); ctx.lineTo(110, 214);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = `rgba(190,215,240,${(.30 + Math.random() * .25).toFixed(3)})`;
+    ctx.fillRect(147, 90, 22, 12);
+    ctx.fillStyle = 'rgba(20,26,34,.35)';
+    for (let y = 90; y < 102; y += 3) ctx.fillRect(147, y + ((t / 90) % 3 | 0), 22, 1);
+  },
   walls: [
     {x:0,y:0,w:320,h:60},{x:0,y:0,w:8,h:300},{x:312,y:0,w:8,h:300},{x:0,y:295,w:320,h:5},
   ],
@@ -7281,11 +7305,11 @@ oldHouse: {
       }},
   ],
   npcs: [
-    { x:230,y:250, sprite:'drizella', name:'Дризелла',
+    { x:246,y:217, sprite:'drizella', name:'Дризелла',
       dialogue:()=> Scene.play('pastDrizella') },
-    { x:96,y:250, sprite:'stacy', name:'Стейси',
+    { x:100,y:241, sprite:'stacy', name:'Стейси',
       dialogue:()=> Scene.play('pastStacy') },
-    { x:262,y:160, sprite:'frank', name:'Фрэнк',
+    { x:158,y:199, sprite:'frank', name:'Фрэнк',
       dialogue:()=> Scene.play('pastFrank') },
   ],
 },
@@ -7746,7 +7770,7 @@ uniCorridorTheatre: {
     { t:'poster', x:UNI_THEATRE_WALL.pierMid(6), y:110 },
     { t:'photo_frame', x:UNI_THEATRE_WALL.pierMid(8), y:114 },
     { t:'notice_board', x:UNI_THEATRE_WALL.pierMid(2), y:118 },
-    { t:'radiator', x:60, y:234 }, { t:'radiator', x:364, y:234 },
+    { t:'radiator', x:UNI_THEATRE_WALL.at('win0')+17, y:206 },
     { t:'plant_pot', x:24, y:284 }, { t:'plant_pot', x:614, y:284 },
     { t:'bin', x:150, y:280 }, { t:'bin', x:508, y:280 },
     { t:'book_stack', x:206, y:230 },
@@ -7836,7 +7860,7 @@ uniCorridorLib: {
     { t:'lockers', x:404, y:254 }, { t:'lockers', x:450, y:254 },
     { t:'pillar_wood', x:262, y:262 },
     { t:'bench_stone', x:330, y:250 }, { t:'bench_stone', x:96, y:250 },
-    { t:'radiator', x:214, y:240 }, { t:'radiator', x:492, y:240 },
+    { t:'radiator', x:UNI_LIB_WALL.at('win0')+17, y:206 },
     { t:'painting', x:UNI_LIB_WALL.pierMid(1), y:112 },
     { t:'painting', x:UNI_LIB_WALL.pierMid(5), y:112 },
     { t:'photo_frame', x:UNI_LIB_WALL.pierMid(3), y:114 },
@@ -7934,7 +7958,7 @@ uniFloor2: {
     { t:'lockers', x:230, y:238 }, { t:'lockers', x:276, y:238 },
     { t:'pillar_wood', x:400, y:246 },
     { t:'bench_stone', x:344, y:234 },
-    { t:'radiator', x:186, y:224 }, { t:'radiator', x:470, y:224 },
+    { t:'radiator', x:UNI_F2_WALL.at('win0')+17, y:186 },
     { t:'painting', x:UNI_F2_WALL.pierMid(1), y:104 },
     { t:'painting', x:UNI_F2_WALL.pierMid(4), y:104 },
     { t:'photo_frame', x:UNI_F2_WALL.pierMid(2), y:106 },
@@ -8057,7 +8081,7 @@ uniCanteen: {
           {who:'naya',expr:'empty',text:'Пахнет тушёной капустой. Я не ела с позавчера и всё равно не хочу.'},
         ]);
         Dialogue.start([
-          {who:'naya',expr:'normal',text:'Суп, второе, компот. Женщина на раздаче кладёт всем одинаково, независимо от просьб.'},
+          {who:'naya',expr:'normal',text:'Куриные наггетсы, картошка, макароны с сыром. Женщина на раздаче кладёт всем одинаково, независимо от просьб.'},
           {who:'naya',expr:'smile',text:'Сью тут берёт только булку и утверждает, что это обед.'},
         ]);
       }},
@@ -8065,7 +8089,7 @@ uniCanteen: {
         Dialogue.start([{who:'naya',expr:'normal',text:'Ценник от руки. Кофе дешевле, чем у нас в кафе, и хуже ровно настолько же.'}]);
       }},
     { x:130,y:42,w:44,h:36, name:'menuCanteen', prompt:'Меню', action(){
-        Dialogue.start([{who:'naya',expr:'smile',text:'«Сегодня: борщ, котлета, компот». Мел не стирали месяц — просто дописывают поверх.'}]);
+        Dialogue.start([{who:'naya',expr:'smile',text:'«Сегодня: чили, мясной рулет, яблочный пирог». Мел не стирали месяц — просто дописывают поверх.'}]);
       }},
     { x:70,y:154,w:52,h:34, name:'tableTalk', prompt:'Стол у окна', action(){
         if (F('cafeSceneComplete')) return Dialogue.start([

@@ -64,6 +64,28 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
       else if (j.x < 4 || j.y < 4 || j.x > room.w - 4 || j.y > room.h - 4)
         spawns.push({ ...j, why:'за пределами комнаты' });
     }
+    // §6-7-9: никого не должно быть закрыто мебелью, а картины, часы, фото,
+    // афиши и окна обязаны целиком помещаться в полосу стены
+    const hidden = [], lowArt = [];
+    const ART = ['painting','photo_frame','clock','poster','window_in','mask_pair','blackboard'];
+    for (const [rk, room] of Object.entries(Rooms)) {
+      const boxes = (room.objects || []).map(o => {
+        const d = Art.defs[o.t];
+        return d ? { t:o.t, x:o.x - d.ax, y:o.y - d.ay, w:d.w, h:d.h, d } : null;
+      }).filter(Boolean);
+      const wallH = (room.walls || []).filter(w => w.x === 0 && w.y === 0 && w.w >= room.w - 1).map(w => w.h)[0];
+      boxes.forEach(o => {
+        if (wallH && ART.includes(o.t) && o.y + o.h > wallH + 2)
+          lowArt.push({ room:rk, t:o.t, bottom:(o.y + o.h) | 0, wallH });
+      });
+      (room.npcs || []).forEach(n => boxes.forEach(o => {
+        if (o.d.flat || o.d.wall) return;
+        const base = o.y + o.h;
+        if (base > n.y && n.x > o.x && n.x < o.x + o.w && n.y > o.y && (base - n.y) > 10)
+          hidden.push({ room:rk, npc:n.name || '?', prop:o.t });
+      }));
+    }
+
     // §14: на стене коридора ничто не должно налезать на соседа
     const walls = [];
     for (const [name, L] of Object.entries({ UNI_LIB_WALL, UNI_F2_WALL, UNI_THEATRE_WALL })) {
@@ -73,7 +95,7 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
         if (gap < 10) walls.push({ name, a:it[i-1].label || it[i-1].k, b:it[i].label || it[i].k, gap });
       }
     }
-    return { anchors, inside, spawns, walls };
+    return { anchors, inside, spawns, walls, hidden, lowArt };
   }, jumps);
 
   let bad = 0;
@@ -91,6 +113,16 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
     bad += out.spawns.length;
     console.log('плохие точки входа:');
     out.spawns.forEach(v => console.log(`  changeRoom('${v.room}', ${v.x}, ${v.y}) — ${v.why}`));
+  }
+  if (out.hidden.length) {
+    bad += out.hidden.length;
+    console.log('персонаж закрыт мебелью:');
+    out.hidden.forEach(h => console.log(`  ${h.room}: ${h.npc} за ${h.prop}`));
+  }
+  if (out.lowArt.length) {
+    bad += out.lowArt.length;
+    console.log('настенный предмет ниже линии стены:');
+    out.lowArt.forEach(a => console.log(`  ${a.room}: ${a.t} низ=${a.bottom}, стена до ${a.wallH}`));
   }
   if (out.walls.length) {
     bad += out.walls.length;
