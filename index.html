@@ -238,27 +238,11 @@
   }
   #shiftScreen.show { display:flex; }
   #shiftPhase { color:#c8a070; font-size:11px; letter-spacing:3px; }
-  #shiftOrder { color:#f0e0c0; font-size:15px; line-height:1.4; max-width:92%; }
-  #shiftRecipe { color:#b09070; font-size:11.5px; letter-spacing:.5px; max-width:92%; line-height:1.6; }
-  #shiftTray {
-    min-height:26px; display:flex; gap:5px; flex-wrap:wrap; justify-content:center;
-    align-items:center; max-width:92%;
+  #shiftCanvas {
+    image-rendering:pixelated; image-rendering:crisp-edges;
+    border:1px solid #6a4630; border-radius:3px; background:#1a1210;
+    touch-action:manipulation; cursor:pointer;
   }
-  #shiftTray span {
-    background:rgba(200,160,100,.16); border:1px solid #7a5a3a; border-radius:3px;
-    color:#e8d0a8; font-size:10.5px; padding:3px 7px;
-  }
-  #shiftBar { width:76%; max-width:280px; height:5px; background:rgba(255,255,255,.10); border-radius:3px; overflow:hidden; }
-  #shiftBar i { display:block; height:100%; width:0; background:#d8a04a; transition:width .1s linear; }
-  #shiftButtons { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:96%; margin-top:2px; }
-  .shiftBtn {
-    min-width:96px; min-height:44px; padding:10px 14px;
-    background:rgba(60,32,20,.92); border:2px solid #9a6a3a; border-radius:5px;
-    color:#f0dcb8; font-family:inherit; font-size:12.5px; letter-spacing:1px; cursor:pointer;
-  }
-  .shiftBtn:active { background:#9a6a3a; color:#fff; transform:translateY(1px); }
-  .shiftBtn.go { border-color:#d8a04a; color:#ffe0a0; }
-  .shiftBtn:disabled { opacity:.35; cursor:not-allowed; }
   #shiftSay { color:#c09880; font-size:11px; min-height:30px; max-width:92%; line-height:1.5; }
 
   /* ==================== OVERLAYS ==================== */
@@ -418,11 +402,7 @@
   <!-- ===== Смена в кафе ===== -->
   <div class="screen" id="shiftScreen">
     <div id="shiftPhase">ДНЕВНАЯ СМЕНА</div>
-    <div id="shiftOrder"></div>
-    <div id="shiftRecipe"></div>
-    <div id="shiftTray"></div>
-    <div id="shiftBar"><i></i></div>
-    <div id="shiftButtons"></div>
+    <canvas id="shiftCanvas" width="240" height="340"></canvas>
     <div id="shiftSay"></div>
   </div>
 
@@ -3626,16 +3606,6 @@ function roomNPCs(room) { return (room.npcs || []).filter(n => !n.when || n.when
    Не компас: он не говорит «ведьма рядом» и не показывает направление.
    Просто изредка вздрагивает искрой и коротко звенит, когда в комнате
    есть та, на кого он отзывается. Вывод делает игрок, а не подсказка. */
-/* ЗАДАНИЯ.
-
-   Цель не хранится в состоянии и не выставляется вручную по ходу сцен —
-   она выводится из тех же сюжетных флагов, что и всё остальное. Список
-   идёт от позднего к раннему, побеждает первое совпадение: значит, после
-   загрузки сохранения цель всегда та же, что была, и рассинхрону взяться
-   неоткуда.
-
-   Формулировки говорят, что делать, но не куда идти по координатам, и не
-   называют того, чего Ная ещё не знает. */
 /* ОХРАНА УНИВЕРСИТЕТА.
 
    Ная не студентка, и бесконечно ходить по корпусу ей никто не даст.
@@ -3664,39 +3634,52 @@ const Campus = {
 
 /* СМЕНА В КАФЕ.
 
-   Между «зайдёшь за мной после смены» и следующим сюжетным событием должно
-   пройти несколько часов, а не один клик. Четыре заказа по два-пять действий,
-   таймер кофемашины, реплики Криса между заказами и свет за окном, который
-   к концу смены уходит в вечер.
+   Полноценный кухонный симулятор, а не список кнопок: у стойки стоит
+   очередь гостей, над каждым — пузырь с тем, что он заказал, и полоска
+   терпения. Внизу станции с ингредиентами: нажимаешь — ингредиент
+   отправляется на поднос. Собранное блюдо отдаёшь конкретному гостю,
+   ткнув в него.
 
-   Ошибка не наказывает: заказ портится, Крис отпускает что-нибудь беззлобное,
-   и его можно собрать заново. */
+   Рисуется на своём канвасе тем же пиксельным языком, что и вся игра.
+   Ошибка не наказывает: поднос отправляется в мойку, Крис отпускает
+   что-нибудь беззлобное, и заказ собирается заново. */
 const Shift = {
-  TOKENS: {
-    cup:'ЧАШКА', plate:'ТАРЕЛКА', coffee:'КОФЕ', milk:'МОЛОКО', choco:'ШОКОЛАД',
-    brew:'ПРИГОТОВИТЬ', marsh:'МАРШМЕЛЛОУ', glaze:'ГЛАЗУРЬ', jam:'ДЖЕМ',
-    cream:'КРЕМ', berry:'ЯГОДА', muffin:'КЕКС', croissant:'КРУАССАН',
-    base:'КОРЖ', serve:'ПОДАТЬ',
+  W:240, H:340, TOTAL:4, QUEUE:3,
+
+  T: {
+    cup:      { n:'Чашка',      c:'#e8e2d8' },
+    plate:    { n:'Тарелка',    c:'#dcd6cc' },
+    coffee:   { n:'Кофе',       c:'#4a2c18' },
+    milk:     { n:'Молоко',     c:'#f2efe6' },
+    choco:    { n:'Шоколад',    c:'#5a3020' },
+    brew:     { n:'Машина',     c:'#8a8a92' },
+    marsh:    { n:'Маршмеллоу', c:'#f6d8e0' },
+    glaze:    { n:'Глазурь',    c:'#3f2416' },
+    jam:      { n:'Джем',       c:'#a8323c' },
+    cream:    { n:'Крем',       c:'#f4e8cc' },
+    berry:    { n:'Ягода',      c:'#b02840' },
+    muffin:   { n:'Кекс',       c:'#6a4428' },
+    croissant:{ n:'Круассан',   c:'#d8a860' },
+    base:     { n:'Корж',       c:'#c9a06a' },
   },
-  /* Меню и гости связаны: если человек просит латте, готовить придётся
-     именно латте. Половина позиций — с таймером кофемашины, половина без,
-     чтобы смена не сводилась к ожиданию. */
+
   MENU: [
-    { name:'Эспрессо',        steps:['cup','coffee','brew','serve'],               wait:3000,
-      who:'Студент',          line:'Эспрессо. Двойной. Нет, обычный. Ладно, обычный.' },
-    { name:'Капучино',        steps:['cup','coffee','milk','brew','serve'],        wait:2600,
-      who:'Мужчина в пальто', line:'Капучино, будьте добры. И побыстрее, если можно.' },
-    { name:'Латте',           steps:['cup','milk','coffee','brew','serve'],        wait:3200,
-      who:'Женщина с коляской', line:'Один латте, пожалуйста. И потише, он только уснул.' },
-    { name:'Горячий шоколад', steps:['cup','choco','milk','brew','marsh','serve'], wait:2400,
-      who:'Девочка лет семи', line:'А горячий шоколад с этими белыми штучками у вас есть?' },
-    { name:'Шоколадный кекс', steps:['plate','muffin','glaze','serve'],
-      who:'Постоянная',       line:'Как всегда. Кекс. Ты помнишь, какой.' },
-    { name:'Круассан',        steps:['plate','croissant','jam','serve'],
-      who:'Курьер',           line:'Круассан навынос, я на две минуты.' },
-    { name:'Пирожное',        steps:['plate','base','cream','berry','serve'],
+    { name:'Эспрессо',        steps:['cup','coffee','brew'],               wait:3000,
+      who:'Студент',          line:'Эспрессо, пожалуйста.' },
+    { name:'Капучино',        steps:['cup','coffee','milk','brew'],        wait:2600,
+      who:'Мужчина в пальто', line:'Капучино, будьте добры.' },
+    { name:'Латте',           steps:['cup','milk','coffee','brew'],        wait:3200,
+      who:'Женщина с коляской', line:'Один латте. И потише, он спит.' },
+    { name:'Горячий шоколад', steps:['cup','choco','milk','brew','marsh'], wait:2400,
+      who:'Девочка лет семи', line:'Горячий шоколад с белыми штучками!' },
+    { name:'Шоколадный кекс', steps:['plate','muffin','glaze'],
+      who:'Постоянная',       line:'Как всегда. Кекс.' },
+    { name:'Круассан',        steps:['plate','croissant','jam'],
+      who:'Курьер',           line:'Круассан навынос.' },
+    { name:'Пирожное',        steps:['plate','base','cream','berry'],
       who:'Пара у окна',      line:'Пирожное. Одно, две вилки.' },
   ],
+  FACES: ['customer','student','acolyte','neighbor','friend'],
   CHRIS: [
     'Крис: «Кофемашина сегодня добрая. Не буди её.»',
     'Крис: «Слушай, ты вообще ела сегодня?»',
@@ -3709,122 +3692,283 @@ const Shift = {
     ['ЗА ОКНОМ СЕРЕЕТ','#241a1c', '#120c10'],
     ['КОНЕЦ СМЕНЫ',    '#1a1420', '#0e0a10'],
   ],
-  TOTAL: 4,
 
-  el(id) { return document.getElementById(id); },
-
-  /* Кнопки: всё нужное для заказа плюс пара лишних, перемешанные —
-     иначе рецепт можно нажимать не глядя. */
-  buttonsFor(recipe) {
-    const need = [...new Set(recipe.steps)];
-    const pool = Object.keys(this.TOKENS).filter(t => !need.includes(t) && t !== 'serve' && t !== 'brew');
-    const extra = [];
-    while (extra.length < 2 && pool.length) extra.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
-    const all = need.concat(extra);
-    for (let i = all.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [all[i], all[j]] = [all[j], all[i]]; }
-    return all;
-  },
+  /* ---------------- состояние ---------------- */
+  queue:[], tray:[], served:0, spawned:0, brewing:null, hit:[], raf:0, flash:0, resolve:null,
 
   run() {
-    return new Promise(resolve => {
-      const scr = this.el('shiftScreen');
+    return new Promise(res => {
+      this.resolve = res;
+      this.queue = []; this.tray = []; this.served = 0; this.spawned = 0;
+      this.brewing = null; this.flash = 0;
+      setFlag('cafeShiftStarted');
+      const scr = document.getElementById('shiftScreen');
       scr.classList.add('show');
       Game.mode = 'menu';
-      setFlag('cafeShiftStarted');
-      let order = 0;
-      // четыре разных позиции за смену: два напитка с таймером и два без,
-      // иначе смена ощущается либо как одно ожидание, либо как одни тарелки
-      const hot = this.MENU.filter(m => m.wait).sort(() => Math.random() - .5).slice(0, 2);
-      const cold = this.MENU.filter(m => !m.wait).sort(() => Math.random() - .5).slice(0, 2);
-      const queue = hot.concat(cold).sort(() => Math.random() - .5);
-      const finish = () => {
-        scr.classList.remove('show');
-        Game.mode = 'cutscene';
-        setFlag('cafeShiftFinished');
-        saveGame();
-        resolve();
+      const cv = document.getElementById('shiftCanvas');
+      this.ctx = cv.getContext('2d');
+      this.ctx.imageSmoothingEnabled = false;
+      if (!this._wired) {
+        cv.addEventListener('click', e => this.onTap(e));
+        this._wired = true;
+      }
+      this.say(this.CHRIS[0]);
+      this.fill();
+      this.last = performance.now();
+      const loop = t => {
+        if (!this.resolve) return;
+        const dt = Math.min(60, t - this.last); this.last = t;
+        this.update(dt); this.draw();
+        this.raf = requestAnimationFrame(loop);
       };
-      const nextOrder = () => {
-        if (order >= this.TOTAL) return finish();
-        const ph = this.PHASES[Math.min(order, this.PHASES.length - 1)];
-        scr.style.setProperty('--shiftTop', ph[1]);
-        scr.style.setProperty('--shiftBot', ph[2]);
-        this.el('shiftPhase').textContent = ph[0] + '  ·  ЗАКАЗ ' + (order + 1) + ' ИЗ ' + this.TOTAL;
-        this.el('shiftSay').textContent = this.CHRIS[Math.min(order, this.CHRIS.length - 1)];
-        const recipe = queue[order];
-        this.playOrder(recipe, () => {
-          order++;
-          setCounter('cafeMinigameProgress', order);
-          nextOrder();
-        });
-      };
-      nextOrder();
+      this.raf = requestAnimationFrame(loop);
     });
   },
+  finish() {
+    cancelAnimationFrame(this.raf);
+    document.getElementById('shiftScreen').classList.remove('show');
+    Game.mode = 'cutscene';
+    setFlag('cafeShiftFinished');
+    saveGame();
+    const r = this.resolve; this.resolve = null;
+    if (r) r();
+  },
+  say(t) { document.getElementById('shiftSay').textContent = t; },
 
-  playOrder(recipe, done) {
-    const tray = this.el('shiftTray'), bar = this.el('shiftBar').firstElementChild;
-    const btns = this.el('shiftButtons'), say = this.el('shiftSay');
-    let at = 0, busy = false;
-    this.el('shiftOrder').textContent = recipe.who + ': «' + recipe.line + '»';
-    this.el('shiftRecipe').textContent = recipe.name.toUpperCase() + ': ' +
-      recipe.steps.map(t => this.TOKENS[t]).join(' → ');
+  /* Очередь: держим до трёх гостей, пока не выдано всё, что положено. */
+  fill() {
+    while (this.queue.length < this.QUEUE && this.spawned < this.TOTAL + 1) {
+      const pool = this.MENU.filter(m => !this.queue.some(q => q.r === m));
+      const r = pool[(Math.random() * pool.length) | 0] || this.MENU[0];
+      this.queue.push({ r, face: this.FACES[(Math.random() * this.FACES.length) | 0],
+                        pat: 1, max: 22000 + r.steps.length * 4000, mood:0 });
+      this.spawned++;
+    }
+    const ph = this.PHASES[Math.min(this.served, this.PHASES.length - 1)];
+    const scr = document.getElementById('shiftScreen');
+    scr.style.setProperty('--shiftTop', ph[1]);
+    scr.style.setProperty('--shiftBot', ph[2]);
+    document.getElementById('shiftPhase').textContent =
+      ph[0] + '  ·  ВЫДАНО ' + this.served + ' ИЗ ' + this.TOTAL;
+  },
 
-    const paint = () => {
-      tray.innerHTML = '';
-      recipe.steps.slice(0, at).forEach(t => {
-        const sp = document.createElement('span'); sp.textContent = this.TOKENS[t]; tray.appendChild(sp);
-      });
-    };
-    const spoil = () => {
-      busy = true; at = 0; paint(); bar.style.width = '0';
-      say.textContent = ['Крис: «Ничего. Вылей и начни заново.»',
-                         'Крис: «Бывает. Гость подождёт.»',
-                         'Крис: «Ну вот, теперь это никому не нужно.»'][(Math.random() * 3) | 0];
-      Audio.beep(150, .22, 'sawtooth', .05);
-      setTimeout(() => { busy = false; }, 700);
-    };
-    const tap = t => {
-      if (busy) return;
-      if (t !== recipe.steps[at]) return spoil();
-      if (t === 'brew') {                       // кофемашина работает не мгновенно
-        busy = true;
-        say.textContent = 'Кофемашина шипит.';
-        Audio.beep(320, .5, 'sawtooth', .035);
-        const ms = recipe.wait || 2200, t0 = Date.now();
-        const tick = setInterval(() => {
-          const k = Math.min(1, (Date.now() - t0) / ms);
-          bar.style.width = (k * 100).toFixed(0) + '%';
-          if (k >= 1) {
-            clearInterval(tick); bar.style.width = '0';
-            busy = false; at++; paint(); Audio.beep(720, .12, 'sine', .05);
-            if (at >= recipe.steps.length) complete();
-          }
-        }, 60);
+  /* Станции: всё, что нужно очереди, плюс машина; добиваем до восьми. */
+  stations() {
+    const need = [];
+    this.queue.forEach(q => q.r.steps.forEach(t => { if (!need.includes(t)) need.push(t); }));
+    if (!need.includes('brew')) need.push('brew');
+    const rest = Object.keys(this.T).filter(t => !need.includes(t));
+    while (need.length < 8 && rest.length) need.push(rest.splice((Math.random() * rest.length) | 0, 1)[0]);
+    return need.slice(0, 8);
+  },
+
+  update(dt) {
+    if (this.flash > 0) this.flash -= dt;
+    if (this.brewing) {
+      this.brewing.t += dt;
+      if (this.brewing.t >= this.brewing.ms) { this.tray.push('brew'); this.brewing = null; Audio.beep(720,.12,'sine',.05); }
+    }
+    for (let i = this.queue.length - 1; i >= 0; i--) {
+      const q = this.queue[i];
+      q.pat -= dt / q.max;
+      if (q.pat <= 0) {                      // гость не дождался: не провал, просто ушёл
+        this.queue.splice(i, 1);
+        this.say('Крис: «Ушёл. Бывает, не убивайся.»');
+        Audio.beep(160, .2, 'sawtooth', .04);
+        this.fill();
+      }
+    }
+  },
+
+  /* Поднос должен быть началом хотя бы одного заказа из очереди. */
+  valid() {
+    return this.queue.some(q => this.tray.every((t, i) => q.r.steps[i] === t));
+  },
+  spoil(msg) {
+    this.tray = []; this.brewing = null; this.flash = 420;
+    Audio.beep(150, .22, 'sawtooth', .05);
+    this.say(msg || ['Крис: «Ничего. Вылей и начни заново.»',
+                     'Крис: «Бывает. Гость подождёт.»',
+                     'Крис: «Ну вот, теперь это никому не нужно.»'][(Math.random() * 3) | 0]);
+  },
+
+  tapToken(t) {
+    if (this.brewing) return;
+    if (t === 'brew') {
+      const want = this.queue.find(q => this.tray.every((x, i) => q.r.steps[i] === x) && q.r.steps[this.tray.length] === 'brew');
+      if (!want) return this.spoil('Крис: «Машина пока не нужна.»');
+      this.brewing = { t:0, ms: want.r.wait || 2400 };
+      Audio.beep(320, .5, 'sawtooth', .035);
+      this.say('Кофемашина шипит.');
+      return;
+    }
+    this.tray.push(t);
+    if (!this.valid()) return this.spoil();
+    Audio.beep(500 + this.tray.length * 40, .07, 'sine', .04);
+  },
+
+  serveIndex(i) {
+    const q = this.queue[i];
+    if (!q || this.brewing) return;
+    if (this.tray.length !== q.r.steps.length || !this.tray.every((t, k) => q.r.steps[k] === t))
+      return this.spoil('Крис: «Это не то, что он просил.»');
+    this.queue.splice(i, 1);
+    this.tray = []; this.served++;
+    Audio.item();
+    this.say(this.CHRIS[Math.min(this.served, this.CHRIS.length - 1)]);
+    if (this.served >= this.TOTAL) { setCounter('cafeMinigameProgress', this.served); return this.finish(); }
+    setCounter('cafeMinigameProgress', this.served);
+    this.fill();
+  },
+
+  onTap(e) {
+    const cv = document.getElementById('shiftCanvas');
+    const r = cv.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width * this.W;
+    const y = (e.clientY - r.top) / r.height * this.H;
+    for (const h of this.hit) {
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+        if (h.kind === 'st') this.tapToken(h.t);
+        else if (h.kind === 'guest') this.serveIndex(h.i);
+        else if (h.kind === 'bin') { if (this.tray.length) this.spoil('Крис: «В мойку так в мойку.»'); }
         return;
       }
-      at++; paint(); Audio.beep(520 + at * 40, .07, 'sine', .04);
-      if (at >= recipe.steps.length) complete();
-    };
-    const complete = () => {
-      busy = true;
-      say.textContent = 'Готово. Гость забрал заказ.';
-      Audio.item();
-      setTimeout(() => { btns.innerHTML = ''; tray.innerHTML = ''; done(); }, 900);
-    };
+    }
+  },
 
-    btns.innerHTML = '';
-    this.buttonsFor(recipe).forEach(t => {
-      const b = document.createElement('button');
-      b.className = 'shiftBtn' + (t === 'serve' || t === 'brew' ? ' go' : '');
-      b.textContent = this.TOKENS[t];
-      b.addEventListener('click', () => { Audio.click(); tap(t); });
-      btns.appendChild(b);
+  /* ---------------- рисование ---------------- */
+  icon(g, t, x, y, s) {
+    const c = (this.T[t] || {}).c || '#888';
+    g.fillStyle = c;
+    if (t === 'cup')       { g.fillRect(x-s*.4, y-s*.35, s*.8, s*.6); g.fillRect(x+s*.4, y-s*.2, s*.16, s*.3); }
+    else if (t === 'plate'){ g.beginPath(); g.ellipse(x, y, s*.55, s*.22, 0, 0, 6.3); g.fill(); }
+    else if (t === 'coffee'){ g.beginPath(); g.arc(x, y, s*.34, 0, 6.3); g.fill();
+                              g.fillStyle='#7a4a28'; g.fillRect(x-s*.1, y-s*.5, s*.2, s*.2); }
+    else if (t === 'milk') { g.fillRect(x-s*.26, y-s*.42, s*.52, s*.76); g.fillStyle='#c8c2b6'; g.fillRect(x-s*.26,y-s*.42,s*.52,s*.12); }
+    else if (t === 'choco'){ g.fillRect(x-s*.4, y-s*.3, s*.8, s*.5);
+                              g.fillStyle='#3a1e12'; for(let i=0;i<3;i++) g.fillRect(x-s*.4+i*s*.27, y-s*.3, s*.05, s*.5); }
+    else if (t === 'brew') { g.fillRect(x-s*.44, y-s*.5, s*.88, s*.9); g.fillStyle='#3a3a42'; g.fillRect(x-s*.3, y-s*.32, s*.6, s*.34);
+                              g.fillStyle='#d8a04a'; g.fillRect(x-s*.08, y+s*.06, s*.16, s*.24); }
+    else if (t === 'marsh'){ for(let i=0;i<3;i++){ g.beginPath(); g.arc(x-s*.24+i*s*.24, y+(i%2?-s*.1:s*.06), s*.16, 0, 6.3); g.fill(); } }
+    else if (t === 'glaze'){ g.beginPath(); g.ellipse(x, y, s*.44, s*.24, 0, 0, 6.3); g.fill();
+                              g.fillStyle='#5f3a22'; g.fillRect(x-s*.44, y, s*.88, s*.14); }
+    else if (t === 'jam')  { g.fillRect(x-s*.3, y-s*.36, s*.6, s*.7); g.fillStyle='#e8dcc0'; g.fillRect(x-s*.3,y-s*.36,s*.6,s*.12); }
+    else if (t === 'cream'){ g.beginPath(); g.arc(x, y+s*.1, s*.3, 0, 6.3); g.fill();
+                              g.beginPath(); g.arc(x, y-s*.16, s*.2, 0, 6.3); g.fill(); }
+    else if (t === 'berry'){ g.beginPath(); g.arc(x, y+s*.06, s*.26, 0, 6.3); g.fill();
+                              g.fillStyle='#4a7a3a'; g.fillRect(x-s*.06, y-s*.32, s*.12, s*.14); }
+    else if (t === 'muffin'){ g.fillRect(x-s*.34, y-s*.06, s*.68, s*.42); g.fillStyle='#8a5a34';
+                              g.beginPath(); g.ellipse(x, y-s*.06, s*.42, s*.24, 0, 0, 6.3); g.fill(); }
+    else if (t === 'croissant'){ g.beginPath(); g.ellipse(x, y, s*.46, s*.24, 0, 0, 6.3); g.fill();
+                              g.fillStyle='#b8863f'; g.fillRect(x-s*.5, y-s*.06, s*.16, s*.14); g.fillRect(x+s*.34, y-s*.06, s*.16, s*.14); }
+    else if (t === 'base') { g.fillStyle='#c9a06a'; g.fillRect(x-s*.4, y-s*.16, s*.8, s*.34); }
+    else { g.beginPath(); g.arc(x, y, s*.3, 0, 6.3); g.fill(); }
+  },
+
+  draw() {
+    const g = this.ctx, W = this.W, H = this.H;
+    this.hit = [];
+    const dayK = this.served / this.TOTAL;
+
+    // зал: стена, два окна с переплётом, свет за ними уходит в вечер
+    const wall = g.createLinearGradient(0,0,0,118);
+    wall.addColorStop(0,'#6a4a34'); wall.addColorStop(1,'#4e3626');
+    g.fillStyle = wall; g.fillRect(0,0,W,118);
+    [12, 156].forEach(wx => {
+      g.fillStyle = '#33241a'; g.fillRect(wx-3, 2, 78, 38);
+      const sky = g.createLinearGradient(0,8,0,54);
+      sky.addColorStop(0, dayK < .5 ? '#ffeec4' : '#7e6a86');
+      sky.addColorStop(1, dayK < .5 ? '#e8c088' : '#40344c');
+      g.fillStyle = sky; g.fillRect(wx, 5, 72, 32);
+      g.fillStyle = dayK < .5 ? 'rgba(140,90,40,.25)' : 'rgba(30,20,40,.35)';
+      g.beginPath(); g.arc(wx+18, 30, 11, 0, 6.3); g.fill();
+      g.beginPath(); g.arc(wx+52, 33, 8, 0, 6.3); g.fill();
+      g.fillStyle = '#3d2b1e';
+      g.fillRect(wx+34, 5, 3, 32); g.fillRect(wx, 19, 72, 3);
+      g.fillStyle = '#7a5638'; g.fillRect(wx-3, 2, 78, 3); g.fillRect(wx-5, 38, 82, 4);
     });
-    paint(); bar.style.width = '0';
+    g.fillStyle = 'rgba(0,0,0,.20)'; g.fillRect(0, 96, W, 22);
+
+    // гости у стойки: сами крупнее, над каждым пузырь с заказом и терпение
+    this.queue.forEach((q, i) => {
+      const gx = 42 + i * 78, gy = 116, K = 2;
+      const img = Assets.images[q.face];
+      if (img) g.drawImage(img, Math.round(gx - img.width), Math.round(gy - img.height*K),
+                           img.width*K, img.height*K);
+      const bw = 46, bh = 30, bx = gx - bw/2, by = 48;
+      g.fillStyle = 'rgba(252,246,234,.96)'; g.fillRect(bx, by, bw, bh);
+      g.fillStyle = '#2a2018';
+      g.fillRect(bx, by, bw, 1); g.fillRect(bx, by+bh-1, bw, 1);
+      g.fillRect(bx, by, 1, bh); g.fillRect(bx+bw-1, by, 1, bh);
+      g.fillStyle = 'rgba(252,246,234,.96)'; g.fillRect(gx-3, by+bh, 6, 5);
+      g.fillStyle = '#2a2018'; g.fillRect(gx-4, by+bh+4, 8, 1);
+      const last = q.r.steps.filter(t => t !== 'brew').slice(-1)[0] || 'cup';
+      this.icon(g, q.r.steps[0], bx + 15, by + 15, 17);
+      this.icon(g, last,          bx + 32, by + 18, 15);
+      g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(bx, by - 7, bw, 4);
+      g.fillStyle = q.pat > .45 ? '#6ac06a' : (q.pat > .2 ? '#e0b040' : '#c03a3a');
+      g.fillRect(bx, by - 7, Math.max(0, bw * q.pat), 4);
+      this.hit.push({ kind:'guest', i, x:gx-26, y:46, w:52, h:74 });
+    });
+
+    // стойка
+    g.fillStyle = '#7a5432'; g.fillRect(0,118,W,14);
+    g.fillStyle = '#98693c'; g.fillRect(0,118,W,4);
+    g.fillStyle = '#3a2618'; g.fillRect(0,132,W,5);
+
+    // рабочая поверхность
+    g.fillStyle = '#584434'; g.fillRect(0,137,W,H-137);
+    g.fillStyle = '#4e3b2c'; for (let y=137;y<H;y+=11) g.fillRect(0,y,W,1);
+
+    // поднос
+    const spoiled = this.flash > 0 && ((this.flash/70)|0)%2;
+    g.fillStyle = spoiled ? '#8a2830' : '#3b2e22';
+    g.fillRect(10,144,192,50);
+    g.fillStyle = spoiled ? '#b04048' : '#6b5540'; g.fillRect(10,144,192,3);
+    g.fillStyle = '#d8c4a0'; g.font = '6px Courier New'; g.textAlign='left';
+    g.fillText('ПОДНОС', 14, 154);
+    this.tray.forEach((t, i) => this.icon(g, t, 34 + i * 34, 176, 26));
+    if (this.brewing) {
+      const k = Math.min(1, this.brewing.t / this.brewing.ms);
+      g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(30,188,150,5);
+      g.fillStyle = '#ffc45a'; g.fillRect(30,188,150*k,5);
+    }
+    // мойка
+    g.fillStyle = '#2e2620'; g.fillRect(206,144,28,50);
+    g.fillStyle = '#9aa0a8'; g.fillRect(210,154,20,13);
+    g.fillStyle = '#6a7078'; g.fillRect(218,148,3,6);
+    g.fillStyle = '#d8c4a0'; g.font = '5px Courier New'; g.textAlign='center';
+    g.fillText('МОЙКА', 220, 180);
+    this.hit.push({ kind:'bin', x:206, y:144, w:28, h:50 });
+
+    // станции с ингредиентами
+    const st = this.stations();
+    st.forEach((t, i) => {
+      const col = i % 4, row = (i / 4) | 0;
+      const x = 6 + col * 58, y = 204 + row * 66;
+      g.fillStyle = '#6b4d34'; g.fillRect(x, y, 54, 60);
+      g.fillStyle = '#87613f'; g.fillRect(x, y, 54, 4);
+      g.fillStyle = '#3a2718'; g.fillRect(x, y + 56, 54, 4);
+      g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x+4, y+34, 46, 8);
+      this.icon(g, t, x + 27, y + 25, 28);
+      g.fillStyle = '#f2e2c2'; g.font = '6px Courier New'; g.textAlign = 'center';
+      g.fillText((this.T[t] || {}).n || t, x + 27, y + 52);
+      this.hit.push({ kind:'st', t, x, y, w:54, h:60 });
+    });
+    g.textAlign = 'left';
   },
 };
 
+/* ЗАДАНИЯ.
+
+   Цель не хранится в состоянии и не выставляется вручную по ходу сцен —
+   она выводится из тех же сюжетных флагов, что и всё остальное. Список
+   идёт от позднего к раннему, побеждает первое совпадение: значит, после
+   загрузки сохранения цель всегда та же, что была, и рассинхрону взяться
+   неоткуда.
+
+   Формулировки говорят, что делать, но не куда идти по координатам, и не
+   называют того, чего Ная ещё не знает. */
 const Quests = {
   GOALS: [
     { w:()=> F('ending'),            t:'История закончена.' },
@@ -7816,15 +7960,20 @@ const Player = {
     if (FX.corruption > 0.72) return 'nayaDark';
     return 'naya';
   },
+  /* lift — подъём над полом только для рисунка: тень остаётся на земле и
+     сжимается, столкновения не меняются. Нужен качелям и зависанию в прологе. */
+  lift:0,
   draw(ctx, camX, camY) {
     const img = Assets.images[this.currentSprite()];
     if (!img) return;
+    const lift = this.lift || 0;
     const px = Math.round(this.x - 8 - camX);
     const py = Math.round(this.y - 20 - camY);
-    ctx.fillStyle = 'rgba(0,0,0,.3)';
-    ctx.beginPath(); ctx.ellipse(px+8, py+20, 6, 2, 0, 0, Math.PI*2); ctx.fill();
+    const k = Math.max(.35, 1 - lift / 46);
+    ctx.fillStyle = `rgba(0,0,0,${(.3 * k).toFixed(2)})`;
+    ctx.beginPath(); ctx.ellipse(px+8, py+20, 6 * k, 2 * k, 0, 0, Math.PI*2); ctx.fill();
     const bob = this.moving ? (this.animFrame % 2) : 0;
-    ctx.drawImage(img, px, py - bob);
+    ctx.drawImage(img, px, py - bob - Math.round(lift));
   }
 };
 
@@ -8225,6 +8374,8 @@ const Scene = {
     if (cmd.resetProlog) { Prologue.reset(); return; }
     if (cmd.checkpoint) { saveCheckpoint(cmd.checkpoint); return; }
     if (cmd.shift)  { await Shift.run(); return; }
+    if (cmd.swing)  { await Prologue.startSwing(cmd.swing, cmd.ms || 900); return; }
+    if (cmd.swingOff) { Prologue.stopSwing(); return; }
     if (cmd.montage){ await Montage.run(cmd.montage); return; }
     if (cmd.goto)   { return { goto: cmd.goto }; }
     if (cmd.jump)   { const n = cmd.jump(); return n ? { goto:n } : undefined; }
@@ -8248,6 +8399,7 @@ const Prologue = {
     this.stars = []; this.showMedea = false; this.showLilith = false;
     this.crystalGlow = 0; this.stones = []; this.stonesT = 0;
     this.butterfly = null; this.glow = 0; this.floatSue = 0;
+    this.swing = null; Player.lift = 0;
   },
   addStar(i) { this.stars.push({ i, t:0 }); Audio.beep(140 + i*40, .5, 'sine', .1); },
 
@@ -8334,7 +8486,110 @@ const Prologue = {
     }
   },
 
-  /* pebbles lifting off the ground around little Naya */
+  /* КАЧЕЛИ.
+
+     Сцена спасения Сью не должна быть набором статичных состояний: игрок
+     видит, как качели раскачиваются с растущей амплитудой, как Сью
+     отрывается, летит по дуге, как её ловит магия и как она висит в
+     воздухе. Никаких телепортаций — координата всё время одна и та же,
+     меняется только фаза.
+
+     Сью — это сам игрок, поэтому фазы двигают Player. Подъём над землёй
+     идёт через Player.lift, чтобы столкновения не поехали.                 */
+  swing: null,
+  SEAT: { x:150, y:150, len:30 },          // ось качелей и длина подвеса
+
+  startSwing(phase, ms) {
+    const st = this.swing || (this.swing = { a:0, amp:0, seatA:0, t:0, phase:'sit', dur:1, done:true });
+    st.phase = phase; st.t = 0; st.dur = ms; st.done = false;
+    if (phase === 'sit') { st.amp = 0; st.a = 0; Player.lift = 0; }
+    if (phase === 'launch') { st.vx = 0; st.vy = 0; }
+    return new Promise(res => { st.resolve = res; });
+  },
+  stopSwing() { this.swing = null; Player.lift = 0; },
+
+  updateSwing(dt) {
+    const st = this.swing;
+    if (!st) return;
+    // пустое сиденье качается само с того момента, как Сью с него сорвалась
+    if (!['sit','push'].includes(st.phase)) this.decaySeat(dt);
+    if (st.done) { if (st.phase === 'float') this.floatIdle(dt); return; }
+    st.t += dt;
+    const k = Math.min(1, st.t / st.dur);
+    const S = this.SEAT;
+    const ease = x => x * x * (3 - 2 * x);
+
+    if (st.phase === 'sit') {
+      st.amp = 0; st.a = 0;
+      Player.x = S.x; Player.y = S.y + S.len;
+    } else if (st.phase === 'push') {
+      st.amp = 0.14 + ease(k) * 0.62;                  // амплитуда растёт постепенно
+      st.a = Math.sin(st.t / 340) * st.amp;
+      Player.x = S.x + Math.sin(st.a) * S.len * .35;
+      Player.y = S.y + Math.cos(st.a) * S.len + Math.sin(st.a) * 26;
+      if (Math.abs(st.a) > st.amp * .96 && !st.creak) {
+        st.creak = true; Audio.beep(180 + Math.random() * 40, .12, 'triangle', .03);
+      } else if (Math.abs(st.a) < st.amp * .5) st.creak = false;
+    } else if (st.phase === 'launch') {
+      st.vx = 0.5; st.vy = 3.2;                        // отрыв: вперёд и вниз по экрану
+      Player.y += st.vy * (dt / 16.6) * ease(k);
+      Player.x += st.vx * (dt / 16.6);
+    } else if (st.phase === 'fly') {
+      const slow = 1 - ease(k);                        // теряет скорость, а не резко замирает
+      Player.x += 0.55 * slow * (dt / 16.6);
+      Player.y += (2.6 * slow - 0.5) * (dt / 16.6);
+      Player.lift = 6 + ease(k) * 14;
+      if (Math.random() < .18) FX.spawn(Player.x, Player.y - Player.lift - 8, 1,
+        { color:'#e8d0a0', spread:5, rise:-.1, life:26 });
+    } else if (st.phase === 'hold') {
+      Player.lift = 20 + ease(k) * 8;
+      if (Math.random() < .5) FX.spawn(Player.x + (Math.random() - .5) * 22,
+        Player.y - Player.lift - 6 + (Math.random() - .5) * 18, 1,
+        { color:'#c060ff', spread:6, rise:-.22, life:52 });
+    } else if (st.phase === 'float') {
+      this.floatIdle(dt);                              // держится, пока сцена не снимет
+    } else if (st.phase === 'land') {
+      Player.lift = 28 * (1 - ease(k));
+      if (k >= 1) { Player.lift = 0; st.floatT = 0; }
+    }
+    if (k >= 1) { st.done = true; const r = st.resolve; st.resolve = null; if (r) r(); }
+  },
+
+  /* Зависание: едва заметное покачивание и редкие искры вокруг. */
+  floatIdle(dt) {
+    const st = this.swing;
+    st.floatT = (st.floatT || 0) + dt;
+    Player.lift = 28 + Math.sin(st.floatT / 420) * 2.5;
+    if (Math.random() < .35) FX.spawn(Player.x + (Math.random() - .5) * 26,
+      Player.y - Player.lift - 4 + (Math.random() - .5) * 22, 1,
+      { color:'#c060ff', spread:5, rise:-.18, life:60 });
+  },
+
+  /* Пустое сиденье после отрыва качается само и постепенно затихает. */
+  decaySeat(dt) {
+    const st = this.swing;
+    if (!st) return;
+    st.seatT = (st.seatT || 0) + dt;
+    st.seatAmp = Math.max(0, (st.seatAmp === undefined ? st.amp : st.seatAmp) - dt * 0.00035);
+    st.seatA = Math.sin(st.seatT / 300) * st.seatAmp;
+  },
+
+  drawSwing(ctx) {
+    const st = this.swing;
+    if (!st) return;
+    const S = this.SEAT;
+    const rider = ['sit','push'].includes(st.phase) && !st.done;
+    const a = rider ? st.a : (st.seatA !== undefined ? st.seatA : st.a);
+    const sx = S.x + Math.sin(a) * S.len * .35;
+    const sy = S.y + Math.cos(a) * S.len + Math.sin(a) * 26;
+    ctx.strokeStyle = '#5a4a38'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(S.x - 7, S.y); ctx.lineTo(sx - 6, sy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(S.x + 7, S.y); ctx.lineTo(sx + 6, sy); ctx.stroke();
+    ctx.fillStyle = '#6b5334'; ctx.fillRect(Math.round(sx) - 8, Math.round(sy), 16, 3);
+    ctx.fillStyle = '#8a6c46'; ctx.fillRect(Math.round(sx) - 8, Math.round(sy), 16, 1);
+  },
+
+  /* pebbles lifting off the ground around little Naya */  /* pebbles lifting off the ground around little Naya */
   liftStones(x, y, n) {
     for (let i = 0; i < n; i++)
       this.stones.push({ bx:x, by:y, a:(i/n)*6.28, r:10 + i*3, h:0, sp:.6 + i*.12 });
@@ -9022,29 +9277,43 @@ prologue: [
   { dlg:[{who:'narrator',expr:'normal',name:'',text:'(Походи по площадке. Когда надоест — залезай на качели.)'}] },
 ],
 
-/* the swing, and the first magic in the game */
+/* Первая магия в игре.
+
+   Двенадцать фаз без единой телепортации: качели раскачиваются с растущей
+   амплитудой, Сью физически отрывается от сиденья, летит по дуге, теряя
+   скорость, магия Наи останавливает её в воздухе, вокруг идут искры,
+   поднимаются камешки, появляется бабочка — и она успевает улететь до того,
+   как экран уйдёт в затемнение.
+
+   Сью — это игрок, поэтому фазы двигают Player, а пустое сиденье потом
+   качается само и затихает. */
 prologSwing: [
+  { swing:'sit', ms:500 },
   { dlg:[
     {who:'sueChild',expr:'smile',name:'Сью',text:'Выше! Выше!'},
   ]},
-  { wait:400 },
+  { swing:'push', ms:3600 },                       // 1-2: амплитуда растёт на глазах
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Она отталкивается слишком сильно.'},
   ]},
   { sfx:'door' }, { shake:3 },
+  { swing:'launch', ms:260 },                      // 3: отрыв
+  { swing:'fly', ms:900 },                         // 4: короткий полёт по дуге
   { dlg:[
-    {who:'narrator',expr:'normal',name:'',text:'Качели резко уходят вперёд. Сью выскальзывает из сиденья и летит.'},
+    {who:'narrator',expr:'normal',name:'',text:'Сью выскальзывает из сиденья и летит.'},
   ]},
   { flash:'#ffffff', dur:260, peak:.55 },
   { sfx:'low' },
   async ()=>{ Prologue.showMedea = false; },
+  { swing:'hold', ms:520 },                        // 5: магия останавливает
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'И время... останавливается.'},
   ]},
-  { magic:'#c060ff', dur:2000 },
+  { magic:'#c060ff', dur:1600 },
+  { swing:'float', ms:1 },                         // 6-7: зависание и частицы
   { dlg:[
     {who:'sueChild',expr:'shocked',name:'Сью',text:'...'},
-    {who:'narrator',expr:'normal',name:'',text:'Сью открывает глаза. Она висит в воздухе, в двух метрах над утоптанной землёй.'},
+    {who:'narrator',expr:'normal',name:'',text:'Сью открывает глаза. Она висит в воздухе, над утоптанной землёй.'},
     {who:'narrator',expr:'normal',name:'',text:'Вокруг неё мерцающее облако. В воздухе медленно кружатся фиолетовые искры.'},
   ]},
   { flag:'prologNayaSeen' },
@@ -9054,12 +9323,14 @@ prologSwing: [
     {who:'narrator',expr:'normal',name:'',text:'Она очень сосредоточена — так сосредоточена, что забыла дышать.'},
   ]},
   { sfx:'chime' },
+  { swing:'land', ms:1100 },                       // Сью опускается, а не оказывается на земле
   { dlg:[
-    {who:'narrator',expr:'normal',name:'',text:'Сью медленно опускается на землю и оказывается на ногах.'},
+    {who:'narrator',expr:'normal',name:'',text:'Сью медленно опускается и встаёт на ноги.'},
     {who:'narrator',expr:'normal',name:'',text:'Девочки смотрят друг на друга.'},
   ]},
-  { stones:[126, 214, 6] },
+  { stones:[126, 214, 6] },                        // 8: камешки с собственными траекториями
   { sfx:'rune' },
+  { wait:900 },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Камешек у ног Сью поднимается в воздух. Потом второй. Потом ещё несколько.'},
     {who:'narrator',expr:'normal',name:'',text:'Камни медленно кружатся вокруг девочки вместе с искрами.'},
@@ -9070,7 +9341,7 @@ prologSwing: [
     {who:'narrator',expr:'normal',name:'',text:'В её ладони появляется маленький огонёк.'},
     {who:'sueChild',expr:'shocked',name:'Сью',text:'Ух ты!'},
   ]},
-  { butterfly:{ from:[126,196], to:[150,214], ms:1800 } },
+  { butterfly:{ from:[126,196], to:[152,206], ms:2000 } },   // 9: бабочка долетает до руки
   { sfx:'chime' },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Огонёк расправляется в светящуюся бабочку.'},
@@ -9078,19 +9349,20 @@ prologSwing: [
     {who:'sueChild',expr:'smile',name:'Сью',text:'...'},
     {who:'narrator',expr:'normal',name:'',text:'Сью смотрит на бабочку. Потом на девочку. Девочка нервничает и мешкается.'},
   ]},
-  { dlg:[
+  { dlg:[                                          // 10: диалог
     {who:'sueChild',expr:'smile',name:'Сью',text:'А ты можешь сделать ещё?'},
     {who:'narrator',expr:'normal',name:'',text:'Девочка улыбается и кивает. Подходит ближе.'},
     {who:'sueChild',expr:'smile',name:'Сью',text:'Меня Сью зовут!'},
     {who:'narrator',expr:'normal',name:'',text:'Она осторожно протягивает руку.'},
     {who:'nayaChild',expr:'shocked',name:'Ная',text:'Я Ная...'},
     {who:'narrator',expr:'normal',name:'',text:'Они смотрят друг на друга и улыбаются.'},
-    {who:'narrator',expr:'normal',name:'',text:'Дует ветер. На фоне слегка скрипят качели.'},
+    {who:'narrator',expr:'normal',name:'',text:'Дует ветер. Позади них качается пустое сиденье.'},
   ]},
-  { butterfly:{ from:[150,214], to:[120,150], ms:1500 } },
-  { wait:600 },
+  { butterfly:{ from:[152,206], to:[118,132], ms:2200 } },   // 11: бабочка успевает улететь
+  { wait:2300 },
+  { swingOff:true },
   { music:'none' },
-  { fadeOut:2000 },
+  { fadeOut:2000 },                                // 12: и только теперь затемнение
   { resetProlog:true },
   { flag:'prologueComplete' },
   { memory:'meeting' },
@@ -11856,6 +12128,13 @@ function drawRoom() {
     Prologue.drawStones(ctx); Prologue.drawButterfly(ctx);
     ctx.restore();
   }
+  // качели, камешки и бабочка живут и на обычной площадке, а не только
+  // в кинематографичных комнатах пролога
+  if (!room.prologue && (Prologue.swing || Prologue.stones.length || Prologue.butterfly)) {
+    ctx.save(); ctx.translate(-camX, -camY);
+    Prologue.drawSwing(ctx); Prologue.drawStones(ctx); Prologue.drawButterfly(ctx);
+    ctx.restore();
+  }
 
   FX.drawMagic(ctx, camX, camY);
   FX.drawParticles(ctx, camX, camY);
@@ -11953,7 +12232,8 @@ function tick(t) {
     Dialogue.update(dt);
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
-    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true); }
+    if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true);
+                 Prologue.updateSwing(dt); }
     drawRoom();
   }
   requestAnimationFrame(tick);

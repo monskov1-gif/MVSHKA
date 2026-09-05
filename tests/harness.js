@@ -19,18 +19,17 @@ async function pump(page, picks, tag) {
     // смена в кафе: харнесс отрабатывает её как обычный игрок — читает рецепт
     // со экрана и жмёт следующий по порядку ингредиент
     if (st.shift) {
-      const done = await page.evaluate(() => {
-        const rec = document.getElementById('shiftRecipe').textContent;
-        const steps = (rec.split(': ')[1] || '').split(' → ').filter(Boolean);
-        const tray = document.querySelectorAll('#shiftTray span').length;
-        const want = steps[tray];
-        if (!want) return false;
-        const btns = [...document.querySelectorAll('.shiftBtn')];
-        const b = btns.find(x => x.textContent === want);
-        if (!b) return false;
-        b.click(); return true;
+      const acted = await page.evaluate(() => {
+        const S = Shift;
+        if (S.brewing) return 'brew';
+        // берём первого гостя, чьё блюдо ещё можно собрать, и кладём следующий шаг
+        const q = S.queue.find(x => S.tray.every((t, i) => x.r.steps[i] === t));
+        if (!q) { S.spoil(); return 'reset'; }
+        if (S.tray.length === q.r.steps.length) { S.serveIndex(S.queue.indexOf(q)); return 'serve'; }
+        S.tapToken(q.r.steps[S.tray.length]);
+        return 'step';
       });
-      await page.waitForTimeout(done ? 130 : 220);
+      await page.waitForTimeout(acted === 'brew' ? 240 : 90);
       continue;
     }
     if (st.choice && st.n > 0) {

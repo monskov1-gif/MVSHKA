@@ -19,25 +19,26 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   if (process.argv[2]) await p.screenshot({ path: process.argv[2], clip:{x:0,y:0,width:420,height:600} });
 
   let guard = 0, wrong = 0;
-  while (guard++ < 400) {
-    const st = await p.evaluate(() => {
-      if (window.__shiftDone) return { done:true };
-      const recipe = document.getElementById('shiftRecipe').textContent;
-      const tray = [...document.querySelectorAll('#shiftTray span')].map(s=>s.textContent);
-      const btns = [...document.querySelectorAll('.shiftBtn')].map(b=>b.textContent);
-      return { done:false, recipe, tray, btns, phase: document.getElementById('shiftPhase').textContent };
-    });
-    if (st.done) break;
-    const steps = st.recipe.split(': ')[1] ? st.recipe.split(': ')[1].split(' → ') : [];
-    const want = steps[st.tray.length];
-    if (!want) { await p.waitForTimeout(200); continue; }
-    // раз в 7 шагов жмём заведомо не то — проверяем, что порча заказа не ломает игру
-    const idx = (guard % 31 === 0) ? st.btns.findIndex(t => t !== want) : st.btns.indexOf(want);
-    if (guard % 31 === 0 && idx >= 0) wrong++;
-    if (idx < 0) { await p.waitForTimeout(150); continue; }
-    await p.evaluate(i => document.querySelectorAll('.shiftBtn')[i].click(), idx);
-    await p.waitForTimeout(180);
+  while (guard++ < 900) {
+    const r = await p.evaluate((doWrong) => {
+      if (window.__shiftDone) return 'done';
+      const S = Shift;
+      if (S.brewing) return 'brew';
+      const q = S.queue.find(x => S.tray.every((t, i) => x.r.steps[i] === t));
+      if (!q) { S.spoil(); return 'reset'; }
+      if (doWrong) {                                   // намеренная ошибка: чужой ингредиент
+        const bad = Object.keys(S.T).find(t => t !== q.r.steps[S.tray.length] && t !== 'brew');
+        if (bad) { S.tapToken(bad); return 'wrong'; }
+      }
+      if (S.tray.length === q.r.steps.length) { S.serveIndex(S.queue.indexOf(q)); return 'serve'; }
+      S.tapToken(q.r.steps[S.tray.length]);
+      return 'step';
+    }, guard % 37 === 0);
+    if (r === 'done') break;
+    if (r === 'wrong') wrong++;
+    await p.waitForTimeout(r === 'brew' ? 200 : 70);
   }
+
   const st = await p.evaluate(()=>({ done: !!window.__shiftDone, started: gameState.flags.cafeShiftStarted,
     finished: gameState.flags.cafeShiftFinished, progress: gameState.counters.cafeMinigameProgress,
     vis: document.getElementById('shiftScreen').classList.contains('show') }));
