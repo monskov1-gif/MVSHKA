@@ -11,10 +11,28 @@ async function pump(page, picks, tag) {
     const st = await page.evaluate(() => ({
       dlg: Dialogue.active, choice: Dialogue.awaitingChoice, scene: Scene.active,
       mode: Game.mode, ending: Game.endingShown, montage: Game.montage,
+      shift: document.getElementById('shiftScreen').classList.contains('show'),
       n: document.querySelectorAll('#choiceOptions .choiceOpt').length,
       texts: [...document.querySelectorAll('#choiceOptions .choiceOpt')].map(b => b.textContent.slice(0, 46)),
     }));
     if (st.ending) return 'ending';
+    // смена в кафе: харнесс отрабатывает её как обычный игрок — читает рецепт
+    // со экрана и жмёт следующий по порядку ингредиент
+    if (st.shift) {
+      const done = await page.evaluate(() => {
+        const rec = document.getElementById('shiftRecipe').textContent;
+        const steps = (rec.split(': ')[1] || '').split(' → ').filter(Boolean);
+        const tray = document.querySelectorAll('#shiftTray span').length;
+        const want = steps[tray];
+        if (!want) return false;
+        const btns = [...document.querySelectorAll('.shiftBtn')];
+        const b = btns.find(x => x.textContent === want);
+        if (!b) return false;
+        b.click(); return true;
+      });
+      await page.waitForTimeout(done ? 130 : 220);
+      continue;
+    }
     if (st.choice && st.n > 0) {
       const want = picks[ci] !== undefined ? picks[ci] : 0;
       const k = Math.min(want, st.n - 1);

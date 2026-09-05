@@ -229,6 +229,38 @@
   }
   #questPanel.show { display:block; }
 
+  /* ==================== СМЕНА В КАФЕ ==================== */
+  #shiftScreen {
+    position:absolute; inset:0; z-index:44; display:none;
+    flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    background:linear-gradient(180deg, var(--shiftTop,#2a1c14) 0%, var(--shiftBot,#160f10) 100%);
+    padding:16px 12px calc(16px + env(safe-area-inset-bottom)); text-align:center;
+  }
+  #shiftScreen.show { display:flex; }
+  #shiftPhase { color:#c8a070; font-size:11px; letter-spacing:3px; }
+  #shiftOrder { color:#f0e0c0; font-size:15px; line-height:1.4; max-width:92%; }
+  #shiftRecipe { color:#b09070; font-size:11.5px; letter-spacing:.5px; max-width:92%; line-height:1.6; }
+  #shiftTray {
+    min-height:26px; display:flex; gap:5px; flex-wrap:wrap; justify-content:center;
+    align-items:center; max-width:92%;
+  }
+  #shiftTray span {
+    background:rgba(200,160,100,.16); border:1px solid #7a5a3a; border-radius:3px;
+    color:#e8d0a8; font-size:10.5px; padding:3px 7px;
+  }
+  #shiftBar { width:76%; max-width:280px; height:5px; background:rgba(255,255,255,.10); border-radius:3px; overflow:hidden; }
+  #shiftBar i { display:block; height:100%; width:0; background:#d8a04a; transition:width .1s linear; }
+  #shiftButtons { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:96%; margin-top:2px; }
+  .shiftBtn {
+    min-width:96px; min-height:44px; padding:10px 14px;
+    background:rgba(60,32,20,.92); border:2px solid #9a6a3a; border-radius:5px;
+    color:#f0dcb8; font-family:inherit; font-size:12.5px; letter-spacing:1px; cursor:pointer;
+  }
+  .shiftBtn:active { background:#9a6a3a; color:#fff; transform:translateY(1px); }
+  .shiftBtn.go { border-color:#d8a04a; color:#ffe0a0; }
+  .shiftBtn:disabled { opacity:.35; cursor:not-allowed; }
+  #shiftSay { color:#c09880; font-size:11px; min-height:30px; max-width:92%; line-height:1.5; }
+
   /* ==================== OVERLAYS ==================== */
   #fade { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:40; transition:opacity .5s; }
   #fade.show { opacity:1; }
@@ -381,6 +413,17 @@
     <h2>НАЯ</h2>
     <div class="listWrap" id="statusRows"></div>
     <button class="menuBtn small" id="btnBackStatus">НАЗАД</button>
+  </div>
+
+  <!-- ===== Смена в кафе ===== -->
+  <div class="screen" id="shiftScreen">
+    <div id="shiftPhase">ДНЕВНАЯ СМЕНА</div>
+    <div id="shiftOrder"></div>
+    <div id="shiftRecipe"></div>
+    <div id="shiftTray"></div>
+    <div id="shiftBar"><i></i></div>
+    <div id="shiftButtons"></div>
+    <div id="shiftSay"></div>
   </div>
 
   <!-- ===== Pause ===== -->
@@ -1192,6 +1235,7 @@ function freshState() {
       archiveUnlocked:false, universityWarned:false, universityAccessRestricted:false,
       universityWindowRouteUnlocked:false,
       metSue:false, cafeSceneComplete:false,
+      cafeShiftStarted:false, cafeShiftFinished:false,
       waitingAtAud:false, metGenevieveUni:false, crystalReacted:false, oldWingOpen:false,
       investigatedUniversity:false, learnedMedea:false, learnedWitches:false,
       homeTalkDone:false, portalOpened:false, metCharlotte:false, metLilith:false,
@@ -1225,7 +1269,7 @@ function freshState() {
     },
     stats: { trustSue:50, witchAmbition:20, humanity:70, hellAffinity:0 },
     counters: {
-      campusHeat:0, witch2Distract:0, mirrorLooks:0, impTalks:0, silenceLooks:0, libClues:0,
+      campusHeat:0, cafeMinigameProgress:0, witch2Distract:0, mirrorLooks:0, impTalks:0, silenceLooks:0, libClues:0,
                 sueResolve:0, sueRespected:0, persuadeStep:0, postStep:0, catPets:0,
                 runesDisarmed:0, lonerFails:0, evilLooks:0 },
     inventory: [],
@@ -1284,6 +1328,7 @@ function setFlag(k, v=true) {
 }
 function C(k) { return (gameState && gameState.counters[k]) || 0; }
 function addC(k, v=1) { if (gameState) gameState.counters[k] = (gameState.counters[k]||0) + v; }
+function setCounter(k, v) { if (gameState) gameState.counters[k] = v; }
 function hasItem(n) { return !!(gameState && gameState.inventory.includes(n)); }
 function amuletCount() {
   if (!gameState) return 0;
@@ -3614,6 +3659,169 @@ const Campus = {
       UI.toast('На тебя оглядываются', 2400);
     }
     if (n >= this.LIMIT) setTimeout(()=> Scene.play('securityEject'), 600);
+  },
+};
+
+/* СМЕНА В КАФЕ.
+
+   Между «зайдёшь за мной после смены» и следующим сюжетным событием должно
+   пройти несколько часов, а не один клик. Четыре заказа по два-пять действий,
+   таймер кофемашины, реплики Криса между заказами и свет за окном, который
+   к концу смены уходит в вечер.
+
+   Ошибка не наказывает: заказ портится, Крис отпускает что-нибудь беззлобное,
+   и его можно собрать заново. */
+const Shift = {
+  TOKENS: {
+    cup:'ЧАШКА', plate:'ТАРЕЛКА', coffee:'КОФЕ', milk:'МОЛОКО', choco:'ШОКОЛАД',
+    brew:'ПРИГОТОВИТЬ', marsh:'МАРШМЕЛЛОУ', glaze:'ГЛАЗУРЬ', jam:'ДЖЕМ',
+    cream:'КРЕМ', berry:'ЯГОДА', muffin:'КЕКС', croissant:'КРУАССАН',
+    base:'КОРЖ', serve:'ПОДАТЬ',
+  },
+  /* Меню и гости связаны: если человек просит латте, готовить придётся
+     именно латте. Половина позиций — с таймером кофемашины, половина без,
+     чтобы смена не сводилась к ожиданию. */
+  MENU: [
+    { name:'Эспрессо',        steps:['cup','coffee','brew','serve'],               wait:3000,
+      who:'Студент',          line:'Эспрессо. Двойной. Нет, обычный. Ладно, обычный.' },
+    { name:'Капучино',        steps:['cup','coffee','milk','brew','serve'],        wait:2600,
+      who:'Мужчина в пальто', line:'Капучино, будьте добры. И побыстрее, если можно.' },
+    { name:'Латте',           steps:['cup','milk','coffee','brew','serve'],        wait:3200,
+      who:'Женщина с коляской', line:'Один латте, пожалуйста. И потише, он только уснул.' },
+    { name:'Горячий шоколад', steps:['cup','choco','milk','brew','marsh','serve'], wait:2400,
+      who:'Девочка лет семи', line:'А горячий шоколад с этими белыми штучками у вас есть?' },
+    { name:'Шоколадный кекс', steps:['plate','muffin','glaze','serve'],
+      who:'Постоянная',       line:'Как всегда. Кекс. Ты помнишь, какой.' },
+    { name:'Круассан',        steps:['plate','croissant','jam','serve'],
+      who:'Курьер',           line:'Круассан навынос, я на две минуты.' },
+    { name:'Пирожное',        steps:['plate','base','cream','berry','serve'],
+      who:'Пара у окна',      line:'Пирожное. Одно, две вилки.' },
+  ],
+  CHRIS: [
+    'Крис: «Кофемашина сегодня добрая. Не буди её.»',
+    'Крис: «Слушай, ты вообще ела сегодня?»',
+    'Крис: «За окном уже темно. Ты заметила?»',
+    'Крис: «Последний. Дальше я сам.»',
+  ],
+  PHASES: [
+    ['ДНЕВНАЯ СМЕНА',  '#2a1c14', '#160f10'],
+    ['ПОСЛЕ ОБЕДА',    '#33200f', '#180f0c'],
+    ['ЗА ОКНОМ СЕРЕЕТ','#241a1c', '#120c10'],
+    ['КОНЕЦ СМЕНЫ',    '#1a1420', '#0e0a10'],
+  ],
+  TOTAL: 4,
+
+  el(id) { return document.getElementById(id); },
+
+  /* Кнопки: всё нужное для заказа плюс пара лишних, перемешанные —
+     иначе рецепт можно нажимать не глядя. */
+  buttonsFor(recipe) {
+    const need = [...new Set(recipe.steps)];
+    const pool = Object.keys(this.TOKENS).filter(t => !need.includes(t) && t !== 'serve' && t !== 'brew');
+    const extra = [];
+    while (extra.length < 2 && pool.length) extra.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+    const all = need.concat(extra);
+    for (let i = all.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [all[i], all[j]] = [all[j], all[i]]; }
+    return all;
+  },
+
+  run() {
+    return new Promise(resolve => {
+      const scr = this.el('shiftScreen');
+      scr.classList.add('show');
+      Game.mode = 'menu';
+      setFlag('cafeShiftStarted');
+      let order = 0;
+      // четыре разных позиции за смену: два напитка с таймером и два без,
+      // иначе смена ощущается либо как одно ожидание, либо как одни тарелки
+      const hot = this.MENU.filter(m => m.wait).sort(() => Math.random() - .5).slice(0, 2);
+      const cold = this.MENU.filter(m => !m.wait).sort(() => Math.random() - .5).slice(0, 2);
+      const queue = hot.concat(cold).sort(() => Math.random() - .5);
+      const finish = () => {
+        scr.classList.remove('show');
+        Game.mode = 'cutscene';
+        setFlag('cafeShiftFinished');
+        saveGame();
+        resolve();
+      };
+      const nextOrder = () => {
+        if (order >= this.TOTAL) return finish();
+        const ph = this.PHASES[Math.min(order, this.PHASES.length - 1)];
+        scr.style.setProperty('--shiftTop', ph[1]);
+        scr.style.setProperty('--shiftBot', ph[2]);
+        this.el('shiftPhase').textContent = ph[0] + '  ·  ЗАКАЗ ' + (order + 1) + ' ИЗ ' + this.TOTAL;
+        this.el('shiftSay').textContent = this.CHRIS[Math.min(order, this.CHRIS.length - 1)];
+        const recipe = queue[order];
+        this.playOrder(recipe, () => {
+          order++;
+          setCounter('cafeMinigameProgress', order);
+          nextOrder();
+        });
+      };
+      nextOrder();
+    });
+  },
+
+  playOrder(recipe, done) {
+    const tray = this.el('shiftTray'), bar = this.el('shiftBar').firstElementChild;
+    const btns = this.el('shiftButtons'), say = this.el('shiftSay');
+    let at = 0, busy = false;
+    this.el('shiftOrder').textContent = recipe.who + ': «' + recipe.line + '»';
+    this.el('shiftRecipe').textContent = recipe.name.toUpperCase() + ': ' +
+      recipe.steps.map(t => this.TOKENS[t]).join(' → ');
+
+    const paint = () => {
+      tray.innerHTML = '';
+      recipe.steps.slice(0, at).forEach(t => {
+        const sp = document.createElement('span'); sp.textContent = this.TOKENS[t]; tray.appendChild(sp);
+      });
+    };
+    const spoil = () => {
+      busy = true; at = 0; paint(); bar.style.width = '0';
+      say.textContent = ['Крис: «Ничего. Вылей и начни заново.»',
+                         'Крис: «Бывает. Гость подождёт.»',
+                         'Крис: «Ну вот, теперь это никому не нужно.»'][(Math.random() * 3) | 0];
+      Audio.beep(150, .22, 'sawtooth', .05);
+      setTimeout(() => { busy = false; }, 700);
+    };
+    const tap = t => {
+      if (busy) return;
+      if (t !== recipe.steps[at]) return spoil();
+      if (t === 'brew') {                       // кофемашина работает не мгновенно
+        busy = true;
+        say.textContent = 'Кофемашина шипит.';
+        Audio.beep(320, .5, 'sawtooth', .035);
+        const ms = recipe.wait || 2200, t0 = Date.now();
+        const tick = setInterval(() => {
+          const k = Math.min(1, (Date.now() - t0) / ms);
+          bar.style.width = (k * 100).toFixed(0) + '%';
+          if (k >= 1) {
+            clearInterval(tick); bar.style.width = '0';
+            busy = false; at++; paint(); Audio.beep(720, .12, 'sine', .05);
+            if (at >= recipe.steps.length) complete();
+          }
+        }, 60);
+        return;
+      }
+      at++; paint(); Audio.beep(520 + at * 40, .07, 'sine', .04);
+      if (at >= recipe.steps.length) complete();
+    };
+    const complete = () => {
+      busy = true;
+      say.textContent = 'Готово. Гость забрал заказ.';
+      Audio.item();
+      setTimeout(() => { btns.innerHTML = ''; tray.innerHTML = ''; done(); }, 900);
+    };
+
+    btns.innerHTML = '';
+    this.buttonsFor(recipe).forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'shiftBtn' + (t === 'serve' || t === 'brew' ? ' go' : '');
+      b.textContent = this.TOKENS[t];
+      b.addEventListener('click', () => { Audio.click(); tap(t); });
+      btns.appendChild(b);
+    });
+    paint(); bar.style.width = '0';
   },
 };
 
@@ -8016,6 +8224,7 @@ const Scene = {
     if (cmd.butterfly) { await Prologue.flyButterfly(cmd.butterfly.from, cmd.butterfly.to, cmd.butterfly.ms || 1400); return; }
     if (cmd.resetProlog) { Prologue.reset(); return; }
     if (cmd.checkpoint) { saveCheckpoint(cmd.checkpoint); return; }
+    if (cmd.shift)  { await Shift.run(); return; }
     if (cmd.montage){ await Montage.run(cmd.montage); return; }
     if (cmd.goto)   { return { goto: cmd.goto }; }
     if (cmd.jump)   { const n = cmd.jump(); return n ? { goto:n } : undefined; }
@@ -9482,7 +9691,14 @@ cafeScene: [
     {who:'naya',expr:'normal',text:'Зайду.'},
     {who:'sue',expr:'smile',text:'Университет, коридор, четырнадцатая. Не пугай первокурсников.'},
   ]},
-  { dlg:[{who:'naya',expr:'normal',text:'(Смена закончилась. Пора за Сью — университет в другом конце улицы.)'}] },
+  { dlg:[{who:'naya',expr:'normal',text:'(До конца смены — четыре часа и очередь у стойки.)'}] },
+  { shift:true },
+  { dlg:[
+    {who:'chris',expr:'normal',text:'Всё, иди. Я закрою.'},
+    {who:'naya',expr:'sad',text:'Крис...'},
+    {who:'chris',expr:'normal',text:'Иди, говорю. Ты сегодня отработала.'},
+  ]},
+  { dlg:[{who:'naya',expr:'normal',text:'(Смена закончилась. Ноги гудят. Пора за Сью — университет в другом конце улицы.)'}] },
 ],
 
 chrisAfter: [
