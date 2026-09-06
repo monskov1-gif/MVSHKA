@@ -38,7 +38,10 @@ const ENTRY = {
           if (x < 4 || x > room.w - 4 || y < Player.h || y > room.h - 2) return false;
           const box = { x:x - Player.w/2, y:y - Player.h, w:Player.w, h:Player.h };
           for (const w of room.walls) if (rectHit(box, w)) return false;
-          return true;   // NPCs are pushable obstacles, not level geometry
+          // Мебель — такая же геометрия уровня, как стены: лестница,
+          // вставшая поверх двери, запирает её ничуть не хуже стены.
+          // NPC не считаем: их можно обойти, они расступаются.
+          return !World.blockedByProps(room, box);
         };
         // snap the entry point to a free cell the way unstickPlayer would
         let sx = ex, sy = ey;

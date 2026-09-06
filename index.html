@@ -4822,7 +4822,7 @@ const Quests = {
       t:'Встретиться с Морель на крыше.', s:'Старое крыло, служебная лестница, вверх.' },
     { w:()=> C('uniDay') === 4 && F('archiveFolderFound'),
       t:'Попасть на премьеру Сью.', s:'Театральный зал — в западном крыле.' },
-    { w:()=> C('uniDay') === 4 && F('sawBasement'),
+    { w:()=> C('uniDay') === 4 && F('libMissing') && F('sawBasement'),
       t:'Найти в цокольном архиве пропавшую папку.', s:'Коробки без описи.' },
     { w:()=> C('uniDay') === 4 && F('backWindowUsed'),
       t:'Спуститься по служебной лестнице в цоколь.' },
@@ -4967,6 +4967,12 @@ const UniDay = {
     if (next >= 4) {
       setFlag('cafeShiftFinished', true);
     }
+    /* sawFloor2/sawOldWing/sawBasement означают «дошла туда сегодня», а не
+       «когда-то бывала». Без сброса на четвёртый день цель прыгала сразу к
+       папке в архиве: в цоколе-то Ная была ещё на третий. */
+    setFlag('sawFloor2', false);
+    setFlag('sawOldWing', false);
+    setFlag('sawBasement', false);
   },
 };
 
@@ -10064,15 +10070,17 @@ uniCorr2: {
     ctx.fillText('← ЗАПАДНОЕ КРЫЛО', 10, 172);
     ctx.fillText('ВОСТОЧНОЕ КРЫЛО →', 578, 172);
     ctx.fillText('ВИД ВО ВНУТРЕННИЙ ДВОР', 262, 246);
-    // площадка парадной лестницы вниз
-    ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fillRect(300, 196, 88, 52);
-    ctx.fillStyle = '#c8b8a0'; ctx.fillText('ВНИЗ, В ХОЛЛ', 310, 244);
+    // Площадка парадной лестницы вниз. Она стоит восточнее двери в старое
+    // крыло: марш шириной 96 не помещается ни в один простенок, поэтому
+    // важно, чтобы он не вставал именно перед сюжетной дверью.
+    ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fillRect(366, 196, 88, 52);
+    ctx.fillStyle = '#c8b8a0'; ctx.fillText('ВНИЗ, В ХОЛЛ', 376, 244);
   },
   objects: [
-    { t:'stairs_main', x:344, y:214 },
+    { t:'stairs_main', x:410, y:214 },
     { t:'lockers', x:120, y:200 }, { t:'lockers', x:166, y:200 },
     { t:'lockers', x:512, y:200 }, { t:'lockers', x:558, y:200 },
-    { t:'bench_stone', x:246, y:196 }, { t:'bench_stone', x:446, y:196 },
+    { t:'bench_stone', x:246, y:196 }, { t:'bench_stone', x:446, y:246 },
     { t:'plant_pot', x:36, y:230 }, { t:'plant_pot', x:648, y:230 },
     { t:'bin', x:210, y:230 }, { t:'radiator', x:UNI_C2_WALL.pierMid(1), y:156 },
     { t:'painting', x:UNI_C2_WALL.pierMid(0), y:62 },
@@ -10086,7 +10094,7 @@ uniCorr2: {
     {x:0,y:250,w:680,h:50},
   ],
   interactables: [
-    { x:302,y:198,w:84,h:50, name:'toFloor1', prompt:'Вниз, в главный холл',
+    { x:366,y:216,w:88,h:30, name:'toFloor1', prompt:'Вниз, в главный холл',
       action: async ()=> await changeRoom('uniHall', 352, 194) },
     { x:8,y:154,w:44,h:60, name:'toWest2', prompt:'Западное крыло',
       action: async ()=> await changeRoom('uniWest2', 130, 44) },
@@ -10573,7 +10581,10 @@ uniArchive: {
     { x:136,y:210,w:52,h:38, name:'archDesk', prompt:'Стол архива',
       action(){ Scene.play('archiveDesk'); }},
     { x:44,y:186,w:64,h:38, name:'archBoxes', prompt:'Коробки без описи', action(){
-        if (F('universityBanned')) return Scene.play('archiveMissingFolder');
+        /* Условие — состояние расследования, а не то, попалась ли Ная
+           охране: в корпус на четвёртый день можно вернуться и знакомой
+           дорогой через старое крыло, минуя холл и высылку. */
+        if (C('uniDay') >= 4 && F('libMissing')) return Scene.play('archiveMissingFolder');
         Dialogue.start([{who:'naya',expr:'normal',text:'Коробки без описи. Внутри — программы, афиши, чьи-то конспекты.'}]);
       }},
   ],
@@ -16473,7 +16484,7 @@ const DevTools = {
         Object.assign(gameState.flags,{
           uniArrived:true, libMissing:true, morelPhotoSeen:true,
           universityBanned:true, universityAccessRestricted:true,
-          backWindowUsed:true, knowsServiceRoute:true,
+          backWindowUsed:false, knowsServiceRoute:false,
           archiveFolderFound:false, premiereDone:false
         });
       }
@@ -16481,14 +16492,30 @@ const DevTools = {
     {
       id:'uni_day4_morel',
       title:'День 4 — кабинет Морель',
-      desc:'после находки фотографии',
+      desc:'папок в библиотеке нет, фотография ещё впереди',
       room:'uniMorelOffice', x:120, y:180,
       apply() {
         this.baseUni(4);
         Object.assign(gameState.flags,{
           uniArrived:true, libMissing:true, morelPhotoSeen:false,
+          universityBanned:false, universityAccessRestricted:false,
+          backWindowUsed:false, knowsServiceRoute:false,
+          archiveFolderFound:false, premiereDone:false
+        });
+      }
+    },
+    {
+      id:'uni_day4_archive',
+      title:'День 4 — цокольный архив',
+      desc:'обход пройден, ищем пропавшую папку',
+      room:'uniArchive', x:70, y:220,
+      apply() {
+        this.baseUni(4);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libMissing:true, morelPhotoSeen:true,
           universityBanned:true, universityAccessRestricted:true,
           backWindowUsed:true, knowsServiceRoute:true,
+          sawFloor2:true, sawOldWing:true, sawBasement:true,
           archiveFolderFound:false, premiereDone:false
         });
       }
@@ -16627,9 +16654,21 @@ const DevTools = {
     if (f.morelTruth)          { f.premiereDone = true; f.archiveFolderFound = true; }
     if (f.communeInvite)         f.morelTruth = true;
     if (f.archiveMorelFound)   { f.archiveMedeaFound = true; }
-    if (f.archiveMedeaFound)   { f.learnedMedea = true; f.basementFound = true; f.sawBasement = true; }
+    if (f.archiveMedeaFound)   { f.learnedMedea = true; f.basementFound = true; }
     if (f.roofPromise)           f.archiveMorelFound = true;
-    if (f.basementFound)         f.sawFloor2 = f.sawOldWing = true;
+    /* sawFloor2/sawOldWing/sawBasement — «дошла туда сегодня». На третий
+       день их достраивает путь по корпусу, на четвёртый — обходной путь,
+       и путать эти два дня нельзя: иначе цель убегает вперёд сюжета. */
+    if (C('uniDay') === 3) {
+      if (f.archiveMedeaFound)   f.sawBasement = true;
+      if (f.basementFound)       f.sawFloor2 = f.sawOldWing = true;
+    }
+    if (C('uniDay') >= 4) {
+      if (f.archiveFolderFound)  f.sawBasement = true;
+      if (f.backWindowUsed)    { f.universityBanned = true; f.sawFloor2 = f.sawOldWing = true; }
+      if (f.universityBanned)    f.morelPhotoSeen = true;
+      if (f.morelPhotoSeen)      f.libMissing = true;
+    }
     if (f.morelKnowsName)      { f.propsMorel = true; f.investigatedUniversity = true; }
     if (f.propsMorel)            f.propsSymbol = true;
     if (f.propsSymbol)           f.libPeriods = true;
