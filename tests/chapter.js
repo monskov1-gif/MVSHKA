@@ -56,8 +56,8 @@ const WANT_JOURNAL = [
   WANT_JOURNAL.forEach(k => { if (!out.journal.includes(k)) bad.push('нет записи журнала ' + k); });
   if (out.day !== 5) bad.push('uniDay=' + out.day + ', ожидалось 5');
   if (out.chapter !== 5) bad.push('глава=' + out.chapter + ', ожидалось 5');
-  // новая карта: университет должен состоять из 23 связанных помещений
-  if (out.uniRooms !== 23) bad.push('комнат университета: ' + out.uniRooms + ', ожидалось 23');
+  // новая карта: университет должен состоять из 24 связанных помещений
+  if (out.uniRooms !== 24) bad.push('комнат университета: ' + out.uniRooms + ', ожидалось 24');
   if (out.room !== 'nayaRoom') bad.push('комната=' + out.room + ', ожидалась nayaRoom');
   // после главы игрока ведут к домашнему разговору со Сью, а не сразу в коммуну
   if (out.goal !== 'Поговорить со Сью дома.') bad.push('цель после главы: ' + out.goal);

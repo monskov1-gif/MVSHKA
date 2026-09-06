@@ -6,7 +6,7 @@ const ENTRY = {
   backAlley:[120,280], hellFinal:[150,300], parkWalk:[120,290],
   kitchen:[120,258], bathroom:[120,240], balcony:[120,192], stairwell:[120,108], oldTown:[30,280],
   prologueHell:[120,200], playground:[150,236], playgroundNow:[150,268],
-  trainStation:[150,206],
+  departureStation:[180,210], uniFrontYard:[250,332],
   uniHall:[220,336], uniWestHall:[130,584], uniEastHall:[130,624],
   uniCourtyard:[210,286], uniRehearsal:[274,176], uniDressing:[212,150],
   uniCostume:[168,130], uniTeachersRoom:[28,130], uniTheatre:[274,250],

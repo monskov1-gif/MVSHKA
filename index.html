@@ -309,6 +309,61 @@
   #endingStats { width:100%; max-width:320px; margin-bottom:20px; }
   #endingBody { color:#c8b0b8; font-size:13px; line-height:1.6; max-width:380px; text-align:center; margin-bottom:22px; white-space:pre-wrap; }
 
+
+  /* ===== Developer test menu ===== */
+  #devToolsScreen {
+    position:fixed; inset:0; z-index:9500; display:none;
+    align-items:flex-start; justify-content:center;
+    padding:18px; box-sizing:border-box;
+    background:rgba(7,4,8,.96); color:#eadfc8;
+    overflow:auto;
+  }
+  #devToolsScreen.show { display:flex; }
+  #devToolsPanel {
+    width:min(680px,100%); max-height:calc(100vh - 36px);
+    overflow:auto; box-sizing:border-box;
+    padding:18px; border:1px solid rgba(170,120,150,.45);
+    background:linear-gradient(180deg,#171019,#0d090f);
+    box-shadow:0 12px 50px rgba(0,0,0,.55);
+  }
+  #devToolsPanel h2 {
+    margin:0 0 4px; color:#f0e4c0; letter-spacing:3px;
+  }
+  #devToolsPanel .devSub {
+    margin:0 0 16px; color:#9e8992; font-size:12px; line-height:1.45;
+  }
+  .devSection {
+    margin:16px 0 8px; padding-bottom:5px;
+    border-bottom:1px solid rgba(200,170,190,.18);
+    color:#c89caf; font-size:11px; letter-spacing:2px;
+  }
+  .devGrid {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px;
+  }
+  .devBtn {
+    appearance:none; border:1px solid rgba(180,135,155,.28);
+    background:rgba(255,255,255,.035); color:#dfd1c4;
+    padding:10px 9px; min-height:44px; text-align:left;
+    font:12px "Courier New",monospace; cursor:pointer;
+  }
+  .devBtn:hover,.devBtn:active {
+    background:rgba(170,80,120,.16); border-color:rgba(220,145,175,.55);
+  }
+  .devBtn .devTitle { color:#f0e4c0; display:block; }
+  .devBtn .devDesc { color:#927f88; display:block; margin-top:3px; font-size:10px; }
+  .devDanger { border-color:rgba(180,70,80,.45); }
+  #devStateReadout {
+    margin-top:12px; padding:10px;
+    background:rgba(0,0,0,.22); color:#9e8992;
+    font:10px/1.5 "Courier New",monospace; white-space:pre-wrap;
+  }
+  @media (max-width:520px) {
+    #devToolsScreen { padding:10px; }
+    #devToolsPanel { max-height:calc(100vh - 20px); padding:13px; }
+    .devGrid { grid-template-columns:1fr; }
+    .devBtn { min-height:48px; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     #dialogueHint { animation:none; }
     #dialogueBox.shakeText #dialogueText { animation:none; }
@@ -362,6 +417,7 @@
     <button class="menuBtn" id="btnMemories">ВОСПОМИНАНИЯ</button>
     <button class="menuBtn" id="btnEndings">КОНЦОВКИ</button>
     <button class="menuBtn" id="btnSettings">НАСТРОЙКИ</button>
+    <button class="menuBtn" id="btnDevMain">МЕНЮ РАЗРАБОТЧИКА</button>
     <div id="menuEndCount">КОНЦОВКИ: 0 / 4</div>
   </div>
 
@@ -423,7 +479,43 @@
     <button class="menuBtn" id="btnSaveGame">СОХРАНИТЬ</button>
     <button class="menuBtn" id="btnPauseMemories">ВОСПОМИНАНИЯ</button>
     <button class="menuBtn" id="btnPauseSettings">НАСТРОЙКИ</button>
+    <button class="menuBtn" id="btnPauseDev">МЕНЮ РАЗРАБОТЧИКА</button>
     <button class="menuBtn" id="btnToMenu">В ГЛАВНОЕ МЕНЮ</button>
+  </div>
+
+
+  <!-- ===== Developer test menu ===== -->
+  <div id="devToolsScreen">
+    <div id="devToolsPanel">
+      <h2>МЕНЮ РАЗРАБОТЧИКА</h2>
+      <p class="devSub">
+        Быстрый тест локаций и сюжетных состояний. Кнопка не меняет код игры:
+        она создаёт временное состояние, выставляет нужные флаги/цели и переносит Наю в выбранную точку.
+      </p>
+
+      <div class="devSection">СЮЖЕТНЫЕ ТОЧКИ — УНИВЕРСИТЕТ</div>
+      <div class="devGrid" id="devStoryGrid"></div>
+
+      <div class="devSection">БЫСТРЫЙ ПЕРЕХОД — ЛОКАЦИИ УНИВЕРСИТЕТА</div>
+      <div class="devGrid" id="devRoomGrid"></div>
+
+      <div class="devSection">БЫСТРЫЙ ПЕРЕХОД — ОСТАЛЬНЫЕ ЛОКАЦИИ</div>
+      <div class="devGrid" id="devWorldGrid"></div>
+
+      <div class="devSection">ОБЩИЕ ТЕСТЫ</div>
+      <div class="devGrid">
+        <button class="devBtn devDanger" id="devFresh">
+          <span class="devTitle">Начальное состояние</span>
+          <span class="devDesc">полностью сбросить сюжет</span>
+        </button>
+        <button class="devBtn" id="devClose">
+          <span class="devTitle">Закрыть</span>
+          <span class="devDesc">вернуться в игру</span>
+        </button>
+      </div>
+
+      <div id="devStateReadout">Состояние: —</div>
+    </div>
   </div>
 
   <!-- ===== Ending card ===== -->
@@ -1388,6 +1480,7 @@ function freshState() {
       communeInvite:false,
       metSue:false, cafeSceneComplete:false,
       cafeShiftStarted:false, cafeShiftFinished:false,
+      sueWaitingCorridor:false,
       // площадка в настоящем
       presentPlaygroundVisited:false, playgroundMemoryTriggered:false,
       metGenevieveUni:false, crystalReacted:false, oldWingOpen:false,
@@ -2299,10 +2392,15 @@ function woodGrain(g, x, y, w, h, col) {
     g.strokeStyle = '#8d949c'; g.lineWidth = 1;                // chains
     [20, 44].forEach(x => { g.beginPath(); g.moveTo(x-5, 11); g.lineTo(x-5, 34);
                             g.moveTo(x+5, 11); g.lineTo(x+5, 34); g.stroke(); });
-    // сиденье здесь только одно: второе рисуется анимацией качелей,
-    // иначе на раме оказывалось три сиденья вместо двух
+    // Оба сиденья видны с самого начала. Правое — интерактивное и
+    // позже получает отдельную анимацию; до этого оно остаётся полупрозрачным,
+    // чтобы игрок сразу понимал, куда сядет Сью.
     g.fillStyle = '#3f5c8a'; g.fillRect(13, 34, 14, 4);
     g.fillStyle = '#4e6d9c'; g.fillRect(13, 34, 14, 1);
+    g.globalAlpha = .48;
+    g.fillStyle = '#8a4a52'; g.fillRect(37, 34, 14, 4);
+    g.fillStyle = '#9c5a60'; g.fillRect(37, 34, 14, 1);
+    g.globalAlpha = 1;
   });
   /* Горка — полноценная конструкция, а не наклонная плоскость: лестница со
      ступенями, поручни, верхняя площадка с бортиком, скат с боковыми
@@ -3672,6 +3770,43 @@ function paintInterior(ctx, w, h, o) {
   ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fillRect(0, wallH, w, 6);
 }
 
+/* Атмосфера университета — не отдельный стиль, а лёгкая надстройка над
+   уже существующим пиксельным рендером. Высокие тёплые окна, старое дерево,
+   пыль в свету и мягкие засветки должны напоминать референс, но оставаться
+   частью палитры игры. Рисуется в фон, поэтому персонажи и предметы остаются
+   резкими и читаемыми. */
+function paintUniAtmosphere(ctx, w, h, o) {
+  o = o || {};
+  const wallH = o.wallH || 56;
+  ctx.save();
+  // Тонкий деревянный карниз и старые панели.
+  ctx.fillStyle = 'rgba(220,190,145,.13)';
+  ctx.fillRect(0, Math.max(10, wallH - 9), w, 2);
+  ctx.fillStyle = 'rgba(35,22,16,.18)';
+  ctx.fillRect(0, Math.max(10, wallH - 6), w, 1);
+  if (wallH > 48) {
+    ctx.fillStyle = 'rgba(35,22,16,.10)';
+    for (let x=8; x<w; x+=34) ctx.fillRect(x, Math.round(wallH*.72), 1, Math.max(8, Math.round(wallH*.25)));
+  }
+  // Пыль/мелкие частицы в тёплом свете — редкие, почти незаметные.
+  const seed = (w*17 + h*31) % 97;
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i=0;i<16;i++) {
+    const x = 12 + ((seed + i*47) % Math.max(20,w-24));
+    const y = 18 + ((seed*3 + i*29) % Math.max(24,h-34));
+    const a = .045 + (i%4)*.018;
+    ctx.fillStyle = `rgba(255,224,172,${a.toFixed(3)})`;
+    ctx.fillRect(x,y,1+(i%2),1+(i%2));
+  }
+  // Очень мягкая общая золотистая дымка в верхней части, как от больших окон.
+  const g = ctx.createRadialGradient(w*.48, wallH*.55, 8, w*.48, wallH*.7, Math.max(w,h)*.72);
+  g.addColorStop(0,'rgba(255,226,174,.075)');
+  g.addColorStop(.55,'rgba(255,213,158,.025)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+  ctx.restore();
+}
+
 /* Длинный университетский коридор: стена с ритмом высоких окон, полосы
    света на полу под ними и ряд дверей с табличками. Рисуется один раз в
    кэш фона, поэтому окон может быть сколько угодно. */
@@ -3854,6 +3989,8 @@ function paintCorridor(ctx, W, H, o) {
     ctx.fillStyle = gd; ctx.fillRect(bend.x0, armH, bend.x1 - bend.x0, H - armH);
   }
 
+  if (o.uniAtmosphere) paintUniAtmosphere(ctx, W, H, { wallH });
+
   /* виньетка — углы коридора должны уходить в темноту */
   const vg = ctx.createRadialGradient(W / 2, armH - 20, Math.min(W, H) * .22,
                                       W / 2, armH - 20, Math.max(W, H) * .70);
@@ -3999,6 +4136,8 @@ function paintWing(ctx, W, H, o) {
     L.items.forEach(it => { if (it.k === 'door') door(it, dir); });
   });
 
+  if (o.uniAtmosphere) paintUniAtmosphere(ctx, W, H, { wallH:Math.min(150, Math.round(H*.25)) });
+
   /* торцы коридора: тёмный проём наверху, светлый выход вниз */
   if (o.capTop !== false) {
     ctx.fillStyle = 'rgba(10,8,12,.34)'; ctx.fillRect(wallW, 0, rx - wallW, 16);
@@ -4015,9 +4154,39 @@ function paintWing(ctx, W, H, o) {
    Помещения крыльев выходят в коридор не сверху, а вбок — иначе здание
    не читается как здание. Художник добавляет к обычному интерьеру толщу
    боковой стены с дверным проёмом ровно там, где стоит точка выхода. */
+/* Университетская оконная отделка для отдельных помещений. */
+function paintUniRoomWindows(ctx, W, H, o) {
+  o=o||{}; const wallH=o.wallH||56, count=o.count||2;
+  const ww=Math.min(56, Math.max(38, Math.floor((W-54-(count-1)*14)/count)));
+  for(let i=0;i<count;i++){
+    const x=Math.round(16+i*((W-16-ww)/(Math.max(1,count-1))));
+    const top=o.top===undefined?8:o.top;
+    const wh=Math.min(42,Math.max(30,wallH-top-9));
+    if(x+ww>W-8) continue;
+    ctx.fillStyle='#332a24'; ctx.fillRect(x-6,top-5,ww+12,wh+10);
+    ctx.fillStyle='#725b46'; ctx.fillRect(x-3,top-2,ww+6,wh+4);
+    const sky=ctx.createLinearGradient(0,top,0,top+wh);
+    sky.addColorStop(0,o.skyTop||'#98a9ba'); sky.addColorStop(.58,o.skyMid||'#c8bca4'); sky.addColorStop(1,o.ground||'#667050');
+    ctx.fillStyle=sky; ctx.fillRect(x,top,ww,wh);
+    ctx.fillStyle='rgba(69,61,48,.42)'; ctx.fillRect(x,top+wh-8,ww,8);
+    ctx.fillStyle='rgba(166,76,38,.48)'; ctx.beginPath(); ctx.arc(x+ww*.24,top+wh*.60,Math.min(9,ww*.18),0,6.3); ctx.fill();
+    ctx.fillStyle='rgba(193,126,46,.45)'; ctx.beginPath(); ctx.arc(x+ww*.73,top+wh*.43,Math.min(8,ww*.15),0,6.3); ctx.fill();
+    ctx.fillStyle='#4b3d32'; ctx.fillRect(x+Math.round(ww/2)-1,top,2,wh); ctx.fillRect(x,top+Math.round(wh/2)-1,ww,2);
+    ctx.fillStyle='rgba(255,246,216,.38)'; ctx.fillRect(x+3,top+3,ww-6,2);
+    ctx.fillStyle='#8c7157'; ctx.fillRect(x-7,top+wh+2,ww+14,5); ctx.fillStyle='#b29572'; ctx.fillRect(x-5,top+wh+2,ww+10,2);
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const len=Math.max(60,H-wallH), slant=(i%2?0.10:-0.07);
+    const lg=ctx.createLinearGradient(x,wallH,x+len*slant,wallH+len);
+    lg.addColorStop(0,'rgba(255,238,196,.17)'); lg.addColorStop(.5,'rgba(255,225,178,.065)'); lg.addColorStop(1,'rgba(255,220,170,0)');
+    ctx.fillStyle=lg; ctx.beginPath(); ctx.moveTo(x,wallH); ctx.lineTo(x+ww,wallH); ctx.lineTo(x+ww+len*slant,Math.min(H,wallH+len)); ctx.lineTo(x+len*slant,Math.min(H,wallH+len)); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  ctx.fillStyle='rgba(235,210,170,.18)'; ctx.fillRect(0,wallH-7,W,2);
+}
+
 function paintRoom(ctx, W, H, o) {
   o = o || {};
   paintInterior(ctx, W, H, o);
+  if (o.autoWindows) paintUniRoomWindows(ctx, W, H, o);
   const warm = o.side || shade(o.wall || '#5a4a3c', 1.06);
   const bandW = o.bandW || 22;
   const wall = (x0, dir) => {                       // dir: 1 — стена слева
@@ -4042,6 +4211,7 @@ function paintRoom(ctx, W, H, o) {
     ctx.fillStyle = 'rgba(200,184,160,.55)'; ctx.font = '6px Courier New';
     ctx.fillText(o.label, o.labelAt ? o.labelAt[0] : 26, o.labelAt ? o.labelAt[1] : H - 12);
   }
+  if (o.uniAtmosphere) paintUniAtmosphere(ctx, W, H, { wallH:o.wallH || 56 });
 }
 
 /* Окно, выходящее во внутренний двор: одинаковое во всех помещениях,
@@ -4060,6 +4230,24 @@ function paintYardWindow(ctx, x, y, w, h, o) {
   ctx.fillRect(x, y + Math.round(h / 2) - 1, w, 2);
   ctx.fillStyle = '#7d6d5c'; ctx.fillRect(x - 4, y - 4, w + 8, 3);
   ctx.fillStyle = '#4a4136'; ctx.fillRect(x - 6, y + h + 2, w + 12, 5);
+  if (o.ornate) {
+    // Более высокий старый оконный блок: толстая рама, внутренние переплёты
+    // и маленькие декоративные боковые накладки.
+    ctx.fillStyle = '#6d5640'; ctx.fillRect(x - 7, y - 7, w + 14, 4);
+    ctx.fillStyle = 'rgba(255,238,195,.20)'; ctx.fillRect(x - 3, y + 1, 3, h - 2);
+    ctx.fillRect(x + w, y + 1, 3, h - 2);
+    ctx.fillStyle = 'rgba(255,225,165,.12)';
+    ctx.fillRect(x + 3, y + 3, w - 6, 2);
+    if (o.rays) {
+      ctx.save(); ctx.globalCompositeOperation='lighter';
+      const rg=ctx.createLinearGradient(x+w*.5,y+h,x+w*.5,y+h+Math.max(70,h*2.4));
+      rg.addColorStop(0,'rgba(255,228,176,.16)'); rg.addColorStop(.55,'rgba(255,210,150,.055)'); rg.addColorStop(1,'rgba(255,200,140,0)');
+      ctx.fillStyle=rg;
+      ctx.beginPath(); ctx.moveTo(x+4,y+h); ctx.lineTo(x+w-4,y+h);
+      ctx.lineTo(x+w+Math.max(22,h*.55),y+h+Math.max(70,h*2.4)); ctx.lineTo(x-Math.max(22,h*.55),y+h+Math.max(70,h*2.4)); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
 }
 
 /* Small shared painters */
@@ -4626,7 +4814,7 @@ const Quests = {
     { w:()=> F('learnedWitches'),    t:'Поговорить со Сью дома.',
       s:()=> F('communeInvite') ? 'Морель зовёт в коммуну после заката.' : '' },
     /* Глава «Женевьева Морель»: цель ведёт по дням и по шагам, от
-       свежего к старому. Каждый физический ход — своя цель с указанием
+       свежего к старому. Каждый физический ход — своя строка с указанием
        места: без этого игрок не догадывался, что старое крыло на втором
        этаже, и упирался в запертую подсобку. */
     { w:()=> C('uniDay') === 4 && F('morelTruth'),   t:'Отправиться в коммуну ведьм после заката.' },
@@ -4691,8 +4879,8 @@ const Quests = {
       t:'Найти Сью в репетиционном зале.', s:'Западное крыло, первая дверь слева.' },
     { w:()=> C('uniDay') === 1,
       t:'Осмотреть стенды в холле.', s:'Афиши, награды, выпускники, преподаватели.' },
-    { w:()=> F('cafeSceneComplete'), t:'Зайти за Сью в университет.' },
-    { w:()=> F('metSue'),            t:'Доработать смену в кафе.' },
+    { w:()=> F('cafeSceneComplete') && (C('uniDay') === 0 || C('uniDay') >= 4), t:'Зайти за Сью в университет.' },
+    { w:()=> F('metSue') && !F('cafeSceneComplete'), t:'Пройти первую смену в кафе.' },
     { w:()=> F('backstoryDone'),     t:'Начать день.' },
     { w:()=> F('prologueComplete'),  t:'Собраться и уехать из дома отца.' },
     { w:()=> true,                   t:'...' },
@@ -4740,6 +4928,7 @@ const UniDay = {
     if (C('uniDay') !== 0) return;
     setCounter('uniDay', 1);
     setFlag('uniArrived');
+    setFlag('sueWaitingCorridor', false);
     Journal.add('goalUni');
   },
   TODO: {
@@ -4767,8 +4956,17 @@ const UniDay = {
   advance() {
     const d = this.cur();
     if (d >= this.MAX) return;
-    setCounter('uniDay', d + 1);
-    setCounter('sueRehearsal', d + 1);
+    const next = d + 1;
+    setCounter('uniDay', next);
+    setCounter('sueRehearsal', next);
+    // На следующий день первые три дня главы смена должна быть пройдена заново.
+    if (next >= 2 && next <= 3) {
+      setFlag('cafeShiftFinished', false);
+      setFlag('cafeShiftStarted', false);
+    }
+    if (next >= 4) {
+      setFlag('cafeShiftFinished', true);
+    }
   },
 };
 
@@ -5586,12 +5784,11 @@ street: {
         if (!F('mainStoryStarted')) {
           return Dialogue.start([{who:'naya',expr:'normal',text:'Автобус до университета. Мне туда сегодня незачем.'}]);
         }
-        /* Первые три дня Ная сначала работает. Бросить смену и уехать
-           расследовать нельзя: это её единственный заработок. */
-        if (C('uniDay') >= 1 && C('uniDay') <= 3 && !F('cafeShiftFinished')) {
+        const day = C('uniDay');
+        if ((day === 0 && !F('cafeShiftFinished')) || (day >= 1 && day <= 3 && !F('cafeShiftFinished'))) {
           return Dialogue.start([
-            {who:'naya',expr:'talk',text:'(У меня смена. Крис один не вытянет вечер.)'},
-            {who:'naya',expr:'normal',text:'(Сначала кафе. Университет никуда не денется — Сью репетирует до восьми.)'},
+            {who:'naya',expr:'normal',text:'Сначала работа. Я не могу просто бросить смену и уехать.'},
+            {who:'naya',expr:'talk',text:'(Пока смена не закончена, в университет я не поеду.)'},
           ]);
         }
         if (F('universityBanned') || (F('universityAccessRestricted') && !F('oldWingOpen'))) {
@@ -5602,7 +5799,7 @@ street: {
         }
         Audio.door();
         UI.toast('Двенадцать минут на автобусе', 1600);
-        await changeRoom('uniHall', 220, 336);
+        await changeRoom('uniFrontYard', 250, 332);
       }},
     /* Задний двор корпуса — теперь настоящее место, а не сцена: туда
        приезжают тем же автобусом и обходят здание пешком. */
@@ -5818,11 +6015,13 @@ cafe: {
       ]) },
   ],
   onEnter() {
-    if (F('mainStoryStarted') && !F('cafeSceneComplete')) return setTimeout(()=> Scene.play('cafeScene'), 520);
-    /* Смена второго и третьего дня начинается сама, как только Ная
-       переступает порог: она сюда именно за этим и пришла. */
-    if (C('uniDay') >= 2 && C('uniDay') <= 3 && !F('cafeShiftFinished'))
-      setTimeout(()=> Scene.play('cafeWorkDay'), 520);
+    if (F('mainStoryStarted') && !F('cafeSceneComplete')) {
+      return setTimeout(()=> Scene.play('cafeScene'), 520);
+    }
+    const d = C('uniDay');
+    if (F('mainStoryStarted') && d >= 2 && d <= 3 && !F('cafeShiftFinished') && !F('cafeShiftStarted')) {
+      return setTimeout(()=> Scene.play('dailyCafeShift'), 420);
+    }
   }
 },
 
@@ -8150,6 +8349,137 @@ oldHouse: {
 },
 
 /* ---------------------------------------------------------------- */
+/* СТАНЦИЯ. Ная и Сью уезжают из старого дома не прямо на будущую
+   улицу, а через небольшую пригородную станцию. Это отдельная
+   промежуточная локация: игрок должен почувствовать дорогу между
+   прошлой жизнью и новой. Стиль — тот же приглушённый пиксель-арт. */
+departureStation: {
+  name:"Пригородная станция", music:'street', w:360, h:300,
+  zone:'town', weather:{ rain:.18, fog:.20, wind:.30, leaves:.55 },
+  light:{ tint:'#181722', dark:.28 },
+  lights:[
+    {x:76,y:88,r:48,c:'#ffd080',i:.44},
+    {x:286,y:88,r:48,c:'#ffd080',i:.38},
+    {x:178,y:128,r:64,c:'#c0b8d0',i:.20},
+  ],
+  bgPaint(ctx) {
+    const W = 360, H = 300;
+    // серое вечернее небо
+    const sky = ctx.createLinearGradient(0,0,0,112);
+    sky.addColorStop(0,'#20202d'); sky.addColorStop(1,'#4a4656');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,112);
+
+    // дальний большой город: многоэтажные силуэты, редкие окна и лёгкая дымка.
+    // Он не должен быть детализирован как отдельная локация — это глубина кадра.
+    ctx.fillStyle = '#252531'; ctx.fillRect(0,58,W,60);
+    const skyline = [[0,22,34],[30,10,28],[56,28,42],[100,4,34],[136,18,30],[170,0,42],[214,24,34],[250,8,44],[300,20,60],[338,2,22]];
+    skyline.forEach(([x,h,w],i)=>{
+      ctx.fillStyle = i%3===0 ? '#31313d' : '#2b2a36';
+      ctx.fillRect(x,72-h,w,h+48);
+      for(let yy=82-h; yy<72; yy+=11) for(let xx=x+6;xx<x+w-5;xx+=12){
+        if(((xx+yy+i*7)/11|0)%4===0){ ctx.fillStyle='rgba(221,188,118,.58)'; ctx.fillRect(xx,yy,5,5); }
+      }
+    });
+    // едва заметные звёзды
+    ctx.fillStyle='rgba(235,225,210,.55)';
+    for(let i=0;i<22;i++){ const x=(i*83)%W, y=12+((i*37)%44); ctx.fillRect(x,y,1,1); if(i%7===0) ctx.fillRect(x-1,y,3,1); }
+    // дымка над городом
+    const haze=ctx.createLinearGradient(0,50,0,135); haze.addColorStop(0,'rgba(120,130,150,.02)'); haze.addColorStop(1,'rgba(190,175,165,.16)');
+    ctx.fillStyle=haze;ctx.fillRect(0,48,W,90);
+
+    // навес станции
+    ctx.fillStyle = '#3a3030'; ctx.fillRect(18,92,324,10);
+    ctx.fillStyle = '#5a4840'; ctx.fillRect(24,102,312,4);
+    for (let x=32;x<336;x+=48) {
+      ctx.fillStyle = '#4a403c'; ctx.fillRect(x,104,5,58);
+      ctx.fillStyle = '#68605a'; ctx.fillRect(x,104,2,58);
+    }
+
+    // освещённые таблички — без новых ассетов
+    ctx.fillStyle = '#241d22'; ctx.fillRect(42,58,78,26);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '7px Courier New';
+    ctx.fillText('СТАНЦИЯ', 55,73);
+    ctx.fillStyle = '#241d22'; ctx.fillRect(250,58,70,26);
+    ctx.fillStyle = '#c8b8a0'; ctx.fillText('МОСКОВКА', 259,73);
+
+    // железнодорожная платформа
+    ctx.fillStyle = '#55515a'; ctx.fillRect(0,160,W,70);
+    ctx.fillStyle = '#66616a'; ctx.fillRect(0,160,W,4);
+    ctx.fillStyle = '#46434b'; ctx.fillRect(0,226,W,74);
+    for (let y=232;y<H;y+=12) {
+      ctx.fillStyle = '#3b3940'; ctx.fillRect(0,y,W,2);
+    }
+
+    // рельсы внизу
+    ctx.fillStyle = '#25242a'; ctx.fillRect(0,250,W,6);
+    ctx.fillStyle = '#77747a'; ctx.fillRect(0,251,W,2);
+    ctx.fillStyle = '#25242a'; ctx.fillRect(0,274,W,6);
+    ctx.fillStyle = '#77747a'; ctx.fillRect(0,275,W,2);
+    for (let x=8;x<W;x+=22) {
+      ctx.fillStyle = '#403b38'; ctx.fillRect(x,246,8,34);
+    }
+
+    // дальний поезд: силуэт, не отдельная сцена
+    ctx.fillStyle = '#272630'; ctx.fillRect(118,112,176,42);
+    ctx.fillStyle = '#3d3a46'; ctx.fillRect(126,118,156,28);
+    ctx.fillStyle = '#d2b56e';
+    for (let x=134;x<276;x+=28) ctx.fillRect(x,123,16,9);
+    ctx.fillStyle = '#17161e'; ctx.fillRect(284,120,10,34);
+
+    // мягкие отражения фонарей на мокром покрытии
+    ctx.save();
+    for (const [x,y,r] of [[76,182,34],[282,182,34]]) {
+      const lg=ctx.createRadialGradient(x,y,0,x,y,r); lg.addColorStop(0,'rgba(255,205,125,.20)'); lg.addColorStop(1,'rgba(255,205,125,0)');
+      ctx.fillStyle=lg;ctx.fillRect(x-r,y-r,r*2,r*2);
+    }
+    ctx.restore();
+    // листья и мокрые пятна
+    const cols = [PAL.leafRed, PAL.leafOrange, PAL.leafGold, '#8a4326'];
+    for (let i=0;i<110;i++) {
+      ctx.fillStyle = cols[i%4];
+      ctx.fillRect((i*71)%W, 162+((i*37)%118), 3, 2);
+    }
+    ctx.fillStyle = 'rgba(20,20,28,.35)';
+    [[54,214,52,9],[208,206,64,10],[302,240,34,8]].forEach(([x,y,w,h])=>{
+      ctx.beginPath(); ctx.ellipse(x,y,w/2,h/2,0,0,Math.PI*2); ctx.fill();
+    });
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('ПЛАТФОРМА', 12,218);
+    ctx.fillText('ПОЕЗД', 250,110);
+  },
+  objects: [
+    { t:'bench', x:62, y:188 }, { t:'bench', x:286, y:188 },
+    { t:'lamp_street', x:76, y:138 }, { t:'lamp_street', x:282, y:138 },
+    { t:'bin', x:324, y:210 },
+    { t:'leaves_pile', x:126, y:212 }, { t:'leaves_pile', x:244, y:214 },
+    { t:'sign_street', x:18, y:140 },
+  ],
+  walls: [
+    {x:0,y:0,w:360,h:160},{x:0,y:0,w:8,h:300},{x:352,y:0,w:8,h:300},{x:0,y:292,w:360,h:8},
+  ],
+  interactables: [
+    { x:146,y:170,w:72,h:34, name:'platform', prompt:'Платформа', action(){
+        Dialogue.start([
+          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Пахнет мокрым железом и кофе из автомата.'},
+          {who:'sue',expr:'smile',text:'И поездами.'},
+          {who:'nayaTeen',expr:'smile',name:'Ная',text:'Это обычно идёт в комплекте.'},
+        ]);
+      }},
+    { x:10,y:252,w:46,h:38, name:'back', prompt:'К дому', action: async ()=>{
+        await changeRoom('oldHouse', 160, 260);
+      }},
+  ],
+  npcs: [
+    { x:94,y:190, sprite:'customer', name:'Пассажир', speed:0.30,
+      path:[[94,190],[110,190],[110,210],[94,210]],
+      dialogue:()=> Dialogue.start([{who:'customer',expr:'normal',name:'Пассажир',text:'Поезд до города через семь минут.'}]) },
+    { x:232,y:190, sprite:'neighbor', name:'Пассажирка', speed:0.26,
+      path:[[232,190],[250,190],[250,212],[232,212]],
+      dialogue:()=> Dialogue.start([{who:'neighbor',expr:'normal',name:'Пассажирка',text:'Осень здесь всегда приходит раньше расписания.'}]) },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
 oldHouseAttic: {
   name:"Дом отца. Чердак", music:'sad', w:240, h:280,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
@@ -8332,119 +8662,6 @@ playgroundNow: {
   onEnter() { if (!F('presentPlaygroundVisited')) { setFlag('presentPlaygroundVisited'); UI.toast('Ты здесь уже была', 2600); } }
 },
 
-/* ---------------------------------------------------------------- */
-/* ВОКЗАЛ. Сюда Ная выходит из отцовского дома — не на улицу, где она
-   будет жить через три года, а на перрон маленького городского вокзала.
-   Отсюда уезжают надолго, и это должно быть видно: часы под фронтоном,
-   табло с единственным поездом, чемоданы, пустые скамьи и жёлтая линия
-   у края платформы.                                                  */
-trainStation: {
-  name:"Вокзал", music:'none', w:340, h:300, wet:true, wetFrom:150,
-  zone:'town', weather:{ rain:.12, fog:.26, wind:.3, leaves:.2 },
-  light:{ tint:'#151a24', dark:.30 },
-  lights:[
-    {x:64,y:170,r:52,c:'#ffcf7a',i:.42},{x:300,y:170,r:52,c:'#ffcf7a',i:.42},
-    {x:170,y:80,r:44,c:'#ffe0a8',i:.30},
-  ],
-  bgPaint(ctx) {
-    const W = 340, H = 300;
-    const sky = ctx.createLinearGradient(0, 0, 0, 50);
-    sky.addColorStop(0, '#1b2130'); sky.addColorStop(1, '#4a3f42');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 50);
-    // здание вокзала: кирпич, высокие арочные окна, часы под фронтоном
-    ctx.fillStyle = '#5c4038'; ctx.fillRect(0, 22, W, 124);
-    ctx.fillStyle = '#523831';
-    for (let y = 22; y < 146; y += 11) for (let x = ((y / 11) % 2) * 13; x < W; x += 26) ctx.fillRect(x, y, 24, 10);
-    ctx.fillStyle = '#6b4c40'; ctx.fillRect(0, 22, W, 4);
-    ctx.fillStyle = '#4a332c';
-    ctx.beginPath(); ctx.moveTo(126, 22); ctx.lineTo(170, 2); ctx.lineTo(214, 22); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#e8dcc0'; ctx.beginPath(); ctx.arc(170, 32, 11, 0, 6.3); ctx.fill();
-    ctx.fillStyle = '#3a2c24'; ctx.beginPath(); ctx.arc(170, 32, 9, 0, 6.3); ctx.fill();
-    ctx.fillStyle = '#e8dcc0'; ctx.fillRect(169, 25, 2, 8); ctx.fillRect(170, 31, 6, 2);
-    [30, 96, 246].forEach(wx => {
-      ctx.fillStyle = '#3a2a22'; ctx.fillRect(wx - 3, 52, 44, 62);
-      const gl = ctx.createLinearGradient(0, 56, 0, 110);
-      gl.addColorStop(0, '#ffe6ae'); gl.addColorStop(1, '#c9985a');
-      ctx.fillStyle = gl; ctx.fillRect(wx, 56, 38, 54);
-      ctx.beginPath(); ctx.arc(wx + 19, 56, 19, Math.PI, 0); ctx.fill();
-      ctx.fillStyle = 'rgba(58,42,34,.85)';
-      ctx.fillRect(wx + 18, 44, 3, 66); ctx.fillRect(wx, 80, 38, 3);
-    });
-    ctx.fillStyle = '#3a2a22'; ctx.fillRect(150, 58, 44, 60);        // двери в зал ожидания
-    ctx.fillStyle = '#5f4530'; ctx.fillRect(153, 62, 38, 56);
-    ctx.fillStyle = '#a8c0d8'; ctx.fillRect(157, 68, 13, 26); ctx.fillRect(174, 68, 13, 26);
-    ctx.fillStyle = '#c9a05a'; ctx.fillRect(170, 96, 3, 5);
-    ctx.fillStyle = '#2e2820'; ctx.fillRect(118, 122, 104, 16);      // вывеска
-    ctx.fillStyle = '#e8dcc0'; ctx.font = '8px Courier New'; ctx.fillText('В О К З А Л', 134, 134);
-    ctx.fillStyle = '#3a2c24'; ctx.fillRect(0, 140, W, 8);           // козырёк перрона
-    ctx.fillStyle = '#4e3a30'; ctx.fillRect(0, 140, W, 2);
-    // перрон
-    ctx.fillStyle = '#6a6660'; ctx.fillRect(0, 148, W, 96);
-    ctx.fillStyle = '#5e5a55';
-    for (let y = 158; y < 244; y += 14) ctx.fillRect(0, y, W, 1);
-    for (let x = 0; x < W; x += 28) ctx.fillRect(x, 148, 1, 96);
-    ctx.fillStyle = '#c9a83c'; ctx.fillRect(0, 232, W, 5);           // жёлтая линия
-    ctx.fillStyle = '#8a7328'; ctx.fillRect(0, 237, W, 2);
-    // пути и вагон у платформы
-    ctx.fillStyle = '#2f2c28'; ctx.fillRect(0, 244, W, H - 244);
-    ctx.fillStyle = '#413c36'; for (let x = 4; x < W; x += 18) ctx.fillRect(x, 248, 12, 6);
-    ctx.fillStyle = '#6e6a62'; ctx.fillRect(0, 250, W, 3);
-    ctx.fillStyle = '#3d4a58'; ctx.fillRect(0, 258, W, 42);
-    ctx.fillStyle = '#4a5a6a'; ctx.fillRect(0, 258, W, 5);
-    ctx.fillStyle = '#2a323c'; ctx.fillRect(0, 296, W, 4);
-    for (let x = 12; x < W; x += 46) {
-      ctx.fillStyle = '#20262e'; ctx.fillRect(x, 266, 30, 20);
-      const wl = ctx.createLinearGradient(0, 266, 0, 286);
-      wl.addColorStop(0, '#f0d79a'); wl.addColorStop(1, '#b98f52');
-      ctx.fillStyle = wl; ctx.fillRect(x + 2, 268, 26, 16);
-    }
-    // табло отправления: одна строка на весь вечер
-    ctx.fillStyle = '#1e1a16'; ctx.fillRect(238, 152, 86, 30);
-    ctx.fillStyle = '#2a2620'; ctx.fillRect(240, 154, 82, 26);
-    ctx.fillStyle = '#e8b84a'; ctx.font = '5px Courier New';
-    ctx.fillText('18:40   ГОРОД', 246, 164);
-    ctx.fillText('единственный', 246, 174);
-  },
-  objects: [
-    { t:'bench', x:70, y:216 }, { t:'bench', x:272, y:216 },
-    { t:'lamp_street', x:44, y:196 }, { t:'lamp_street', x:306, y:196 },
-    { t:'chest', x:126, y:214 }, { t:'archive_box', x:152, y:222 },
-    { t:'bin', x:214, y:216 },
-    { t:'puddle', x:192, y:230 }, { t:'leaves_pile', x:96, y:232 },
-  ],
-  walls: [
-    {x:0,y:0,w:340,h:148},{x:0,y:0,w:8,h:300},{x:332,y:0,w:8,h:300},{x:0,y:236,w:340,h:64},
-  ],
-  interactables: [
-    { x:120,y:148,w:80,h:34, name:'waitRoom', prompt:'Зал ожидания', action(){
-        Dialogue.start([
-          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Зал ожидания. Ряды стульев, автомат с водой и расписание, в котором одна строка.'},
-          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Отсюда уезжают один раз. Обратные билеты тут никто не берёт.)'},
-        ]);
-      }},
-    { x:238,y:184,w:86,h:32, name:'board', prompt:'Табло отправления', action(){
-        Dialogue.start([
-          {who:'nayaTeen',expr:'normal',name:'Ная',text:'«18:40 — ГОРОД». Больше сегодня отсюда ничего не уходит.'},
-          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Восемь часов пути. Я никогда не уезжала дальше соседнего округа.)'},
-        ]);
-      }},
-    { x:110,y:190,w:64,h:34, name:'bags', prompt:'Вещи', action(){
-        Dialogue.start([
-          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Чемодан и коробка. Всё, что я забрала из дома, где прожила семнадцать лет.'},
-          {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Коробка легче чемодана.)'},
-        ]);
-      }},
-    { x:246,y:196,w:60,h:34, name:'platform', prompt:'Край платформы', action(){
-        Dialogue.start([
-          {who:'nayaTeen',expr:'normal',name:'Ная',text:'Жёлтая линия, за ней пути. Вагон стоит и тихо гудит.'},
-          {who:'nayaTeen',expr:'talk',name:'Ная',text:'(Через восемь часов будет другой город. И там меня никто не знает.)'},
-        ]);
-      }},
-  ],
-  npcs: [],
-},
-
-/* ---------------------------------------------------------------- */
 /* ================================================================
    УНИВЕРСИТЕТ — построен заново по архитектурному плану.
 
@@ -8474,6 +8691,137 @@ trainStation: {
 ================================================================ */
 
 /* ---------------------------------------------------------------- */
+/* ПЕРЕДНИЙ ДВОР УНИВЕРСИТЕТА. По плану главный корпус стоит за широким
+   парадным двором: сначала игрок видит фасад, газон, дорожки и лестницу,
+   и только потом попадает в холл. Это не заменяет внутренний двор — это
+   отдельная южная территория перед главным входом. */
+uniFrontYard: {
+  name:"Университет. Передний двор", music:'street', w:500, h:360,
+  zone:'town', weather:{ rain:.18, fog:.10, wind:.24, leaves:.55 },
+  light:{ tint:'#171a24', dark:.28 },
+  lights:[
+    {x:86,y:150,r:54,c:'#ffd080',i:.40},
+    {x:414,y:150,r:54,c:'#ffd080',i:.40},
+    {x:250,y:88,r:90,c:'#d6c5a0',i:.16},
+  ],
+  bgPaint(ctx) {
+    const W=500,H=360;
+    // вечернее небо
+    const sky=ctx.createLinearGradient(0,0,0,120);
+    sky.addColorStop(0,'#272632'); sky.addColorStop(1,'#56505a');
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,120);
+
+    // Парадный фасад главного корпуса — широкий, симметричный, как на плане.
+    ctx.fillStyle='#4b4037'; ctx.fillRect(70,38,360,112);
+    ctx.fillStyle='#5b4c3e'; ctx.fillRect(58,74,384,76);
+    // центральный выступ
+    ctx.fillStyle='#3d342d'; ctx.fillRect(190,22,120,128);
+    ctx.fillStyle='#655341'; ctx.fillRect(198,30,104,120);
+    // крыша/карниз
+    ctx.fillStyle='#302824'; ctx.fillRect(48,34,404,10);
+    ctx.fillStyle='#78604b'; ctx.fillRect(66,44,368,5);
+    ctx.fillStyle='#2f2824'; ctx.fillRect(184,18,132,8);
+
+    // высокие окна фасада — главный визуальный акцент.
+    const facadeWin=(x,y,w,h,lit=true)=>{
+      ctx.fillStyle='#2b2522'; ctx.fillRect(x-5,y-5,w+10,h+10);
+      const g=ctx.createLinearGradient(0,y,0,y+h);
+      g.addColorStop(0,lit?'#fff1c9':'#657080'); g.addColorStop(.55,lit?'#e8c27c':'#46505c'); g.addColorStop(1,lit?'#b37a48':'#303641');
+      ctx.fillStyle=g; ctx.fillRect(x,y,w,h);
+      ctx.fillStyle='#5b4a3a';
+      for(let i=1;i<3;i++) ctx.fillRect(x+Math.round(i*w/3)-1,y,2,h);
+      for(let i=1;i<5;i++) ctx.fillRect(x,y+Math.round(i*h/5)-1,w,2);
+      ctx.fillStyle='rgba(255,238,196,.12)'; ctx.fillRect(x+3,y+3,w-6,3);
+    };
+    facadeWin(92,62,54,64,true); facadeWin(154,62,54,64,true);
+    facadeWin(292,62,54,64,true); facadeWin(354,62,54,64,true);
+    facadeWin(218,54,64,74,true);
+    // Второй ярус и высокий центральный фронтон.
+    [104,166,334,396].forEach(x=>facadeWin(x,45,38,11,false));
+    ctx.fillStyle='#40362f'; ctx.beginPath(); ctx.moveTo(184,18); ctx.lineTo(250,4); ctx.lineTo(316,18); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#6c5745'; ctx.fillRect(194,18,112,5);
+
+    // центральные двери и парадные ступени.
+    ctx.fillStyle='#2b211b'; ctx.fillRect(214,102,72,48);
+    ctx.fillStyle='#62452f'; ctx.fillRect(220,108,28,42); ctx.fillRect(252,108,28,42);
+    ctx.fillStyle='#c4a15e'; ctx.fillRect(244,129,4,4); ctx.fillRect(252,129,4,4);
+    ctx.fillStyle='#74614d'; ctx.fillRect(204,148,92,7);
+    for(let i=0;i<5;i++){
+      ctx.fillStyle=i%2?'#7a6754':'#685747'; ctx.fillRect(194-i*10,155+i*6,112+i*20,5);
+    }
+
+    // боковые части фасада и тёмные арки.
+    ctx.fillStyle='rgba(25,20,18,.42)'; ctx.fillRect(70,126,110,24); ctx.fillRect(320,126,110,24);
+    ctx.fillStyle='#3a3028'; ctx.fillRect(78,92,22,38); ctx.fillRect(400,92,22,38);
+
+    // Передний двор: широкая центральная дорожка, две симметричные газонные
+    // чаши и боковые дорожки, как на ситуационном плане.
+    ctx.fillStyle='#4a4b45'; ctx.fillRect(0,150,W,H-150);
+    ctx.fillStyle='#4f5149';
+    for(let y=158;y<H;y+=18) ctx.fillRect(0,y,W,1);
+    // газонные поля
+    ctx.fillStyle='#39472f'; ctx.fillRect(20,166,150,122); ctx.fillRect(330,166,150,122);
+    // центральная дорожка с расширением у входа
+    ctx.fillStyle='#777063'; ctx.beginPath();
+    ctx.moveTo(224,154); ctx.lineTo(276,154); ctx.lineTo(360,360); ctx.lineTo(140,360); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(210,194,165,.10)'; ctx.beginPath();
+    ctx.moveTo(232,156); ctx.lineTo(268,156); ctx.lineTo(322,360); ctx.lineTo(178,360); ctx.closePath(); ctx.fill();
+    // боковые дорожки
+    ctx.fillStyle='#69675f'; ctx.fillRect(0,292,500,14);
+    ctx.fillStyle='#77736a'; ctx.fillRect(0,296,500,3);
+
+    // небольшая клумба/фонтанная чаша перед лестницей.
+    ctx.fillStyle='#5b5a54'; ctx.beginPath(); ctx.ellipse(250,190,44,16,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#353b42'; ctx.beginPath(); ctx.ellipse(250,188,36,12,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(170,196,215,.25)'; ctx.beginPath(); ctx.ellipse(250,187,31,9,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#716c61'; ctx.fillRect(247,168,6,20);
+
+    ctx.fillStyle='#c8b8a0'; ctx.font='7px Courier New'; ctx.fillText('ГЛАВНЫЙ ВХОД',215,16);
+    ctx.font='6px Courier New'; ctx.fillText('ПЕРЕДНИЙ ДВОР',196,342);
+  },
+  objects:[
+    {t:'tree_gold',x:42,y:196},{t:'tree_red',x:126,y:190},{t:'tree_orange',x:374,y:190},{t:'tree_rust',x:458,y:198},
+    {t:'lamp_street',x:86,y:150},{t:'lamp_street',x:414,y:150},
+    {t:'bench_stone',x:84,y:276},{t:'bench_stone',x:416,y:276},
+    {t:'bin',x:160,y:282},{t:'bin',x:340,y:282},
+    {t:'leaves_pile',x:112,y:304},{t:'leaves_pile',x:388,y:304},
+    {t:'puddle',x:56,y:246},{t:'puddle',x:444,y:248},
+  ],
+  walls:[
+    {x:0,y:0,w:500,h:38},
+    {x:0,y:0,w:8,h:360},{x:492,y:0,w:8,h:360},
+    {x:0,y:350,w:500,h:10},
+    // фасад ограничивает верхнюю часть, но центральный вход оставляет проход.
+    {x:58,y:38,w:156,h:116},{x:286,y:38,w:156,h:116},
+  ],
+  interactables:[
+    {x:214,y:100,w:72,h:58,name:'mainEntrance',prompt:'Главный вход',action:async()=>{
+      await changeRoom('uniHall',220,336);
+    }},
+    {x:198,y:174,w:104,h:38,name:'frontFountain',prompt:'Фонтан',action(){
+      Dialogue.start([{who:'naya',expr:'normal',text:'Небольшой фонтан перед главным корпусом. Вода тёмная, но в ней отражаются окна.'},{who:'naya',expr:'talk',text:'(Сью говорила, что в этом дворе всё выглядит лучше после дождя.)'}]);
+    }},
+    {x:20,y:260,w:60,h:44,name:'frontBench',prompt:'Скамейка',action(){
+      Dialogue.start([{who:'naya',expr:'normal',text:'Каменная скамейка. На краю лежат мокрые листья, и кто-то оставил бумажный стаканчик.'}]);
+    }},
+    {x:420,y:260,w:60,h:44,name:'frontBench2',prompt:'Скамейка',action(){
+      Dialogue.start([{who:'naya',expr:'normal',text:'Отсюда хорошо видно центральный вход и окна верхнего этажа.'}]);
+    }},
+    {x:6,y:310,w:70,h:36,name:'toStreet',prompt:'На улицу',action:async()=>await changeRoom('street',210,200)},
+  ],
+  npcs:[
+    {x:184,y:250,sprite:'student',name:'Студент',speed:.28,path:[[184,250],[205,250],[205,280],[184,280]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Главный вход прямо по лестнице. Не перепутайте с боковым крылом.'}])},
+    {x:316,y:250,sprite:'friend',name:'Студентка',speed:.26,path:[[316,250],[296,250],[296,280],[316,280]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'friend',expr:'normal',name:'Студентка',text:'Осенью этот двор всегда забит листьями. Дворник сдаётся раньше всех.'}])},
+  ],
+  onEnter(){
+    if(F('cafeSceneComplete') && F('cafeShiftFinished') && C('uniDay')===0){
+      UniDay.start();
+      setTimeout(()=>Scene.play('uniDay1Arrive'),500);
+    }
+  },
+},
+
+/* ---------------------------------------------------------------- */
 /* ГЛАВНЫЙ ХОЛЛ. Юг здания: главный вход снизу, проход во внутренний
    двор наверху, парадная лестница на второй этаж, стойка информации и
    стенды, с которых начинается расследование.                        */
@@ -8499,6 +8847,9 @@ uniHall: {
       ctx.beginPath(); ctx.moveTo(wx - 6, wallH); ctx.lineTo(wx + 68, wallH);
       ctx.lineTo(wx + 96, H); ctx.lineTo(wx - 34, H); ctx.closePath(); ctx.fill();
     });
+    // Дополнительные высокие боковые окна с глубокими откосами.
+    paintYardWindow(ctx, 112, 10, 54, 70, {ornate:true,rays:true});
+    paintYardWindow(ctx, 274, 10, 54, 70, {ornate:true,rays:true});
     // проход во внутренний двор — сквозной проём в северной стене
     ctx.fillStyle = '#2a3020'; ctx.fillRect(196, 24, 60, 76);
     ctx.fillStyle = 'rgba(150,190,120,.20)'; ctx.fillRect(200, 28, 52, 70);
@@ -8548,8 +8899,8 @@ uniHall: {
     {x:0,y:352,w:178,h:8},{x:262,y:352,w:178,h:8},
   ],
   interactables: [
-    { x:178,y:322,w:84,h:34, name:'toStreet', prompt:'На улицу',
-      action: async ()=> await changeRoom('street', 210, 200) },
+    { x:178,y:322,w:84,h:34, name:'toFrontYard', prompt:'В передний двор',
+      action: async ()=> await changeRoom('uniFrontYard', 250, 318) },
     { x:0,y:180,w:40,h:60, name:'toWest', prompt:'Западное крыло (театральное)',
       action: async ()=> await changeRoom('uniWestHall', 130, 584) },
     { x:400,y:180,w:40,h:60, name:'toEast', prompt:'Восточное крыло (аудитории)',
@@ -8633,11 +8984,11 @@ uniHall: {
   /* Первый приход в корпус после смены открывает главу; на четвёртый
      день, когда Ная возвращается из восточного крыла, её тут ловят. */
   onEnter() {
-    if (F('cafeSceneComplete') && C('uniDay') === 0) {
+    if (F('cafeSceneComplete') && F('cafeShiftFinished') && C('uniDay') === 0) {
       UniDay.start();
       return setTimeout(()=> Scene.play('uniDay1Arrive'), 500);
     }
-    if (C('uniDay') === 4 && F('morelPhotoSeen') && !F('universityBanned'))
+    if (C('uniDay') === 4 && (F('morelPhotoSeen') || F('complaintFiled')) && !F('universityBanned'))
       setTimeout(()=> Scene.play('securityBan'), 600);
   },
 },
@@ -8656,6 +9007,7 @@ uniWestHall: {
   ],
   bgPaint(ctx) {
     paintWing(ctx, 260, 620, {
+      uniAtmosphere:true,
       wallW:62, warm:'#6b5a44', floor:'#8e7448', floor2:'#7a6038',
       left:UNI_W1_LEFT, right:UNI_W1_RIGHT,
       leaf1:'#a8412c', leaf2:'#c9992f', lightA:.36, vignette:.34,
@@ -8740,10 +9092,11 @@ uniWestHall: {
       }},
   ],
   npcs: [
-    /* Репетиция кончилась — Сью вышла и ждёт тут, а не сидит в зале. */
-    { x:130, y:420, sprite:'sue', name:'Сью',
-      when:()=> F('uniArrived') && C('uniDay') <= 3 && UniDay.ready(C('uniDay')),
-      dialogue:()=> Scene.play('sueRehearsalTalk') },
+    /* После окончания вечерней репетиции Сью не остаётся стоять внутри
+       пустого зала. Она выходит в коридор и ждёт Наю у двери. */
+    { x:118, y:UNI_W1_LEFT.mid('rehearsal') + 26, sprite:'sue', name:'Сью',
+      when:()=> F('sueWaitingCorridor') && !F('premiereDone'),
+      dialogue:()=> Scene.play('sueWaitingCorridor') },
     { x:110, y:300, sprite:'student', name:'Студент', speed:0.44,
       path:[[110,300],[150,300],[150,470],[110,470]],
       when:()=> !F('sueDead'),
@@ -8777,6 +9130,7 @@ uniEastHall: {
   ],
   bgPaint(ctx) {
     paintWing(ctx, 260, 660, {
+      uniAtmosphere:true,
       wallW:62, warm:'#6b5a44', floor:'#8e7448', floor2:'#7a6038',
       left:UNI_E1_LEFT, right:UNI_E1_RIGHT,
       leaf1:'#c2702c', leaf2:'#a8412c', lightA:.36, vignette:.36,
@@ -8894,7 +9248,7 @@ uniRehearsal: {
     {x:150,y:120,r:74,c:'#ffe0a8',i:.55},{x:56,y:86,r:36,c:'#ffd0a0',i:.30},
     {x:244,y:86,r:36,c:'#ffd0a0',i:.30},
   ],
-  bgKey:()=> 'd' + C('uniDay') + (F('premiereDone') ? 'p' : '') + (UniDay.ready(C('uniDay')) ? 'e' : ''),
+  bgKey:()=> 'd' + C('uniDay') + (F('premiereDone') ? 'p' : ''),
   bgPaint(ctx) {
     const day = Math.max(1, C('uniDay'));
     paintRoom(ctx, 300, 320, {
@@ -8907,6 +9261,9 @@ uniRehearsal: {
     ctx.fillStyle = 'rgba(255,255,255,.10)';
     for (let x = 30; x < 254; x += 44) ctx.fillRect(x, 14, 13, 40);
     ctx.fillStyle = '#3a3128'; ctx.fillRect(24, 56, 236, 4);
+    // Высокие боковые окна, чтобы зал не был глухой коробкой.
+    paintYardWindow(ctx, 4, 8, 18, 44, {ornate:true,rays:true});
+    paintYardWindow(ctx, 278, 8, 18, 44, {ornate:true,rays:true});
     ctx.fillStyle = '#7d6a4e'; ctx.fillRect(28, 68, 226, 3);
     for (let x = 38; x < 250; x += 58) { ctx.fillStyle = '#5f5040'; ctx.fillRect(x, 68, 3, 16); }
     // разметка сценической площадки
@@ -8924,11 +9281,6 @@ uniRehearsal: {
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
     ctx.fillText(day >= 4 ? '«ПОСЛЕДНИЙ СВЕТ» — ПРЕМЬЕРА'
                           : ['','ЧИТКА','НА НОГАХ','ГЕНЕРАЛЬНАЯ'][Math.min(3, day)], 28, 80);
-    if (UniDay.ready(day)) {                         // репетиция кончилась
-      ctx.fillStyle = 'rgba(8,6,12,.34)'; ctx.fillRect(0, 0, 300, 320);
-      ctx.fillStyle = 'rgba(200,184,160,.55)';
-      ctx.fillText('РЕПЕТИЦИЯ ОКОНЧЕНА', 96, 240);
-    }
   },
   objects: [
     { t:'piano', x:64, y:124 },
@@ -8970,7 +9322,7 @@ uniRehearsal: {
   ],
   npcs: [
     { x:96, y:200, sprite:'acolyte', name:'Режиссёр',
-      when:()=> F('uniArrived') && !F('premiereDone'),
+      when:()=> F('uniArrived') && !F('premiereDone') && (!F('sueWaitingCorridor') || C('uniDay') === 3),
       dialogue:()=> {
         const day = Math.max(1, C('uniDay'));
         if (day <= 1) return Dialogue.start([
@@ -8985,31 +9337,16 @@ uniRehearsal: {
         ]);
         return Dialogue.start([{who:'acolyte',expr:'normal',name:'Режиссёр',text:'Все по местам. Зал уже собирается.'}]);
       }},
-    { x:132, y:236, sprite:'acolyte', name:'Режиссёр',
-      when:()=> F('uniArrived') && C('uniDay') <= 3 && UniDay.ready(C('uniDay')),
-      dialogue:()=> Dialogue.start([
-        {who:'acolyte',expr:'normal',name:'Режиссёр',text:'На сегодня всё, я дожимаю одну сцену. Вашу подругу я отпустил.'},
-        {who:'acolyte',expr:'smile',name:'Режиссёр',text:'Она ждёт в коридоре. Идите, не стойте тут.'},
-      ]) },
-    /* Вечером репетиция заканчивается: труппа расходится, режиссёр
-       остаётся дожимать сцену с одним актёром, а Сью выходит ждать Наю
-       в коридор. Пока дела дня не закрыты — все на местах. */
     { x:186, y:204, sprite:'student', name:'Актёр', speed:0.34,
       path:[[186,204],[212,210],[212,236],[176,232]],
-      when:()=> F('uniArrived') && !F('premiereDone'),
-      dialogue:()=> {
-        if (UniDay.ready(C('uniDay'))) return Dialogue.start([
-          {who:'student',expr:'worried',name:'Актёр',text:'Все ушли, а меня оставили. У меня третья сцена не идёт.'},
-          {who:'student',expr:'normal',name:'Актёр',text:'Сью в коридоре, если ты к ней.'},
-        ]);
-        return Dialogue.start([{who:'student',expr:'normal',name:'Актёр',text:'Мы репетируем «Последний свет». Про девушку, которая возвращается в дом перед продажей.'}]);
-      } },
+      when:()=> F('uniArrived') && !F('premiereDone') && (!F('sueWaitingCorridor') || C('uniDay') === 3),
+      dialogue:()=> Dialogue.start([{who:'student',expr:'normal',name:'Актёр',text:'Мы репетируем «Последний свет». Про девушку, которая возвращается в дом перед продажей.'}]) },
     { x:150, y:192, sprite:'sue', name:'Сью',
-      when:()=> F('uniArrived') && C('uniDay') <= 3 && !UniDay.ready(C('uniDay')),
+      when:()=> F('uniArrived') && !F('premiereDone') && !F('sueWaitingCorridor'),
       dialogue:()=> Scene.play('sueRehearsalTalk') },
     { x:120, y:296, sprite:'acolyte', name:'Актриса', speed:0.30,
       path:[[120,296],[200,294],[204,268],[116,270]],
-      when:()=> F('uniArrived') && C('uniDay') <= 3 && !UniDay.ready(C('uniDay')),
+      when:()=> F('uniArrived') && !F('premiereDone') && !F('sueWaitingCorridor'),
       dialogue:()=> { const d = Math.max(1, C('uniDay'));
         if (d >= 3) return Dialogue.start([{who:'acolyte',expr:'worried',name:'Актриса',text:'У меня во втором акте четыре реплики, и я все четыре забываю. Каждый раз одни и те же.'}]);
         return Dialogue.start([{who:'acolyte',expr:'normal',name:'Актриса',text:'Ты подруга Сью? Она нас всех держит. Без неё бы третью сцену до сих пор читали с листа.'}]);
@@ -9027,6 +9364,8 @@ uniDressing: {
   lights:[{x:70,y:80,r:40,c:'#ffe8c0',i:.5},{x:170,y:80,r:40,c:'#ffe8c0',i:.5}],
   bgPaint(ctx) {
     paintRoom(ctx, 240, 260, {
+      autoWindows:true, count:2,
+      uniAtmosphere:true,
       wall:'#4c4038', wall2:'#403630', floor:'#8a7454', floor2:'#77603f', wallH:56,
       right:{ door:[126, 48] }, label:'ГРИМЁРНАЯ', labelAt:[28, 250],
     });
@@ -9094,6 +9433,8 @@ uniCostume: {
   lights:[{x:100,y:90,r:44,c:'#e8c890',i:.36,flicker:true}],
   bgPaint(ctx) {
     paintRoom(ctx, 200, 220, {
+      autoWindows:true, count:2,
+      uniAtmosphere:true,
       wall:'#463a34', wall2:'#3b312c', floor:'#7a6a54', floor2:'#695944', wallH:52,
       right:{ door:[106, 48] }, label:'КОСТЮМЕРНАЯ', labelAt:[26, 210],
     });
@@ -9242,10 +9583,11 @@ uniTeachersRoom: {
   lights:[{x:120,y:90,r:56,c:'#ffdca0',i:.44}],
   bgPaint(ctx) {
     paintRoom(ctx, 240, 200, {
+      uniAtmosphere:true,
       wall:'#5e5142', wall2:'#4e4436', floor:'#8a7454', floor2:'#77603f', wallH:54,
       left:{ door:[104, 46] }, label:'ПРЕПОДАВАТЕЛЬСКАЯ', labelAt:[64, 192],
     });
-    paintYardWindow(ctx, 150, 10, 62, 38);
+    paintYardWindow(ctx, 142, 6, 72, 46, { ornate:true, rays:true });
     ctx.fillStyle = '#c8b8a0'; ctx.font = '5px Courier New'; ctx.fillText('во двор', 166, 8);
   },
   objects: [
@@ -9299,10 +9641,11 @@ uniLibrary: {
   sun:{ x:180, y:48, w:48, len:150, tilt:.18, a:.11 },
   bgPaint(ctx) {
     paintRoom(ctx, 320, 300, {
+      uniAtmosphere:true,
       wall:'#5a4a3c', wall2:'#4a3c30', floor:'#6f5a44', floor2:'#5f4c38', wallH:56,
       left:{ door:[142, 52] }, label:'ЧИТАЛЬНЫЙ ЗАЛ', labelAt:[120, 292],
     });
-    paintYardWindow(ctx, 148, 10, 60, 38, { top:'#8fa6bd', bot:'#b9b8a6' });
+    paintYardWindow(ctx, 140, 6, 76, 48, { top:'#8fa6bd', bot:'#b9b8a6', ornate:true, rays:true });
     ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(120, 150, 88, 100);
     // запертая дверь архива в дальней стене
     ctx.fillStyle = '#2b2018'; ctx.fillRect(258, 56, 40, 46);
@@ -9369,10 +9712,11 @@ uniMorelOffice: {
   lights:[{x:110,y:110,r:52,c:'#ffd89a',i:.44}],
   bgPaint(ctx) {
     paintRoom(ctx, 220, 240, {
+      uniAtmosphere:true,
       wall:'#5e5142', wall2:'#4e4436', floor:'#7a6a58', floor2:'#6a5b4a', wallH:56,
       left:{ door:[112, 46] }, label:'МОРЕЛЬ Ж.', labelAt:[64, 232],
     });
-    paintYardWindow(ctx, 146, 10, 58, 38);
+    paintYardWindow(ctx, 138, 6, 74, 48, { ornate:true, rays:true });
   },
   objects: [
     { t:'desk', x:104, y:126 }, { t:'chair_wood', x:104, y:152 },
@@ -9424,6 +9768,8 @@ uniAud14: {
   lights:[{x:140,y:100,r:64,c:'#ffe0aa',i:.46}],
   bgPaint(ctx) {
     paintRoom(ctx, 280, 240, {
+      autoWindows:true, count:2,
+      uniAtmosphere:true,
       wall:'#5e5142', wall2:'#4e4436', floor:'#8a7454', floor2:'#77603f', wallH:56,
       left:{ door:[110, 46] }, label:'АУДИТОРИЯ 14', labelAt:[64, 232],
     });
@@ -9476,6 +9822,8 @@ uniMusicRoom: {
   lights:[{x:120,y:96,r:58,c:'#ffdca0',i:.42}],
   bgPaint(ctx) {
     paintRoom(ctx, 240, 220, {
+      autoWindows:true, count:2,
+      uniAtmosphere:true,
       wall:'#544a48', wall2:'#463d3c', floor:'#7f6a52', floor2:'#6d5943', wallH:54,
       left:{ door:[100, 46] }, label:'МУЗЫКАЛЬНАЯ', labelAt:[64, 212],
     });
@@ -9526,10 +9874,11 @@ uniArtRoom: {
   lights:[{x:130,y:100,r:62,c:'#f4e6c0',i:.46}],
   bgPaint(ctx) {
     paintRoom(ctx, 260, 240, {
+      uniAtmosphere:true,
       wall:'#5a5348', wall2:'#4b453c', floor:'#84725a', floor2:'#72614a', wallH:54,
       left:{ door:[110, 46] }, label:'ХУДОЖЕСТВЕННАЯ', labelAt:[64, 232],
     });
-    paintYardWindow(ctx, 158, 8, 66, 40, { top:'#a8bccc', bot:'#c6c4ae' });
+    paintYardWindow(ctx, 150, 5, 74, 50, { top:'#a8bccc', bot:'#c6c4ae', ornate:true, rays:true });
     // приколотые к стене этюды
     [[62,14],[92,20],[122,12]].forEach(([x,y],i) => {
       ctx.fillStyle = '#d8d0bc'; ctx.fillRect(x, y, 24, 22);
@@ -9702,6 +10051,7 @@ uniCorr2: {
   ],
   bgPaint(ctx) {
     paintCorridor(ctx, 680, 250, {
+      uniAtmosphere:true,
       wallH:150, warm:'#6b5a44', floor:'#8e7448', floor2:'#7a6038',
       layout:UNI_C2_WALL, lightA:.30, tilt:.5, vignette:.30,
       leaf1:'#c2702c', leaf2:'#a8412c',
@@ -9742,6 +10092,15 @@ uniCorr2: {
       action: async ()=> await changeRoom('uniWest2', 130, 44) },
     { x:628,y:154,w:44,h:60, name:'toEast2', prompt:'Восточное крыло',
       action: async ()=> await changeRoom('uniEast2', 130, 44) },
+    { x:UNI_C2_WALL.at('oldwing')-8,y:196,w:72,h:34, name:'serviceHint', prompt:'Служебный проход', action(){
+        if (C('uniDay') < 3) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Служебный проход закрыт. Похоже, сюда водят только персонал.'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'(Старое крыло начинается отсюда. На стене стрелка: «служебная лестница — дальше по коридору».)'},
+          {who:'naya',expr:'talk',text:'(Если мне нужен цоколь, искать надо не подсобку на первом этаже.)'},
+        ]);
+      }},
     { x:UNI_C2_WALL.at('oldwing'),y:150,w:56,h:40, name:'toOldWing', prompt:'Старое крыло', action: async ()=>{
         if (C('uniDay') < 3 && !F('oldWingOpen')) return Dialogue.start([
           {who:'naya',expr:'normal',text:'Проход в старое крыло. Поперёк — ленточка и табличка «ремонт».'},
@@ -9794,7 +10153,7 @@ uniCorr2: {
       path:[[540,236],[300,236],[300,206],[540,206]],
       when:()=> !F('sueDead') },
   ],
-  /* Отметка «я тут была»: по ней цель ведёт игрока дальше по зданию. */
+  /* Отметка «я тут была»: по ней цель ведёт игрока дальше. */
   onEnter() { setFlag('sawFloor2'); },
 },
 
@@ -9808,6 +10167,7 @@ uniWest2: {
   lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.30},{x:130,y:280,r:44,c:'#ffdc9a',i:.30}],
   bgPaint(ctx) {
     paintWing(ctx, 260, 400, {
+      uniAtmosphere:true,
       wallW:62, warm:'#665744', floor:'#8a7048', floor2:'#755c38',
       left:UNI_W2_LEFT, right:UNI_W2_RIGHT,
       leaf1:'#a8412c', leaf2:'#c9992f', lightA:.30, vignette:.38,
@@ -9862,6 +10222,7 @@ uniEast2: {
   lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.30},{x:130,y:280,r:44,c:'#ffdc9a',i:.30}],
   bgPaint(ctx) {
     paintWing(ctx, 260, 400, {
+      uniAtmosphere:true,
       wallW:62, warm:'#665744', floor:'#8a7048', floor2:'#755c38',
       left:UNI_E2_LEFT, right:UNI_E2_RIGHT,
       leaf1:'#c2702c', leaf2:'#a8412c', lightA:.30, vignette:.38,
@@ -9918,6 +10279,7 @@ uniOldWing: {
   lights:[{x:130,y:170,r:38,c:'#d8c8a0',i:.22,flicker:true},{x:370,y:170,r:38,c:'#d8c8a0',i:.20,flicker:true}],
   bgPaint(ctx) {
     paintCorridor(ctx, 520, 320, {
+      uniAtmosphere:true,
       wallH:178, warm:'#4e4236', warm2:'#3f352c', floor:'#5f5040', floor2:'#4f4234',
       layout:UNI_OLD_WALL, lightA:.08, tilt:.5, vignette:.46,
       glass:'#8a8a7a', glassLow:'#5a5a52',
@@ -9944,7 +10306,7 @@ uniOldWing: {
   interactables: [
     { x:472,y:180,w:40,h:56, name:'toCorr2', prompt:'Обратно в коридор',
       action: async ()=> await changeRoom('uniCorr2', UNI_C2_WALL.at('oldwing') + 28, 196) },
-    { x:UNI_OLD_WALL.at('service'),y:178,w:50,h:40, name:'toService', prompt:'Служебная лестница',
+    { x:UNI_OLD_WALL.at('service'),y:178,w:58,h:44, name:'toService', prompt:'Служебная лестница: вверх / вниз',
       action: async ()=> await changeRoom('uniServiceStair', 110, 92) },
     { x:UNI_OLD_WALL.at('oldarch'),y:178,w:48,h:40, name:'oldArchDoor', prompt:'Дверь «АРХИВ»', action(){
         if (!F('basementFound')) {
@@ -9981,6 +10343,7 @@ uniOldWing: {
       }},
   ],
   npcs: [],
+  /* Отметка «я тут была»: по ней цель ведёт игрока дальше. */
   onEnter() { setFlag('sawOldWing'); },
 },
 
@@ -10050,8 +10413,13 @@ uniServiceStair: {
   interactables: [
     { x:44,y:16,w:132,h:44, name:'up', prompt:'Наверх, на крышу',
       action: async ()=> await changeRoom('uniRoof', 60, 210) },
-    { x:44,y:356,w:132,h:52, name:'down', prompt:'Вниз, в цоколь',
-      action: async ()=> await changeRoom('uniBasement', 60, 190) },
+    { x:38,y:346,w:144,h:64, name:'down', prompt:'Спуститься в цоколь',
+      action: async ()=> {
+        if (C('uniDay') < 3) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Лестница вниз закрыта для студентов.'},
+        ]);
+        await changeRoom('uniBasement', 60, 190);
+      }},
     { x:150,y:74,w:52,h:48, name:'toOldWing', prompt:'В старое крыло',
       action: async ()=> await changeRoom('uniOldWing', UNI_OLD_WALL.at('service') + 24, 208) },
     /* Обходной путь: низкое окно во двор. Работает в обе стороны, но
@@ -10154,6 +10522,7 @@ uniBasement: {
         {who:'customer',expr:'normal',name:'Техник',text:'Только за трубы не хватайся, они горячие.'},
       ]) },
   ],
+  /* Отметка «я тут была»: по ней цель ведёт игрока дальше. */
   onEnter() { setFlag('sawBasement'); },
 },
 
@@ -10762,9 +11131,10 @@ const Scene = {
      переходы goto не блокируются никогда. */
   DISPATCHERS: new Set([
     'pastCheck','rehearsalWatch','sueRehearsalTalk','sueDayWait','libraryFolk',
-    'librarianTalk','archiveFolder15','archiveFolder5','chrisShiftDay',
+    'sueWaitingCorridor','dressingCostumes','libraryArchive',
+    'librarianTalk','archiveFolder15','archiveFolder5','chrisShiftDay','dailyCafeShift',
     'persuadeSue','persuadeResolve','sueHint','distractWitch2','dorothy',
-    'dorothyHall','postRevival','lonerDoor','lonerCaughtScene','cafeWorkDay',
+    'dorothyHall','postRevival','lonerDoor','lonerCaughtScene',
   ]),
   seen(name) { return !!(gameState && gameState.scenesSeen && gameState.scenesSeen.includes(name)); },
   mark(name) {
@@ -10856,6 +11226,7 @@ const Scene = {
     if (cmd.crackStar !== undefined) { Prologue.crackStar(cmd.crackStar); return; }
     if (cmd.medea !== undefined)  { Prologue.showMedea = cmd.medea; return; }
     if (cmd.lilithFig !== undefined) { Prologue.showLilith = cmd.lilithFig; return; }
+    if (cmd.witchTableau !== undefined) { Prologue.showWitchTableau = cmd.witchTableau; return; }
     if (cmd.crystalGlow !== undefined) { Prologue.crystalGlow = cmd.crystalGlow; return; }
     if (cmd.stones) { Prologue.liftStones(cmd.stones[0], cmd.stones[1], cmd.stones[2] || 5); return; }
     if (cmd.butterfly) { await Prologue.flyButterfly(cmd.butterfly.from, cmd.butterfly.to, cmd.butterfly.ms || 1400); return; }
@@ -10887,12 +11258,12 @@ const Scene = {
 ===================================================================== */
 const Prologue = {
   stars: [], starWords: ['ВИДЬ СКВОЗЬ', 'ПОДЧИНЯЙ', 'РАЗРУШАЙ', 'ТВОРИ'],
-  showMedea:false, showLilith:false, crystalGlow:0,
+  showMedea:false, showLilith:false, showWitchTableau:false, crystalGlow:0,
   stones: [], stonesT:0,
   butterfly:null, glow:0, floatSue:0,
 
   reset() {
-    this.stars = []; this.showMedea = false; this.showLilith = false;
+    this.stars = []; this.showMedea = false; this.showLilith = false; this.showWitchTableau = false;
     this.crystalGlow = 0; this.stones = []; this.stonesT = 0;
     this.butterfly = null; this.glow = 0; this.floatSue = 0;
     this.swing = null; Player.lift = 0;
@@ -11022,8 +11393,72 @@ const Prologue = {
       if (Math.random() < .25) FX.spawn(x, y, 1, {color:'#5a2040', spread:r*2, rise:-.2, life:40});
     });
   },
+  /* Пять силуэтов из вступительной легенды. Это процедурные формы,
+     а не вставленные изображения: у каждой фигуры свой контур и характерная
+     причёска/одежда по референсам. Рисуются маленькими, как иллюстрация в сказе. */
+  drawWitchTableau(ctx, t) {
+    if (!this.showWitchTableau) return;
+    const pulse = .88 + .06 * Math.sin(t / 720);
+    const drawOne = (x, y, sc, type, phase) => {
+      const sway = Math.sin(t / 1100 + phase) * 1.8;
+      ctx.save(); ctx.translate(x + sway, y); ctx.scale(sc, sc);
+      ctx.fillStyle = '#09070b';
+      ctx.beginPath();
+      // общая юбка/тело
+      if (type === 'ruby') {
+        ctx.moveTo(-9,18); ctx.lineTo(9,18); ctx.quadraticCurveTo(18,46,25,72); ctx.lineTo(-25,72); ctx.quadraticCurveTo(-18,46,-9,18); ctx.closePath(); ctx.fill();
+        // пышные рукава
+        ctx.beginPath(); ctx.moveTo(-8,20); ctx.lineTo(-25,28); ctx.lineTo(-30,42); ctx.lineTo(-20,45); ctx.lineTo(-9,34); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(8,20); ctx.lineTo(25,28); ctx.lineTo(30,42); ctx.lineTo(20,45); ctx.lineTo(9,34); ctx.closePath(); ctx.fill();
+        // короткие растрёпанные волосы
+        ctx.beginPath(); ctx.arc(0,8,15,0,Math.PI*2); ctx.fill();
+        [[-14,2,-20,-5],[-9,-7,-13,-16],[0,-8,2,-18],[9,-7,14,-16],[14,2,20,-5]].forEach(a=>{ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(a[2],a[3]);ctx.lineTo(a[2]+3,a[3]+7);ctx.closePath();ctx.fill();});
+      } else if (type === 'beatrice') {
+        ctx.moveTo(-10,18); ctx.lineTo(10,18); ctx.quadraticCurveTo(16,48,28,72); ctx.lineTo(-28,72); ctx.quadraticCurveTo(-16,48,-10,18); ctx.closePath(); ctx.fill();
+        // широкие рукава
+        ctx.beginPath();ctx.moveTo(-8,22);ctx.quadraticCurveTo(-27,24,-34,39);ctx.lineTo(-23,45);ctx.lineTo(-8,34);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(8,22);ctx.quadraticCurveTo(27,24,34,39);ctx.lineTo(23,45);ctx.lineTo(8,34);ctx.closePath();ctx.fill();
+        // высокий кудрявый пучок
+        ctx.beginPath();ctx.arc(0,7,14,0,Math.PI*2);ctx.fill();
+        for(let i=0;i<9;i++){const a=i/9*Math.PI*2;ctx.beginPath();ctx.arc(Math.cos(a)*13,Math.sin(a)*7-2,5,0,Math.PI*2);ctx.fill();}
+      } else if (type === 'agatha') {
+        ctx.moveTo(-9,18);ctx.lineTo(9,18);ctx.quadraticCurveTo(15,48,23,72);ctx.lineTo(-23,72);ctx.quadraticCurveTo(-15,48,-9,18);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(-8,21);ctx.lineTo(-29,33);ctx.lineTo(-25,44);ctx.lineTo(-8,34);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(8,21);ctx.lineTo(29,33);ctx.lineTo(25,44);ctx.lineTo(8,34);ctx.closePath();ctx.fill();
+        // длинные волосы с характерным выступом сбоку
+        ctx.beginPath();ctx.arc(0,7,14,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.moveTo(-12,4);ctx.quadraticCurveTo(-27,14,-19,31);ctx.quadraticCurveTo(-16,39,-9,30);ctx.lineTo(-7,12);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(9,0);ctx.lineTo(22,-16);ctx.lineTo(20,9);ctx.closePath();ctx.fill();
+      } else { // medea
+        ctx.moveTo(-10,22);ctx.lineTo(10,22);ctx.quadraticCurveTo(14,47,22,66);ctx.lineTo(-22,66);ctx.quadraticCurveTo(-14,47,-10,22);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(-8,25);ctx.lineTo(-24,36);ctx.lineTo(-20,48);ctx.lineTo(-8,37);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(8,25);ctx.lineTo(24,36);ctx.lineTo(20,48);ctx.lineTo(8,37);ctx.closePath();ctx.fill();
+        // длинные волнистые волосы
+        ctx.beginPath();ctx.arc(0,9,14,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.moveTo(-12,10);ctx.quadraticCurveTo(-26,20,-18,34);ctx.quadraticCurveTo(-27,48,-17,56);ctx.lineTo(-7,39);ctx.lineTo(-7,14);ctx.closePath();ctx.fill();
+        ctx.beginPath();ctx.moveTo(12,10);ctx.quadraticCurveTo(26,20,18,34);ctx.quadraticCurveTo(27,48,17,56);ctx.lineTo(7,39);ctx.lineTo(7,14);ctx.closePath();ctx.fill();
+        // широкая остроконечная шляпа
+        ctx.beginPath();ctx.moveTo(-25,2);ctx.quadraticCurveTo(0,-7,25,2);ctx.lineTo(4,-31);ctx.quadraticCurveTo(0,-39,-4,-31);ctx.closePath();ctx.fill();
+      }
+      // ноги/обувь, видимые у четырёх фигур
+      if (type !== 'beatrice') { ctx.fillRect(-11,67,8,8); ctx.fillRect(3,67,8,8); }
+      ctx.restore();
+    };
+    ctx.save(); ctx.globalAlpha = .92 * pulse;
+    drawOne(38,214,.38,'ruby',0);
+    drawOne(88,208,.40,'beatrice',1);
+    drawOne(139,211,.40,'agatha',2);
+    drawOne(190,214,.40,'medea',3);
+    ctx.restore();
+    // тонкий свет вокруг tableau, как у старой иллюстрации
+    const g=ctx.createRadialGradient(115,245,10,115,245,108);
+    g.addColorStop(0,'rgba(220,170,255,.10)'); g.addColorStop(1,'rgba(220,170,255,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,150,240,160);
+  },
+
   drawFigures(ctx) {
     const t = Date.now();
+    this.drawWitchTableau(ctx, t);
     if (this.showLilith) this.drawLilith(ctx, t);
     if (this.showMedea) {
       const a = .92 + .06 * Math.sin(t/600);
@@ -11950,13 +12385,14 @@ prologue: [
     {who:'narrator',expr:'normal',name:'',text:'С давних времён мир был расколот на три великие сферы: светлый Рай, пылающий Ад и зыбкую Землю.'},
     {who:'narrator',expr:'normal',name:'',text:'Между ними воздвиглись непреодолимые преграды, и никто не смел переступить их...'},
     {who:'narrator',expr:'normal',name:'',text:'...кроме тех, кто владел тайной древних путей. Этих избранных существ называли ведьмами.'},
-    {who:'narrator',expr:'normal',name:'',text:'Их было несметное множество — сотни, тысячи. Но лишь немногие поднимались до вершин истинного могущества.'},
+    {who:'narrator',expr:'normal',name:'',text:'Их было несметное множество — сотни, тысячи. Но в каждой эпохе находились те, чьи имена переживали остальных.'},
   ]},
-  { lilithFig:true }, { sfx:'low' }, { shake:2 },
+  { lilithFig:true }, { witchTableau:true }, { sfx:'low' }, { shake:2 },
+  { wait:650 },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Над всеми же властвовала одна — первая и сильнейшая, Лилит, жена самого Люцифера.'},
-    {who:'narrator',expr:'normal',name:'',text:'Её чёрная воля стремилась к тому, чтобы множить подобных себе.'},
-    {who:'narrator',expr:'normal',name:'',text:'И потому она избрала четверых особых ведьм: Агату, Лидия, Вивиан... и Мидею.'},
+    {who:'narrator',expr:'normal',name:'',text:'Перед ней стояли четверо избранных: Руби, Беатрис, Агата и Мидея.'},
+    {who:'narrator',expr:'normal',name:'',text:'Они ещё не знали, что одна из них однажды нарушит главное правило.'},
   ]},
   { star:0 }, { wait:420 }, { star:1 }, { wait:420 }, { star:2 }, { wait:420 }, { star:3 }, { wait:500 },
   { dlg:[
@@ -11966,6 +12402,10 @@ prologue: [
   { medea:true }, { wait:600 },
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Мидея дрожала перед словом «Разрушай». Она верила: творить можно иначе, не разрушая, а исцеляя и возрождая.'},
+  ]},
+  { magic:'#c060ff', dur:900 }, { wait:350 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Она подняла ладони — и чёрные искры вокруг неё начали медленно превращаться в свет.'},
   ]},
   { crackStar:2 }, { sfx:'scare' }, { shake:4 },
   { dlg:[
@@ -12356,11 +12796,10 @@ prologLeave: [
   ]},
   { fadeOut:1200 },
   { wait:600 },
-  { title:'ВОКЗАЛ. ТОТ ЖЕ ВЕЧЕР', dur:1600 },
-  { room:'trainStation', x:150, y:206 },
-  { music:'warm' },
+  { room:'departureStation', x:180, y:210 },
+  { music:'street' },
   { fadeIn:1200 },
-  { cast:[{ x:196, y:210, sprite:'sue', name:'Сью' }] },
+  { cast:[{ x:214, y:210, sprite:'sue', name:'Сью' }] },
   { dlg:[
     {who:'sue',expr:'smile',text:'Ну наконец-то. Я тут уже с местными собаками перезнакомилась.'},
     {who:'nayaTeen',expr:'normal',name:'Ная',text:'Извини. Прощался только я, это заняло время.'},
@@ -12370,11 +12809,15 @@ prologLeave: [
     {who:'sue',expr:'smile',text:'Ну и хорошо. Значит, не будут звонить.'},
   ]},
   { dlg:[
-    {who:'sue',expr:'smile',text:'Слушай. Я всё посчитала. Общага на первом курсе — только со второго семестра, а комната у вокзала стоит как половина моей стипендии.'},
-    {who:'nayaTeen',expr:'talk',name:'Ная',text:'А вторая половина?'},
-    {who:'sue',expr:'smile',text:'А вторая половина — это ты. Найдёшь работу. Ты умеешь работать, ты с двенадцати лет работаешь.'},
-    {who:'nayaTeen',expr:'shocked',name:'Ная',text:'Сью, это... ты понимаешь, что это на годы?'},
-    {who:'sue',expr:'smile',text:'Понимаю. Поэтому и говорю сейчас, а не через год.'},
+    {who:'sue',expr:'normal',text:'Я всё посчитала. Комната у вокзала стоит почти столько же, сколько моя стипендия и подработка вместе.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'А общежитие?'},
+    {who:'sue',expr:'sad',text:'На первый семестр нам его не дадут. Я проверила.'},
+    {who:'nayaTeen',expr:'talk',name:'Ная',text:'То есть тебе учёба, мне работа?'},
+    {who:'sue',expr:'normal',text:'Скорее, мы обе делаем то, что сейчас можем. У меня пары и репетиции почти весь день. У тебя уже есть опыт работы, и ты сама говорила, что не хочешь брать деньги у отца.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Не хочу. Но решать за меня всё равно не надо.'},
+    {who:'sue',expr:'sad',text:'Не решаю. Предлагаю план. Если тебе не подходит — ищем другой. Вместе.'},
+    {who:'nayaTeen',expr:'smile',name:'Ная',text:'Ладно. Тогда это наш план, а не моя обязанность.'},
+    {who:'sue',expr:'smile',text:'Именно. И если через месяц он окажется плохим — переделаем.'},
   ]},
   { wait:500 },
   { dlg:[
@@ -12382,10 +12825,17 @@ prologLeave: [
     {who:'nayaTeen',expr:'sad',name:'Ная',text:'(С тех пор она ни разу не отошла.)'},
     {who:'nayaTeen',expr:'smile',name:'Ная',text:'Хорошо.'},
     {who:'sue',expr:'smile',text:'«Хорошо»? Я тут речь готовила.'},
-    {who:'nayaTeen',expr:'smile',name:'Ная',text:'Расскажешь в автобусе.'},
+    {who:'nayaTeen',expr:'smile',name:'Ная',text:'Расскажешь в поезде.'},
+    {who:'sue',expr:'smile',text:'Тогда побежали. Если опоздаем, будем ночевать на платформе.'},
   ]},
   { stats:{ trustSue:+12, humanity:+6 } },
   { memory:'leaving' },
+  { wait:900 },
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Вдалеке гудит поезд. На платформе загорается табличка следующего рейса.'},
+    {who:'sue',expr:'smile',text:'Это наш.'},
+    {who:'nayaTeen',expr:'normal',name:'Ная',text:'Тогда поехали.'},
+  ]},
   { uncast:true },
   { music:'none' },
   { fadeOut:1800 },
@@ -12435,11 +12885,11 @@ uniDay1Arrive: [
   { chapter:3 },
   { music:'home' },
   { dlg:[
-    {who:'naya',expr:'normal',text:'(Старый корпус. Окна светятся все разом, и от этого он кажется больше, чем днём.)'},
-    {who:'naya',expr:'normal',text:'(Сью написала, что задержится. Значит, у меня есть время.)'},
+    {who:'naya',expr:'normal',text:'(Старый корпус. Днём я его почти не рассмотрела. Вечером окна превращают его в отдельный город.)'},
+    {who:'naya',expr:'normal',text:'(Сью задержится после репетиции. Отлично. Осмотрюсь, пока она занята.)'},
   ]},
   { dlg:[
-    {who:'naya',expr:'talk',text:'(Ладно. Осмотрюсь. Стенды, доска, списки — всё, что тут висит для таких, как я.)'},
+    {who:'naya',expr:'talk',text:'(Начну с простого: стенды, списки преподавателей, фотографии. Если Морель здесь работает, её фамилия где-нибудь найдётся.)'},
   ]},
 ],
 
@@ -12458,7 +12908,7 @@ rehearsalDay1: [
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Сью кладёт лист на пол и начинает сцену заново — уже глазами, а не бумагой.'},
     {who:'sue',expr:'normal',text:'«Я думала, дом меня узнает. А он просто дом».'},
-    {who:'naya',expr:'smile',text:'(Она заметно лучше остальных. И, кажется, сама этого не понимает.)'},
+    {who:'naya',expr:'smile',text:'(Сью уже уверенно держит сцену. Видно, что она не просто выучила текст — она понимает, зачем говорит каждую реплику.)'},
   ]},
   { flag:'sawRehearsal' },
   { dlg:[
@@ -12471,7 +12921,7 @@ rehearsalDay2: [
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Листов почти нет. Актёры ходят по площадке, берут реквизит, задевают друг друга плечами.'},
     {who:'acolyte',expr:'normal',name:'Режиссёр',text:'Теперь слушайте друг друга. Вы уже знаете текст.'},
-    {who:'naya',expr:'smile',text:'(Сью держит сцену. Не громкостью — паузами.)'},
+    {who:'naya',expr:'smile',text:'(Она держит сцену паузами. Остальные подстраиваются под неё, и это заметно даже мне.)'},
   ]},
   { flag:'sawRehearsal' },
 ],
@@ -12496,7 +12946,8 @@ sueRehearsalTalk: [
     const d = Math.max(1, C('uniDay'));
     if (d >= 4) return { goto:'suePremiereDay' };
     if (!UniDay.ready(d)) return { goto:'sueDayWait' };
-    return { goto:'sueDayEnd' + d };
+    setFlag('sueWaitingCorridor', true);
+    return { goto:'sueRehearsalExit' };
   },
 ],
 sueDayWait: [
@@ -12504,27 +12955,49 @@ sueDayWait: [
     const left = UniDay.left(C('uniDay'));
     const first = left.length ? left[0].t : '';
     return new Promise(res => Dialogue.start([
-      {who:'sue',expr:'smile',text:'Мы ещё не закончили. Погуляй по корпусу, только не пугай первокурсников.'},
-      {who:'naya',expr:'smile',text:'У меня обычное лицо.'},
-      {who:'sue',expr:'smile',text:'У тебя лицо человека, который пришёл описывать имущество.'},
+      {who:'sue',expr:'normal',text:'Мы ещё не закончили. Я закончу сцену и выйду к тебе сама.'},
+      {who:'naya',expr:'smile',text:'Хорошо. Тогда я пока посмотрю коридор.'},
+      {who:'sue',expr:'smile',text:'Только не лезь туда, куда тебя явно не пускают.'},
       {who:'naya',expr:'talk',text:'(Сначала — ' + first.charAt(0).toLowerCase() + first.slice(1) + '.)'},
     ], res));
   },
 ],
+sueRehearsalExit: [
+  { dlg:[
+    {who:'narrator',expr:'normal',name:'',text:'Сью складывает сценарий, убирает его в сумку и выходит из зала. В коридоре уже тише.'},
+  ]},
+  { wait:350 },
+],
+
+sueWaitingCorridor: [
+  { dlg:[
+    {who:'sue',expr:'smile',text:'Вот ты где. Я вышла из зала, остальные уже разошлись.'},
+    {who:'naya',expr:'normal',text:'А режиссёр?'},
+    {who:'sue',expr:'normal',text:'На третий день он ещё остался с одним актёром. В остальные — все ушли.'},
+    {who:'naya',expr:'smile',text:'Тогда идём домой.'},
+  ]},
+  ()=>{
+    const d = Math.max(1, C('uniDay'));
+    return { goto:'sueDayEnd' + Math.min(3, d) };
+  },
+],
+
 sueDayEnd1: [
+  { flag:'sueWaitingCorridor', value:false },
   { dlg:[
     {who:'sue',expr:'smile',text:'Долго ждала?'},
-    {who:'naya',expr:'normal',text:'Не очень. Немного походила по университету.'},
+    {who:'naya',expr:'normal',text:'Не очень. Я кое-что нашла и хочу проверить, прежде чем делать выводы.'},
     {who:'sue',expr:'normal',text:'Нашла что-нибудь интересное?'},
-    {who:'naya',expr:'talk',text:'Кажется, да. Но пока не уверена.'},
-    {who:'sue',expr:'smile',text:'Если захочешь проверить — проверяй. Я могу помочь.'},
-    {who:'naya',expr:'smile',text:'Спасибо. Сначала сама пойму, что именно нашла.'},
+    {who:'naya',expr:'talk',text:'Да. Пока это только совпадение, но я хочу разобраться сама.'},
+    {who:'sue',expr:'smile',text:'Если понадобится пара глаз — скажи. Я помогу.'},
+    {who:'naya',expr:'smile',text:'Договорились. Но сначала хочу собрать факты, а не строить теории.'},
     {who:'sue',expr:'smile',text:'Договорились.'},
   ]},
   { stats:{ trustSue:+3, humanity:+2 } },
   { goto:'uniDayEnd' },
 ],
 sueDayEnd2: [
+  { flag:'sueWaitingCorridor', value:false },
   { dlg:[
     {who:'sue',expr:'smile',text:'Ты закончила?'},
     {who:'naya',expr:'normal',text:'Да. Ты стала заметно лучше.'},
@@ -12538,9 +13011,10 @@ sueDayEnd2: [
   { goto:'uniDayEnd' },
 ],
 sueDayEnd3: [
+  { flag:'sueWaitingCorridor', value:false },
   { dlg:[
     {who:'sue',expr:'smile',text:'Ты придёшь завтра?'},
-    {who:'naya',expr:'normal',text:'Конечно.'},
+    {who:'naya',expr:'normal',text:'Конечно. После смены.'},
     {who:'sue',expr:'worried',text:'Даже если я забуду текст?'},
     {who:'naya',expr:'smile',text:'Тогда я скажу, что это была гениальная импровизация.'},
     {who:'sue',expr:'smile',text:'Отлично. Мне уже спокойнее.'},
@@ -12561,11 +13035,7 @@ suePremiereDay: [
 /* Общий переход между днями: вечер, дорога домой, утро. */
 uniDayEnd: [
   { fadeOut:800 },
-  ()=>{
-    UniDay.advance();
-    /* Новый день — новая смена. На четвёртый её берёт на себя Крис. */
-    if (C('uniDay') <= 3) setFlag('cafeShiftFinished', false);
-  },
+  ()=>{ UniDay.advance(); },
   { room:'nayaRoom', x:120, y:250 },
   { music:'home' },
   { fadeIn:800 },
@@ -12573,8 +13043,8 @@ uniDayEnd: [
     const d = C('uniDay');
     if (d === 4) return { goto:'uniDay4Morning' };
     return new Promise(res => Dialogue.start([
-      {who:'naya',expr:'normal',text:'(Дома. Сью уснула с текстом на лице.)'},
-      {who:'naya',expr:'talk',text:'(Завтра смена до шести. А потом — снова туда.)'},
+      {who:'naya',expr:'normal',text:'(Дома. Сью уснула прямо с текстом в руках.)'},
+      {who:'naya',expr:'talk',text:'(Завтра снова смена. Потом университет. Если я хочу разобраться — придётся совмещать.)'},
     ], res));
   },
 ],
@@ -12583,7 +13053,7 @@ uniDayEnd: [
 uniDay4Morning: [
   { music:'tense' },
   { dlg:[
-    {who:'naya',expr:'empty',text:'(Я почти не спала. На столе — кристалл и мой почерк на полях тетради.)'},
+    {who:'naya',expr:'empty',text:'(Я почти не спала. Кристалл лежит на столе рядом с записями из университета.)'},
     {who:'naya',expr:'talk',text:'(Сегодня у неё премьера. И сегодня Морель обещала рассказать.)'},
   ]},
   { sfx:'select' },
@@ -12598,7 +13068,7 @@ uniDay4Morning: [
   { flag:'chrisCovering' },
   ()=>{ Journal.add('chrisCover'); },
   { dlg:[
-    {who:'naya',expr:'talk',text:'(Всё. Сегодня я весь день там.)'},
+    {who:'naya',expr:'talk',text:'(Сегодня я не тороплюсь. У меня есть весь день, и я хочу закончить расследование нормально.)'},
   ]},
 ],
 
@@ -12691,9 +13161,10 @@ morelOldCorridor: [
   { dlg:[
     {who:'naya',expr:'talk',text:'Вы давно работаете в университете?'},
     {who:'genevieve',expr:'normal',text:'Достаточно давно.'},
-    {who:'naya',expr:'normal',text:'На старых фотографиях вы тоже есть.'},
-    {who:'genevieve',expr:'serious',text:'Вы нашли архив.'},
-    {who:'naya',expr:'normal',text:'Получается, вы знали, что я его найду.'},
+    {who:'naya',expr:'normal',text:'Настолько, что вы попали на фотографии тридцатилетней давности.'},
+    {who:'genevieve',expr:'serious',text:'Ты посмотрела не только открытые материалы.'},
+    {who:'naya',expr:'normal',text:'Да. И теперь хочу понять, почему вы там.'},
+    {who:'genevieve',expr:'normal',text:'Потому что когда-то я тоже здесь училась. И работала. Некоторые вещи повторяются дольше, чем хотелось бы.'},
   ]},
   { wait:600 },
   { dlg:[
@@ -12734,9 +13205,9 @@ libraryTheatre: [
   { dlg:[
     {who:'naya',expr:'normal',text:'История театра. Ряды одинаковых корешков, между ними — тонкая папка без названия.'},
     {who:'naya',expr:'normal',text:'Фотографии выпусков. Тридцатые, сороковые, пятидесятые.'},
-    {who:'naya',expr:'shocked',text:'(На фотографии сорок девятого года, в третьем ряду, стоит женщина.)'},
-    {who:'naya',expr:'shocked',text:'(Очень похожая на преподавательницу Сью. Совсем похожая.)'},
-    {who:'naya',expr:'normal',text:'(Ну да. Бабушка. Внучка. Такое бывает.)'},
+    {who:'naya',expr:'shocked',text:'(На старой фотографии, в третьем ряду, стоит женщина.)'},
+    {who:'naya',expr:'shocked',text:'(Это Морель. Или человек, который выглядит точно как Морель.)'},
+    {who:'naya',expr:'normal',text:'(Одна фотография ничего не доказывает. Но теперь я смотрю внимательнее.)'},
     {action(){ addC('libClues'); }},
   ]},
   { jump:()=> C('libClues') >= 3 && !F('learnedMedea') ? 'libraryBreak' : null },
@@ -13275,38 +13746,35 @@ roofTruth: [
   { goto:'genevieveReveal' },
 ],
 
-/* Конец смены на второй, третий и четвёртый день главы. Крис не
-   расспрашивает — он просто отмечает, что Ная зачастила. */
-/* Смена второго и третьего дня: короткий заход, работа, короткий выход.
-   Диспетчер — реплики Криса зависят от дня, а сама сцена повторяется. */
-cafeWorkDay: [
-  { music:'warm' },
+/* ЕЖЕДНЕВНАЯ СМЕНА. Дни 2 и 3 нельзя пропустить ради расследования:
+   игрок приходит в кафе, получает короткую реплику по текущему дню и
+   проходит тот же полноценный рабочий мини-цикл. */
+dailyCafeShift: [
   ()=>{
+    if (F('cafeShiftFinished')) return { goto:'chrisShiftDay' };
+    setFlag('cafeShiftStarted');
     const d = C('uniDay');
-    return new Promise(res => Dialogue.start(d >= 3 ? [
-      {who:'chris',expr:'normal',text:'Пришла. Я уж думал, ты сегодня в университете ночуешь.'},
-      {who:'naya',expr:'smile',text:'Ещё не всё выяснила. Дай фартук.'},
+    const lines = d === 2 ? [
+      {who:'chris',expr:'normal',text:'Опять ранний автобус? Сначала кофе, потом твоя таинственная жизнь.'},
+      {who:'naya',expr:'smile',text:'Сначала работа. Потом всё остальное.'},
+      {who:'chris',expr:'smile',text:'Вот это уже похоже на нормальный план.'},
     ] : [
-      {who:'chris',expr:'normal',text:'О, явилась. Вечер обещает быть бодрым.'},
-      {who:'naya',expr:'normal',text:'Как всегда. Давай.'},
-    ], res));
+      {who:'chris',expr:'normal',text:'Сегодня ты опять уходишь после смены?'},
+      {who:'naya',expr:'normal',text:'Да. Мне нужно кое-что закончить.'},
+      {who:'chris',expr:'smile',text:'Тогда сначала закончи здесь.'},
+      {who:'naya',expr:'smile',text:'Справедливо.'},
+    ];
+    return new Promise(res => Dialogue.start(lines, res));
   },
   { shift:true },
-  ()=>{
-    const d = C('uniDay');
-    return new Promise(res => Dialogue.start(d >= 3 ? [
-      {who:'chris',expr:'normal',text:'Всё, иди. Я закрою.'},
-      {who:'naya',expr:'smile',text:'Спасибо.'},
-      {who:'chris',expr:'smile',text:'И удачи там. С чем бы ты ни возилась.'},
-    ] : [
-      {who:'chris',expr:'smile',text:'Свободна. Беги к своей актрисе.'},
-      {who:'naya',expr:'smile',text:'Она не моя актриса.'},
-      {who:'chris',expr:'smile',text:'Ага.'},
-    ], res));
-  },
-  { dlg:[{who:'naya',expr:'talk',text:'(Теперь — автобус.)'}] },
+  { dlg:[
+    {who:'chris',expr:'normal',text:'Смена закончена.'},
+    {who:'naya',expr:'normal',text:'Теперь можно ехать.'},
+  ]},
 ],
 
+/* Конец смены на второй, третий и четвёртый день главы. Крис не
+   расспрашивает — он просто отмечает, что Ная зачастила. */
 chrisShiftDay: [
   ()=>{
     const d = C('uniDay');
@@ -13352,7 +13820,7 @@ genevieveReveal: [
   ]},
   { dlg:[
     {who:'naya',expr:'talk',text:'А кристалл?'},
-    {who:'genevieve',expr:'sad',text:'Кристалл — работа Мидеи. Я узнала его в первый же день, ещё в коридоре.'},
+    {who:'genevieve',expr:'sad',text:'Кристалл — работа Мидеи. Я узнала его, когда впервые увидела тебя в коридоре.'},
     {who:'genevieve',expr:'sad',text:'Поэтому и заговорила с тобой. Я думала, ты знаешь, что носишь.'},
     {who:'naya',expr:'angry',text:'Я не знала. Мне никто не сказал.'},
     {who:'genevieve',expr:'sad',text:'Знаю. И это, пожалуй, самое некрасивое во всей истории.'},
@@ -13461,7 +13929,6 @@ cafeScene: [
     {who:'naya',expr:'sad',text:'Всё нормально. Правда.'},
     {who:'sue',expr:'normal',text:'Ага. Поговорим дома.'},
   ]},
-  { flag:'cafeSceneComplete' },
   { memory:'cafe' },
   { dlg:[
     {who:'sue',expr:'smile',text:'Всё, я побежала, у меня прогон. Зайдёшь за мной после смены?'},
@@ -13470,6 +13937,7 @@ cafeScene: [
   ]},
   { dlg:[{who:'naya',expr:'normal',text:'(До конца смены — четыре часа и очередь у стойки.)'}] },
   { shift:true },
+  { flag:'cafeSceneComplete' },
   { dlg:[
     {who:'chris',expr:'normal',text:'Всё, иди. Я закрою.'},
     {who:'naya',expr:'sad',text:'Крис...'},
@@ -13497,48 +13965,49 @@ chrisAfter: [
 homeTalkWithSue: [
   { music:'sad' },
   { dlg:[
-    {who:'sue',expr:'normal',text:'Ты чего такая тихая весь вечер?'},
-    {who:'naya',expr:'normal',text:'Ничего.'},
-    {who:'sue',expr:'worried',text:'Ты опять говоришь «ничего», когда явно что-то есть.'},
-    {who:'naya',expr:'sad',text:'...Ладно. Мне сегодня показалось, что ты про меня забыла.'},
-    {who:'sue',expr:'shocked',text:'Я?'},
-    {who:'naya',expr:'normal',text:'Понимаю, что звучит глупо. Но мне всё равно было неприятно, и врать я не буду.'},
-    {who:'sue',expr:'sad',text:'Почему ты раньше не сказала?'},
+    {who:'sue',expr:'normal',text:'Ты сегодня какая-то отстранённая. Всё нормально?'},
+    {who:'naya',expr:'normal',text:'Не совсем. Я сама пока разбираюсь, что со мной происходит.'},
+    {who:'sue',expr:'worried',text:'Можешь не рассказывать сразу. Просто скажи, что тебе сейчас от меня нужно.'},
+    {who:'naya',expr:'sad',text:'Наверное, чтобы ты просто послушала. Без попытки всё исправить.'},
+    {who:'sue',expr:'smile',text:'Это я умею. Ну... иногда.'},
+    {who:'naya',expr:'smile',text:'Тогда иногда — тоже подходит.'},
   ]},
   { dlg:[
-    {choice:{ prompt:'Она ждёт. Впервые за много лет — по-настоящему ждёт.', options:[
-      { text:'«Потому что это выглядит некрасиво. А мне не хочется быть некрасивой при тебе.»',
+    {choice:{ prompt:'Ная впервые говорит прямо. Сью не давит.', options:[
+      { text:'«Мне неприятно, что у тебя сейчас столько всего нового, а я не понимаю, где моё место.»',
         stats:{trustSue:+12, humanity:+6},
         then:[
-          {who:'naya',expr:'sad',text:'Потому что это выглядит некрасиво. А мне не хочется быть некрасивой при тебе.'},
-          {who:'sue',expr:'sad',text:'Ная. Я тебя с девяти лет знаю. Я видела тебя всякой.'},
-          {who:'sue',expr:'smile',text:'И я всё ещё здесь.'},
-          {who:'naya',expr:'normal',text:'Знаю. Поэтому и говорю.'},
+          {who:'naya',expr:'sad',text:'У тебя университет, новые люди, репетиции. Я рада за тебя. Просто иногда не понимаю, где в этом всём моё место.'},
+          {who:'sue',expr:'sad',text:'Рядом со мной. Это место никуда не делось.'},
+          {who:'naya',expr:'normal',text:'Я знаю. Просто иногда мне нужно это услышать.'},
+          {who:'sue',expr:'smile',text:'Тогда говори. Я не догадаюсь каждый раз сама.'},
         ]},
-      { text:'«Потому что это моё дело, а не твоё.»',
-        stats:{trustSue:-4, witchAmbition:+5},
+      { text:'«Мне нужно немного пространства. Но я не хочу от тебя отдаляться.»',
+        stats:{trustSue:+6, humanity:+4},
         then:[
-          {who:'naya',expr:'normal',text:'Потому что это моё дело. Разберусь.'},
-          {who:'sue',expr:'worried',text:'Ты всегда так говоришь. И потом три дня ходишь тихая.'},
-          {who:'naya',expr:'normal',text:'Значит, у меня будет три тихих дня.'},
+          {who:'naya',expr:'normal',text:'Мне нужно немного пространства, чтобы самой разобраться. Но я не хочу от тебя отдаляться.'},
+          {who:'sue',expr:'normal',text:'Хорошо. Я дам тебе его.'},
+          {who:'sue',expr:'smile',text:'Только не превращай «пространство» в исчезновение на три дня.'},
+          {who:'naya',expr:'smile',text:'Не обещаю три. Максимум два.'},
         ]},
-      { text:'«Потому что ты бы всё равно не поняла.»',
-        stats:{trustSue:-9, witchAmbition:+7, humanity:-4},
+      { text:'«Я пока не готова об этом говорить.»',
+        stats:{trustSue:+2, humanity:+2},
         then:[
-          {who:'naya',expr:'angry',text:'Потому что ты бы не поняла. У тебя всё легко. У тебя всегда всё было легко.'},
-          {who:'sue',expr:'shocked',text:'...это неправда.'},
-          {who:'naya',expr:'sad',text:'(Это правда. И я только что сказала это вслух — уже перебор.)'},
+          {who:'naya',expr:'normal',text:'Я пока не готова об этом говорить.'},
+          {who:'sue',expr:'normal',text:'Хорошо. Когда будешь — я рядом.'},
+          {who:'naya',expr:'smile',text:'Спасибо.'},
         ]},
     ]}},
   ]},
   { dlg:[
-    {who:'naya',expr:'talk',text:'Иногда я мечтаю просто убежать. В другую жизнь. Не быть собой.'},
-    {who:'sue',expr:'normal',text:'Куда ты хочешь убежать?'},
+    {who:'naya',expr:'talk',text:'Иногда я хочу просто выйти из этой жизни. Не потому, что мне плохо с тобой. Наоборот. Я устала от того, что за меня всё уже будто решено.'},
+    {who:'sue',expr:'normal',text:'Куда бы ты ушла, если бы могла выбрать любое место?'},
     {who:'naya',expr:'shocked',text:'Куда угодно. Хоть в ад.'},
-    {who:'sue',expr:'smile',text:'Ха. А что если правда — в ад? Только без меня, я туда пас.'},
-    {who:'naya',expr:'normal',text:'...в ад.'},
-    {who:'naya',expr:'shocked',text:'(Кристалл. Он весь вечер отзывается под рукой на каждое её слово. Может быть...)'},
-    {who:'sue',expr:'worried',text:'Ная? Ная, что ты делаешь?'},
+    {who:'sue',expr:'smile',text:'Если это фигура речи — я понимаю. Если буквально — сначала предупрежу, что мне будет страшно.'},
+    {who:'naya',expr:'normal',text:'Я тоже не собиралась никуда идти. Просто...'},
+    {who:'sue',expr:'worried',text:'Ная, подожди. Кристалл светится.'},
+    {who:'naya',expr:'shocked',text:'Я вижу.'},
+    {who:'sue',expr:'worried',text:'Тогда давай хотя бы не делать вид, что это шутка.'},
   ]},
   { flag:'homeTalkDone' },
   { sfx:'portal' },
@@ -15812,6 +16281,501 @@ function tick(t) {
   requestAnimationFrame(tick);
 }
 
+
+/* =====================================================================
+   DEVELOPER TEST TOOLS
+   Только для локального тестирования. Не является частью сюжета.
+===================================================================== */
+const DevTools = {
+  fromMainMenu: false,
+  storyPoints: [
+    {
+      id:'uni_day1_hall',
+      title:'День 1 — холл',
+      desc:'после смены, начало расследования',
+      room:'uniHall', x:220, y:300,
+      apply() {
+        this.baseUni(1);
+        gameState.flags.uniArrived = true;
+        gameState.flags.uniHallStands = false;
+      }
+    },
+    {
+      id:'uni_day1_rehearsal',
+      title:'День 1 — репетиция',
+      desc:'Сью на репетиции, Морель ещё впереди',
+      room:'uniRehearsal', x:220, y:270,
+      apply() {
+        this.baseUni(1);
+        Object.assign(gameState.flags,{
+          uniArrived:true, uniTeacherList:true, sawRehearsal:false,
+          metGenevieveUni:false, symbolPhoto:false, libAsked:false
+        });
+      }
+    },
+    {
+      id:'uni_day1_library',
+      title:'День 1 — библиотека',
+      desc:'найти старые театральные материалы',
+      room:'uniLibrary', x:150, y:220,
+      apply() {
+        this.baseUni(1);
+        Object.assign(gameState.flags,{
+          uniArrived:true, uniTeacherList:true, sawRehearsal:true,
+          metGenevieveUni:true, symbolPhoto:true, libAsked:false
+        });
+      }
+    },
+    {
+      id:'uni_day2_library',
+      title:'День 2 — библиотека',
+      desc:'сравнение материалов разных лет',
+      room:'uniLibrary', x:150, y:220,
+      apply() {
+        this.baseUni(2);
+        Object.assign(gameState.flags,{
+          uniArrived:true, uniTeacherList:true, sawRehearsal:true,
+          metGenevieveUni:true, symbolPhoto:true, libAsked:true,
+          libPeriods:false, propsSymbol:false, propsMorel:false, morelKnowsName:false
+        });
+      }
+    },
+    {
+      id:'uni_day2_theatre',
+      title:'День 2 — театр',
+      desc:'реквизит и старый символ',
+      room:'uniWestHall', x:135, y:470,
+      apply() {
+        this.baseUni(2);
+        Object.assign(gameState.flags,{
+          uniArrived:true, uniTeacherList:true, sawRehearsal:true,
+          metGenevieveUni:true, symbolPhoto:true, libAsked:true,
+          libPeriods:true, propsSymbol:false, propsMorel:false, morelKnowsName:false
+        });
+      }
+    },
+    {
+      id:'uni_day3_oldwing',
+      title:'День 3 — старое крыло',
+      desc:'открыт маршрут к служебной лестнице',
+      room:'uniOldWing', x:430, y:230,
+      apply() {
+        this.baseUni(3);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libPeriods:true, propsSymbol:true, propsMorel:true,
+          morelKnowsName:true, basementFound:false, archiveMedeaFound:false,
+          archiveMorelFound:false, roofPromise:false
+        });
+      }
+    },
+    {
+      id:'uni_day3_basement',
+      title:'День 3 — цоколь',
+      desc:'поиск настоящего архива',
+      room:'uniBasement', x:120, y:250,
+      apply() {
+        this.baseUni(3);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libPeriods:true, propsSymbol:true, propsMorel:true,
+          morelKnowsName:true, basementFound:true, archiveMedeaFound:false,
+          archiveMorelFound:false, roofPromise:false
+        });
+      }
+    },
+    {
+      id:'uni_day3_archive',
+      title:'День 3 — архив',
+      desc:'Медея и имя Морель',
+      room:'uniArchive', x:150, y:210,
+      apply() {
+        this.baseUni(3);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libPeriods:true, propsSymbol:true, propsMorel:true,
+          morelKnowsName:true, basementFound:true, archiveMedeaFound:true,
+          archiveMorelFound:false, roofPromise:false
+        });
+      }
+    },
+    {
+      id:'uni_day3_roof',
+      title:'День 3 — крыша',
+      desc:'догнать Морель',
+      room:'uniRoof', x:160, y:220,
+      apply() {
+        this.baseUni(3);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libPeriods:true, propsSymbol:true, propsMorel:true,
+          morelKnowsName:true, basementFound:true, archiveMedeaFound:true,
+          archiveMorelFound:true, roofPromise:false
+        });
+      }
+    },
+    {
+      id:'uni_day4_banned',
+      title:'День 4 — запрет',
+      desc:'охранник перекрыл главный вход',
+      room:'uniFrontYard', x:250, y:315,
+      apply() {
+        this.baseUni(4);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libMissing:true, morelPhotoSeen:true,
+          archiveFolderFound:false, premiereDone:false,
+          universityBanned:true, universityAccessRestricted:true,
+          backWindowUsed:false, knowsServiceRoute:false
+        });
+      }
+    },
+    {
+      id:'uni_day4_bypass',
+      title:'День 4 — обход',
+      desc:'задний двор и служебный маршрут',
+      room:'uniBackYard', x:70, y:260,
+      apply() {
+        this.baseUni(4);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libMissing:true, morelPhotoSeen:true,
+          universityBanned:true, universityAccessRestricted:true,
+          backWindowUsed:true, knowsServiceRoute:true,
+          archiveFolderFound:false, premiereDone:false
+        });
+      }
+    },
+    {
+      id:'uni_day4_morel',
+      title:'День 4 — кабинет Морель',
+      desc:'после находки фотографии',
+      room:'uniMorelOffice', x:120, y:180,
+      apply() {
+        this.baseUni(4);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libMissing:true, morelPhotoSeen:false,
+          universityBanned:true, universityAccessRestricted:true,
+          backWindowUsed:true, knowsServiceRoute:true,
+          archiveFolderFound:false, premiereDone:false
+        });
+      }
+    },
+    {
+      id:'uni_day4_premiere',
+      title:'День 4 — премьера',
+      desc:'Сью играет спектакль',
+      room:'uniTheatre', x:150, y:270,
+      apply() {
+        this.baseUni(4);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libMissing:true, morelPhotoSeen:true,
+          universityBanned:true, universityAccessRestricted:true,
+          backWindowUsed:true, knowsServiceRoute:true,
+          archiveFolderFound:true, premiereDone:false
+        });
+      }
+    },
+    {
+      id:'uni_day4_roof_truth',
+      title:'День 4 — крыша / правда',
+      desc:'Морель раскрывает тайну Медеи',
+      room:'uniRoof', x:160, y:220,
+      apply() {
+        this.baseUni(4);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libMissing:true, morelPhotoSeen:true,
+          universityBanned:true, universityAccessRestricted:true,
+          backWindowUsed:true, knowsServiceRoute:true,
+          archiveFolderFound:true, premiereDone:true,
+          morelTruth:false, communeInvite:false
+        });
+      }
+    },
+    {
+      id:'commune_invite',
+      title:'После университета',
+      desc:'приглашение в коммуну ведьм',
+      room:'uniRoof', x:160, y:220,
+      apply() {
+        this.baseUni(4);
+        Object.assign(gameState.flags,{
+          uniArrived:true, libMissing:true, morelPhotoSeen:true,
+          universityBanned:true, backWindowUsed:true, knowsServiceRoute:true,
+          archiveFolderFound:true, premiereDone:true,
+          morelTruth:true, communeInvite:true
+        });
+      }
+    }
+  ],
+
+  baseUni(day) {
+    const fresh = freshState();
+    gameState = fresh;
+    gameState.currentRoom = 'uniHall';
+    gameState.playerX = 220; gameState.playerY = 300;
+    gameState.act = 0;
+    gameState.chapter = 1;
+    gameState.eventStep = 0;
+    gameState.counters.uniDay = day;
+    gameState.counters.sueRehearsal = day;
+    gameState.flags.prologueComplete = true;
+    gameState.flags.prologBackstoryStarted = true;
+    gameState.flags.backstoryDone = true;
+    gameState.flags.mainStoryStarted = true;
+    gameState.flags.metSue = true;
+    gameState.flags.cafeSceneComplete = true;
+    gameState.flags.cafeShiftStarted = true;
+    gameState.flags.cafeShiftFinished = true;
+    gameState.flags.sueWaitingCorridor = false;
+    gameState.inventory = ['Кристалл'];
+    gameState.journal = [];
+    gameState.scenesSeen = [];
+    gameState.stats = { trustSue:65, witchAmbition:20, humanity:70, hellAffinity:0 };
+    // Первые три дня должны считаться уже после обязательной смены.
+    if (day <= 3) {
+      gameState.flags.cafeShiftFinished = true;
+      gameState.flags.cafeShiftStarted = true;
+    }
+  },
+
+  open(fromMainMenu=false) {
+    this.fromMainMenu = !!fromMainMenu;
+    this.render();
+    const screen = document.getElementById('devToolsScreen');
+    screen.classList.add('show');
+    Game.paused = true;
+    document.getElementById('pauseMenu').classList.remove('show');
+    if (this.fromMainMenu) {
+      document.getElementById('mainMenu').classList.remove('show');
+    }
+  },
+
+  close() {
+    document.getElementById('devToolsScreen').classList.remove('show');
+    if (this.fromMainMenu) {
+      this.fromMainMenu = false;
+      Game.mode = 'menu';
+      Game.paused = false;
+      document.getElementById('mainMenu').classList.add('show');
+      document.getElementById('pauseMenu').classList.remove('show');
+      return;
+    }
+    Game.paused = false;
+    if (gameState) {
+      Game.mode = 'explore';
+      document.getElementById('endingScreen').classList.remove('show');
+      document.getElementById('dialogueBox').classList.remove('active');
+      document.getElementById('choiceBox').classList.remove('show');
+      document.getElementById('questPanel').classList.remove('show');
+      FX.clearAll(); FX.refreshCorruption();
+      const room = Rooms[gameState.currentRoom];
+      if (room) {
+        Music.play(room.music || 'home');
+        Weather.apply(room);
+        Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
+      }
+      World.invalidate();
+      UI.updateInventory();
+      Quests.refresh(false);
+      this.updateReadout();
+    }
+  },
+
+  /* Сюжетные флаги связаны между собой, и выставить один без другого —
+     значит получить состояние, которого в игре не бывает. Так точки
+     четвёртого дня ставили backWindowUsed без oldWingOpen, и цель
+     залипала на «Найти другой путь в корпус» уже после того, как Ная
+     этот путь нашла. Здесь состояние доводится до непротиворечивого. */
+  normalize() {
+    const f = gameState.flags;
+    if (f.backWindowUsed)      { f.oldWingOpen = true; f.knowsServiceRoute = true; }
+    if (f.universityBanned)    { f.universityAccessRestricted = true; f.universityWindowRouteUnlocked = true; }
+    if (f.premiereDone)          f.archiveFolderFound = true;
+    if (f.morelTruth)          { f.premiereDone = true; f.archiveFolderFound = true; }
+    if (f.communeInvite)         f.morelTruth = true;
+    if (f.archiveMorelFound)   { f.archiveMedeaFound = true; }
+    if (f.archiveMedeaFound)   { f.learnedMedea = true; f.basementFound = true; f.sawBasement = true; }
+    if (f.roofPromise)           f.archiveMorelFound = true;
+    if (f.basementFound)         f.sawFloor2 = f.sawOldWing = true;
+    if (f.morelKnowsName)      { f.propsMorel = true; f.investigatedUniversity = true; }
+    if (f.propsMorel)            f.propsSymbol = true;
+    if (f.propsSymbol)           f.libPeriods = true;
+    if (f.libAsked)              f.symbolPhoto = true;
+    if (f.symbolPhoto)         { f.metGenevieveUni = true; f.crystalReacted = true; }
+    if (f.metGenevieveUni)       f.sawRehearsal = true;
+    if (f.sawRehearsal)          f.uniTeacherList = true;
+    if (f.uniTeacherList)        f.uniHallStands = true;
+    // на четвёртый день Наю подменяет Крис, смена не нужна
+    if (C('uniDay') >= 4)      { f.chrisCovering = true; f.cafeShiftFinished = true; }
+  },
+
+  async applyPoint(point) {
+    Scene.active = false; Scene.pending = null;
+    Dialogue.active = false;
+    Game.chase = null;
+    Game.endingShown = false;
+
+    // Сначала формируем тестовое сюжетное состояние.
+    point.apply.call(this);
+    this.normalize();
+
+    // ВАЖНО: не меняем currentRoom вручную. Используем штатный changeRoom(),
+    // чтобы сработали fade, камера, collision, Patrol, Weather, Ambience,
+    // музыка, очистка FX и onEnter — ровно так же, как при обычном переходе.
+    const x = point.x, y = point.y;
+    const target = point.room;
+    this.closeOverlayForTravel();
+    Game.mode = 'explore';
+    Game.paused = false;
+    try {
+      await changeRoom(target, x, y);
+      this.updateReadout();
+    } catch (e) {
+      console.error('[DEV] Ошибка перехода:', e);
+      // Не оставляем игру в transition/чёрном экране при ошибке.
+      Game.mode = 'explore'; Game.paused = false;
+      World.invalidate();
+      drawRoom();
+      UI.toast('DEV: ошибка перехода, см. консоль', 2600);
+    }
+  },
+
+  async teleport(roomKey) {
+    if (!Rooms[roomKey]) return;
+    if (!gameState) {
+      this.baseUni(Math.max(1, C('uniDay') || 1));
+    }
+    Scene.active = false; Scene.pending = null;
+    Dialogue.active = false;
+    Game.chase = null;
+    Game.endingShown = false;
+
+    const room = Rooms[roomKey];
+    const spot = this.freeSpot(room);
+    const x = spot.x, y = spot.y;
+    this.closeOverlayForTravel();
+    Game.mode = 'explore';
+    Game.paused = false;
+    try {
+      await changeRoom(roomKey, x, y);
+      this.updateReadout();
+    } catch (e) {
+      console.error('[DEV] Ошибка телепорта:', e);
+      Game.mode = 'explore'; Game.paused = false;
+      World.invalidate();
+      drawRoom();
+      UI.toast('DEV: ошибка перехода, см. консоль', 2600);
+    }
+  },
+
+  /* Центр комнаты не везде свободен (в прологе там стена), поэтому
+     ищем ближайшую к центру точку, где игрок не застрянет. */
+  freeSpot(room) {
+    const W = room.w || 240, H = room.h || 300;
+    const cx = Math.min(Math.max(24, W / 2), W - 24);
+    const cy = Math.min(Math.max(40, H / 2), H - 40);
+    const free = (x, y) => {
+      const box = { x: x - Player.w / 2, y: y - Player.h, w: Player.w, h: Player.h };
+      for (const w of (room.walls || [])) if (rectHit(box, w)) return false;
+      return !World.blockedByProps(room, box);
+    };
+    if (free(cx, cy)) return { x: cx, y: cy };
+    for (let r = 8; r <= Math.max(W, H); r += 8) {
+      for (let a = 0; a < 16; a++) {
+        const t = a * Math.PI / 8;
+        const x = Math.min(Math.max(20, cx + Math.cos(t) * r), W - 20);
+        const y = Math.min(Math.max(36, cy + Math.sin(t) * r), H - 20);
+        if (free(x, y)) return { x, y };
+      }
+    }
+    return { x: cx, y: cy };
+  },
+
+  closeOverlayForTravel() {
+    document.getElementById('devToolsScreen').classList.remove('show');
+    document.getElementById('endingScreen').classList.remove('show');
+    document.getElementById('dialogueBox').classList.remove('active');
+    document.getElementById('choiceBox').classList.remove('show');
+    document.getElementById('pauseMenu').classList.remove('show');
+    try { FX.clearAll(); FX.refreshCorruption(); } catch(e) { console.warn('[DEV] FX reset:', e); }
+    World.invalidate();
+    UI.updateInventory();
+  },
+
+  finishApply(label) {
+    // Оставлено для совместимости со старыми вызовами DEV-кода.
+    this.closeOverlayForTravel();
+    Game.mode = 'explore'; Game.paused = false;
+    World.invalidate();
+    UI.updateInventory();
+    Quests.refresh(false);
+    saveGame();
+    this.updateReadout();
+    UI.toast(label + ' — готово', 1800);
+  },
+
+  fresh() {
+    Scene.active = false; Scene.pending = null;
+    Dialogue.active = false;
+    Game.chase = null;
+    Game.endingShown = false;
+    gameState = freshState();
+    Player.x = gameState.playerX;
+    Player.y = gameState.playerY;
+    try { localStorage.removeItem(CONFIG.SAVE_KEY); } catch(e) {}
+    this.finishApply('Начальное состояние');
+  },
+
+  render() {
+    const sg = document.getElementById('devStoryGrid');
+    const rg = document.getElementById('devRoomGrid');
+    if (!sg || !rg) return;
+    sg.innerHTML = '';
+    rg.innerHTML = '';
+
+    this.storyPoints.forEach(p => {
+      const b = document.createElement('button');
+      b.className = 'devBtn';
+      b.innerHTML = '<span class="devTitle">' + p.title + '</span><span class="devDesc">' + p.desc + '</span>';
+      b.addEventListener('click', () => this.applyPoint(p));
+      sg.appendChild(b);
+    });
+
+    /* Корпус — отдельной сеткой, весь остальной мир — второй: новую
+       локацию достаточно добавить в Rooms, кнопка появится сама. */
+    const wg = document.getElementById('devWorldGrid');
+    const fill = (grid, keys) => {
+      if (!grid) return;
+      grid.innerHTML = '';
+      keys.forEach(k => {
+        const b = document.createElement('button');
+        b.className = 'devBtn';
+        b.innerHTML = '<span class="devTitle">' + (Rooms[k].name || k) + '</span><span class="devDesc">' + k + '</span>';
+        b.addEventListener('click', () => this.teleport(k));
+        grid.appendChild(b);
+      });
+    };
+    const all = Object.keys(Rooms);
+    fill(rg, all.filter(k => /^uni/.test(k)));
+    fill(wg, all.filter(k => !/^uni/.test(k)));
+
+    this.updateReadout();
+  },
+
+  updateReadout() {
+    const el = document.getElementById('devStateReadout');
+    if (!el) return;
+    if (!gameState) { el.textContent = 'Состояние: нет игры'; return; }
+    const g = Quests.goal();
+    el.textContent =
+      'Комната: ' + gameState.currentRoom +
+      '\nДень университета: ' + C('uniDay') +
+      '\nЦель: ' + (g ? g.t : '—') +
+      '\nСмена кафе: ' + (F('cafeShiftFinished') ? 'пройдена' : 'не пройдена') +
+      '\nФлаги университета: ' +
+      ['uniArrived','uniTeacherList','sawRehearsal','metGenevieveUni','symbolPhoto','libAsked',
+       'libPeriods','propsSymbol','propsMorel','morelKnowsName','basementFound','archiveMedeaFound',
+       'archiveMorelFound','roofPromise','libMissing','morelPhotoSeen','universityBanned',
+       'backWindowUsed','knowsServiceRoute','archiveFolderFound','premiereDone','morelTruth','communeInvite']
+      .filter(k => F(k)).join(', ');
+  }
+};
+
 /* =====================================================================
    MENUS / SCREENS
 ===================================================================== */
@@ -16007,11 +16971,24 @@ window.addEventListener('load', () => {
     document.getElementById('fxVal').textContent = prev.settings.effects ? 'вкл' : 'выкл';
   }
 
-  const wire = (id, fn) => document.getElementById(id).addEventListener('click', () => { Audio.resume(); Audio.click(); fn(); });
+  /* Кнопки, которых нет в разметке, не должны обрывать инициализацию:
+     раньше одна отсутствующая (btnPauseDev) убивала всё, что вешалось
+     после неё — закрытие меню разработчика, F8, Escape, выход в главное
+     меню и три кнопки на карточке концовки. */
+  const wire = (id, fn) => {
+    const el = document.getElementById(id);
+    if (!el) { console.warn('нет кнопки', id); return; }
+    el.addEventListener('click', () => { Audio.resume(); Audio.click(); fn(); });
+  };
+  const wireOpt = (id, ev, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(ev, fn); else console.warn('нет элемента', id);
+  };
 
   wire('btnNew', startNewGame);
   wire('btnContinue', continueGame);
   wire('btnSettings', () => UI.showScreen('settingsPanel', true));
+  wire('btnDevMain', () => DevTools.open(true));
   wire('btnBackSettings', () => { UI.showScreen('settingsPanel', false); });
   wire('btnMemories', () => { Memories.renderList(); UI.showScreen('memoriesScreen', true); });
   wire('btnBackMemories', () => UI.showScreen('memoriesScreen', false));
@@ -16068,6 +17045,25 @@ window.addEventListener('load', () => {
   wire('btnSaveGame', () => { saveGame(); UI.toast('Сохранено'); });
   wire('btnPauseMemories', () => { Memories.renderList(); UI.showScreen('memoriesScreen', true); });
   wire('btnPauseSettings', () => UI.showScreen('settingsPanel', true));
+  wire('btnPauseDev', () => DevTools.open());
+  wireOpt('devClose', 'click', () => { Audio.resume(); Audio.click(); DevTools.close(); });
+  wireOpt('devFresh', 'click', () => {
+    Audio.resume(); Audio.click();
+    if (confirm('Сбросить сюжет и сохранение?')) DevTools.fresh();
+  });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'F8') {
+      e.preventDefault();
+      if (Game.mode !== 'cutscene') {
+        Audio.resume();
+        DevTools.open(false);
+      }
+    }
+    if (e.code === 'Escape' && document.getElementById('devToolsScreen').classList.contains('show')) {
+      e.preventDefault();
+      DevTools.close();
+    }
+  });
   wire('btnToMenu', () => { saveGame(); location.reload(); });
 
   wire('btnRewind', rewindToCheckpoint);

@@ -151,6 +151,15 @@ async function opening(page, picks, tag) {
    Маршруты идут по настоящей архитектуре здания: холл → крыло →
    комната → обратно в крыло → холл. Каждый день закрывается разговором
    со Сью в репетиционном зале западного крыла.                        */
+/* Вечер: Ная заходит в зал, Сью обещает выйти, зал пустеет, и разговор
+   продолжается уже в коридоре у двери. */
+async function endUniDay(page, tag) {
+  await step(page, 'obj', 'toRehearsal', [], tag);
+  await step(page, 'npc', 'Сью', [], tag);   // «выйду к тебе сама»
+  await step(page, 'obj', 'exit', [], tag);  // -> коридор западного крыла
+  await step(page, 'npc', 'Сью', [], tag);   // ждёт у двери -> дом
+}
+
 async function university(page, picks, tag) {
   const day = () => page.evaluate(() => C('uniDay'));
   const need = async (d, t) => {
@@ -159,7 +168,8 @@ async function university(page, picks, tag) {
   };
 
   // --- день первый: стенды, репетиция, кулон, символ, библиотекарь ---
-  await step(page, 'obj', 'toUni', [], tag);                       // автобус -> главный холл
+  await step(page, 'obj', 'toUni', [], tag);                       // автобус -> передний двор
+  await step(page, 'obj', 'mainEntrance', [], tag);                // -> главный холл
   await need(1, 'приезд');
   await step(page, 'obj', 'teachers', [], tag);                    // ЖЕНЕВЬЕВА МОРЕЛЬ
   await step(page, 'obj', 'toWest', [], tag);                      // западное крыло
@@ -174,7 +184,7 @@ async function university(page, picks, tag) {
   await step(page, 'obj', 'exit', [], tag);
   await step(page, 'obj', 'toHall', [], tag);
   await step(page, 'obj', 'toWest', [], tag);
-  await step(page, 'npc', 'Сью', [], tag);                         // ждёт в коридоре -> дом
+  await endUniDay(page, tag);
   await need(2, 'конец первого дня');
 
   // --- день второй: периоды, щит на сцене, коробки, «До свидания, Ная.» ---
@@ -193,7 +203,7 @@ async function university(page, picks, tag) {
   await step(page, 'obj', 'costumeBoxes', [], tag);                // МОРЕЛЬ в коробках
   await step(page, 'obj', 'exit', [], tag);                        // -> гримёрная
   await step(page, 'obj', 'exit', [], tag);                        // -> коридор: «Я не называла имени»
-  await step(page, 'npc', 'Сью', [], tag);                         // ждёт в коридоре
+  await endUniDay(page, tag);
   await need(3, 'конец второго дня');
 
   // --- день третий: старое крыло, служебная лестница, архив, крыша ---
@@ -217,7 +227,7 @@ async function university(page, picks, tag) {
   await step(page, 'obj', 'toCorr2', [], tag);
   await step(page, 'obj', 'toFloor1', [], tag);
   await step(page, 'obj', 'toWest', [], tag);
-  await step(page, 'npc', 'Сью', [], tag);                         // ждёт в коридоре
+  await endUniDay(page, tag);
   await need(4, 'конец третьего дня');
 
   // --- день четвёртый: запрет, обходной путь, премьера, правда ---
@@ -263,6 +273,7 @@ async function toUni(page, tag) {
     await step(page, 'obj', 'exit', [], tag);
   }
   await step(page, 'obj', 'toUni', [], tag);
+  await step(page, 'obj', 'mainEntrance', [], tag);   // передний двор -> холл
 }
 
 async function amuletArc(page, picks, tag) {

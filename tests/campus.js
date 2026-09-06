@@ -35,12 +35,16 @@ const H = require('./harness.js');
     s = await H.snap(page);
     console.log('после окна: комната=%s oldWingOpen=%s', s.room, s.flags.includes('oldWingOpen'));
     if (s.room !== 'uniServiceStair') throw new Error('ожидалась uniServiceStair, а не ' + s.room);
-    // служебная лестница действительно связывает всё здание
-    console.log(await H.useObj(page, 'down'));
-    await H.pump(page, [], 'CAMPUS');
-    s = await H.snap(page);
-    console.log('вниз по лестнице: комната=%s', s.room);
-    if (s.room !== 'uniBasement') throw new Error('ожидался uniBasement, а не ' + s.room);
+    /* Обход должен доводить не до лестницы, а внутрь корпуса: лестница —
+       только вход. Проверяем весь путь до главного холла. */
+    for (const [name, want] of [['toOldWing','uniOldWing'], ['toCorr2','uniCorr2'], ['toFloor1','uniHall']]) {
+      const r = await H.useObj(page, name);
+      if (r !== 'ok') throw new Error(name + ': ' + r);
+      await H.pump(page, [], 'CAMPUS');
+      s = await H.snap(page);
+      console.log('%s -> %s', name, s.room);
+      if (s.room !== want) throw new Error('ожидался ' + want + ', а не ' + s.room);
+    }
     return {};
   });
   H.errors.forEach(e=>console.log(e));
