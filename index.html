@@ -3138,6 +3138,31 @@ function woodGrain(g, x, y, w, h, col) {
   });
 
   /* ---- главная лестница холла ---- */
+  /* ---- служебный марш: бетон и металлические перила. В цоколе и на
+          чёрных лестницах парадного ковра не бывает ---- */
+  D('stairs_service', {w:88,h:60,ax:44,ay:56,foot:{x:-44,y:-56,w:88,h:58}}, g => {
+    g.fillStyle = '#1e1e24'; g.fillRect(22, 0, 44, 7);
+    for (let i = 0; i < 7; i++) {
+      const y = 3 + i * 8, w = 54 + i * 5, x = 44 - w / 2;
+      g.fillStyle = 'rgba(0,0,0,.32)'; g.fillRect(x, y + 6, w, 2);
+      g.fillStyle = '#4c4c56'; g.fillRect(x, y, w, 7);
+      g.fillStyle = '#5e5e6a'; g.fillRect(x, y, w, 2);
+      g.fillStyle = '#6e6e7c'; g.fillRect(x, y, w, 1);
+    }
+    [[1, 2], [-1, 86]].forEach(([dir, x0]) => {
+      g.fillStyle = '#5c5c66';
+      g.beginPath();
+      g.moveTo(x0, 54); g.lineTo(x0 + dir * 13, 2); g.lineTo(x0 + dir * 17, 2);
+      g.lineTo(x0 + dir * 4, 54); g.closePath(); g.fill();
+      g.fillStyle = '#43434c';
+      for (let i = 0; i < 5; i++) g.fillRect(x0 + dir * (2 + i * 2.4) - (dir < 0 ? 2 : 0), 46 - i * 9, 2, 9);
+      g.fillStyle = '#74747e';
+      g.beginPath();
+      g.moveTo(x0, 51); g.lineTo(x0 + dir * 13, -1); g.lineTo(x0 + dir * 15, -1);
+      g.lineTo(x0 + dir * 2, 51); g.closePath(); g.fill();
+    });
+  });
+
   /* ---- парадный марш: ступени сужаются кверху, по краям балюстрада,
           посередине ковровая дорожка с латунными прутьями ---- */
   D('stairs_main', {w:96,h:64,ax:48,ay:60,foot:{x:-48,y:-60,w:96,h:62}}, g => {
@@ -4195,23 +4220,25 @@ function uniOutside(g, x, y, w, h, kind, o) {
 
   else if (kind === 'yardDown') {
     /* Двор со второго этажа: смотришь вниз, поэтому земли много, а от
-       противоположного крыла видно только крышу и верх стены. */
-    const rf = y + h * .30;
-    sky(h * .10, '#39404e', '#5d5a56');
-    g.fillStyle = '#4a4038'; R(x, y + h * .08, w, rf - y - h * .08);     // крыша напротив
+       противоположного крыла видно только край кровли и карниз. */
+    const rf = y + h * .20;
+    g.fillStyle = '#454b55'; R(x, y, w, h * .07);                         // полоска неба над кровлей
+    g.fillStyle = '#4a4038'; R(x, y + h * .06, w, rf - y - h * .06);      // кровля напротив
     g.fillStyle = '#565043';
-    for (let xx = x; xx < x + w; xx += 9) R(xx, y + h * .09, 4, rf - y - h * .09);
-    g.fillStyle = '#39322a'; R(x, rf - 4, w, 4);
-    g.fillStyle = '#6b6256'; R(x, rf, w, 3);                              // карниз
-    ground(rf + 3, UNI.paving, UNI.pavingLo);
-    g.fillStyle = UNI.grass; R(x + w * .04, rf + h * .14, w * .40, h * .30);
-    g.fillStyle = UNI.grassLo; R(x + w * .56, rf + h * .14, w * .40, h * .30);
+    for (let xx = x; xx < x + w; xx += 9) R(xx, y + h * .07, 4, rf - y - h * .07);
+    g.fillStyle = '#39322a'; R(x, rf - 3, w, 3);
+    g.fillStyle = '#7b7264'; R(x, rf, w, 3);                              // карниз
+    ground(rf + 3, '#7a746a', '#6b665d');
+    g.fillStyle = UNI.grass;   R(x + w * .05, rf + h * .18, w * .36, h * .34);
+    g.fillStyle = UNI.grassLo; R(x + w * .59, rf + h * .18, w * .36, h * .34);
     g.fillStyle = '#585850';                                              // фонтан сверху
-    g.beginPath(); g.ellipse(x + w * .50, rf + h * .40, Math.max(5, w * .17), Math.max(3, h * .10), 0, 0, 6.3); g.fill();
-    g.fillStyle = 'rgba(150,180,205,.34)';
-    g.beginPath(); g.ellipse(x + w * .50, rf + h * .40, Math.max(4, w * .13), Math.max(2, h * .07), 0, 0, 6.3); g.fill();
-    crown(x + w * .18, rf + h * .26, Math.max(4, w * .13), '#8e4a2c', '#b06238');   // кроны сверху
-    crown(x + w * .82, rf + h * .30, Math.max(4, w * .12), '#9c7a2c', '#c39a3c');
+    g.beginPath(); g.ellipse(x + w * .50, rf + h * .48, Math.max(5, w * .15), Math.max(3, h * .12), 0, 0, 6.3); g.fill();
+    g.fillStyle = 'rgba(150,180,205,.36)';
+    g.beginPath(); g.ellipse(x + w * .50, rf + h * .48, Math.max(4, w * .11), Math.max(2, h * .09), 0, 0, 6.3); g.fill();
+    crown(x + w * .16, rf + h * .30, Math.max(4, w * .11), '#8e4a2c', '#b06238');   // кроны сверху
+    crown(x + w * .84, rf + h * .36, Math.max(4, w * .10), '#9c7a2c', '#c39a3c');
+    g.fillStyle = '#5c564c';                                              // дорожки между газонами
+    R(x + w * .41, rf + h * .12, w * .18, h * .88);
   }
 
   else if (kind === 'back' || kind === 'oldyard') {
@@ -6057,7 +6084,8 @@ const UNI_E1_LEFT = wingLayout(680, [
 
 /* Центральный коридор второго этажа: аудитории и кабинеты по северной
    стене, проход в старое крыло посередине, окна во двор — по южной. */
-const UNI_C2_WALL = wallLayout(680, [
+const UNI_C2_WALL = wallLayout(720, [
+  { k:'win',  id:'c2w0', w:44, view:'roofs' },
   { k:'door', label:'201', w:40, id:'a201', style:'shut' },
   { k:'door', label:'203', w:40, id:'a203', style:'shut' },
   { k:'door', label:'WC',  w:34, id:'wc2' },
@@ -6065,33 +6093,47 @@ const UNI_C2_WALL = wallLayout(680, [
   { k:'door', label:'204', w:40, id:'a204', style:'glass' },
   { k:'door', label:'206', w:40, id:'a206', style:'shut' },
   { k:'door', label:'КАФЕДРА', w:48, id:'chair', style:'shut' },
+  { k:'win',  id:'c2w1', w:44, view:'roofs' },
 ]);
+
+/* Южная стена второго этажа: сплошная лента больших окон во двор, а в
+   середине разрыв — эркер с лестницей вниз, как на плане. */
+const UNI_C2_YARD = { items:[
+  { k:'win', x:26,  w:62 }, { k:'win', x:110, w:62 }, { k:'win', x:194, w:62 },
+  { k:'win', x:452, w:62 }, { k:'win', x:536, w:62 }, { k:'win', x:620, w:62 },
+] };
 
 /* Крылья второго этажа: сюда игрока не пускают, но двери настоящие —
    за ними аудитории, которые просто не нужны сюжету. */
-const UNI_W2_LEFT = wingLayout(340, [
+const UNI_W2_LEFT = wingLayout(380, [
   { k:'door', label:'ТЕАТРАЛЬНОЕ ОТД.', h:50, id:'dept', style:'shut' },
   { k:'door', label:'305', h:42, id:'a305', style:'shut' },
   { k:'door', label:'307', h:42, id:'a307', style:'shut' },
+  { k:'door', label:'309', h:40, id:'a309', style:'shut' },
 ]);
-const UNI_W2_RIGHT = wingLayout(340, [
-  { k:'win',  id:'w0', h:50 },
+const UNI_W2_RIGHT = wingLayout(380, [
+  { k:'win',  id:'w0', h:54 },
   { k:'door', label:'ГРИМ. КЛАСС', h:44, id:'makeup', style:'shut' },
-  { k:'win',  id:'w1', h:50 },
+  { k:'win',  id:'w1', h:54 },
+  { k:'door', label:'311', h:40, id:'a311', style:'shut' },
+  { k:'win',  id:'w2', h:54 },
 ]);
-const UNI_E2_RIGHT = wingLayout(340, [
+const UNI_E2_RIGHT = wingLayout(380, [
   { k:'door', label:'302', h:42, id:'a302', style:'shut' },
   { k:'door', label:'304', h:42, id:'a304', style:'shut' },
   { k:'door', label:'КАБИНЕТЫ', h:48, id:'offices', style:'shut' },
+  { k:'door', label:'306', h:40, id:'a306', style:'shut' },
 ]);
-const UNI_E2_LEFT = wingLayout(340, [
-  { k:'win',  id:'w0', h:50 },
+const UNI_E2_LEFT = wingLayout(380, [
+  { k:'win',  id:'w0', h:54 },
   { k:'door', label:'WC', h:38, id:'wc3' },
-  { k:'win',  id:'w1', h:50 },
+  { k:'win',  id:'w1', h:54 },
+  { k:'door', label:'308', h:40, id:'a308', style:'shut' },
+  { k:'win',  id:'w2', h:54 },
 ]);
 
 /* Старое крыло: почти всё заперто, открыта только служебная лестница. */
-const UNI_OLD_WALL = wallLayout(520, [
+const UNI_OLD_WALL = wallLayout(560, [
   { k:'door', label:'АРХИВ', w:48, id:'oldarch', style:'shut' },
   { k:'door', label:'—', w:38, id:'old1', style:'shut' },
   { k:'win',  id:'ow0' },
@@ -6569,7 +6611,7 @@ street: {
         }
         Audio.door();
         UI.toast('Двенадцать минут на автобусе', 1600);
-        await changeRoom('uniFrontYard', 250, 332);
+        await changeRoom('uniFrontYard', 320, 366);
       }},
     /* Задний двор корпуса — теперь настоящее место, а не сцена: туда
        приезжают тем же автобусом и обходят здание пешком. */
@@ -6579,7 +6621,7 @@ street: {
         if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
         Audio.door();
         UI.toast('Двенадцать минут на автобусе', 1600);
-        await changeRoom('uniBackYard', 44, 262);
+        await changeRoom('uniBackYard', 34, 240);
       }},
     { x:6,y:252,w:34,h:60, name:'toOldTown', prompt:'Старый квартал', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Туда нельзя. Только домой.'); return; }
@@ -9466,122 +9508,193 @@ playgroundNow: {
    и только потом попадает в холл. Это не заменяет внутренний двор — это
    отдельная южная территория перед главным входом. */
 uniFrontYard: {
-  name:"Университет. Передний двор", music:'street', w:500, h:360,
+  name:"Университет. Передний двор", music:'street', w:640, h:400,
   zone:'town', weather:{ rain:.18, fog:.10, wind:.24, leaves:.55 },
   light:{ tint:'#171a24', dark:.28 },
   lights:[
-    {x:86,y:150,r:54,c:'#ffd080',i:.40},
-    {x:414,y:150,r:54,c:'#ffd080',i:.40},
-    {x:250,y:88,r:90,c:'#d6c5a0',i:.16},
+    {x:150,y:214,r:56,c:'#ffd080',i:.40},{x:490,y:214,r:56,c:'#ffd080',i:.40},
+    {x:320,y:150,r:96,c:'#d6c5a0',i:.18},
+    {x:96,y:330,r:44,c:'#ffd080',i:.30},{x:544,y:330,r:44,c:'#ffd080',i:.30},
   ],
+  wet:true, wetFrom:200,
   bgPaint(ctx) {
-    const W=500,H=360;
-    // вечернее небо
-    const sky=ctx.createLinearGradient(0,0,0,120);
-    sky.addColorStop(0,'#272632'); sky.addColorStop(1,'#56505a');
-    ctx.fillStyle=sky; ctx.fillRect(0,0,W,120);
+    const W = 640, H = 400, gr = 208;                 // gr — линия земли у цоколя
+    /* небо и дальний город за корпусом */
+    const sky = ctx.createLinearGradient(0, 0, 0, 130);
+    sky.addColorStop(0, '#232430'); sky.addColorStop(1, '#5a5460');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 130);
+    ctx.fillStyle = '#262632';
+    for (let x = -6; x < W; x += 26) { const h = 10 + ((x * 11) % 22); ctx.fillRect(x, 96 - h, 22, h); }
 
-    // Парадный фасад главного корпуса — широкий, симметричный, как на плане.
-    ctx.fillStyle='#4b4037'; ctx.fillRect(70,38,360,112);
-    ctx.fillStyle='#5b4c3e'; ctx.fillRect(58,74,384,76);
-    // центральный выступ
-    ctx.fillStyle='#3d342d'; ctx.fillRect(190,22,120,128);
-    ctx.fillStyle='#655341'; ctx.fillRect(198,30,104,120);
-    // крыша/карниз
-    ctx.fillStyle='#302824'; ctx.fillRect(48,34,404,10);
-    ctx.fillStyle='#78604b'; ctx.fillRect(66,44,368,5);
-    ctx.fillStyle='#2f2824'; ctx.fillRect(184,18,132,8);
+    /* ФАСАД. Трёхэтажный, с боковыми крыльями пониже и центральным
+       ризалитом повыше: одно здание, а не три отдельные коробки. */
+    uniFacade(ctx, 26, 96, 152, gr - 96, { storeys:3, cols:4, lit:.34, wall:'#544639' });   // западное крыло
+    uniFacade(ctx, 462, 96, 152, gr - 96, { storeys:3, cols:4, lit:.30, wall:'#544639' });  // восточное крыло
+    uniFacade(ctx, 170, 78, 300, gr - 78, { storeys:3, cols:6, lit:.42, wall:'#5b4c3e' });  // главный корпус
+    uniFacade(ctx, 246, 56, 148, gr - 56, { storeys:3, cols:3, lit:.52, wall:'#63533f' });  // центральный ризалит
+    /* фронтон над ризалитом */
+    ctx.fillStyle = '#3f362e';
+    ctx.beginPath(); ctx.moveTo(238, 52); ctx.lineTo(320, 26); ctx.lineTo(402, 52); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#6c5745'; ctx.fillRect(244, 48, 152, 5);
+    ctx.fillStyle = '#7d6650';
+    ctx.beginPath(); ctx.moveTo(240, 50); ctx.lineTo(320, 29); ctx.lineTo(400, 50); ctx.lineTo(400, 47);
+    ctx.lineTo(320, 26); ctx.lineTo(240, 47); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2f2a26'; ctx.fillRect(300, 34, 40, 12);          // циферблат во фронтоне
+    ctx.fillStyle = '#c9bfa2'; ctx.fillRect(303, 36, 34, 8);
+    ctx.fillStyle = '#3a3026'; ctx.fillRect(319, 37, 1, 5); ctx.fillRect(320, 40, 5, 1);
+    /* вывеска университета */
+    ctx.fillStyle = '#3a3128'; ctx.fillRect(258, gr - 42, 124, 13);
+    ctx.fillStyle = '#c9bfa2'; ctx.fillRect(260, gr - 40, 120, 9);
+    ctx.fillStyle = '#3a3026'; ctx.font = '6px Courier New';
+    ctx.fillText('УНИВЕРСИТЕТ', 288, gr - 33);
 
-    // высокие окна фасада — главный визуальный акцент.
-    const facadeWin=(x,y,w,h,lit=true)=>{
-      ctx.fillStyle='#2b2522'; ctx.fillRect(x-5,y-5,w+10,h+10);
-      const g=ctx.createLinearGradient(0,y,0,y+h);
-      g.addColorStop(0,lit?'#fff1c9':'#657080'); g.addColorStop(.55,lit?'#e8c27c':'#46505c'); g.addColorStop(1,lit?'#b37a48':'#303641');
-      ctx.fillStyle=g; ctx.fillRect(x,y,w,h);
-      ctx.fillStyle='#5b4a3a';
-      for(let i=1;i<3;i++) ctx.fillRect(x+Math.round(i*w/3)-1,y,2,h);
-      for(let i=1;i<5;i++) ctx.fillRect(x,y+Math.round(i*h/5)-1,w,2);
-      ctx.fillStyle='rgba(255,238,196,.12)'; ctx.fillRect(x+3,y+3,w-6,3);
-    };
-    facadeWin(92,62,54,64,true); facadeWin(154,62,54,64,true);
-    facadeWin(292,62,54,64,true); facadeWin(354,62,54,64,true);
-    facadeWin(218,54,64,74,true);
-    // Второй ярус и высокий центральный фронтон.
-    [104,166,334,396].forEach(x=>facadeWin(x,45,38,11,false));
-    ctx.fillStyle='#40362f'; ctx.beginPath(); ctx.moveTo(184,18); ctx.lineTo(250,4); ctx.lineTo(316,18); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#6c5745'; ctx.fillRect(194,18,112,5);
+    /* колонны портика и главный вход в их глубине */
+    ctx.fillStyle = 'rgba(20,16,14,.50)'; ctx.fillRect(268, gr - 74, 104, 74);
+    ctx.fillStyle = '#2b211b'; ctx.fillRect(288, gr - 62, 64, 62);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(292, gr - 58, 28, 58); ctx.fillRect(322, gr - 58, 28, 58);
+    ctx.fillStyle = '#8fa6bd'; ctx.fillRect(295, gr - 54, 22, 30); ctx.fillRect(325, gr - 54, 22, 30);
+    ctx.fillStyle = '#c8dcec'; ctx.fillRect(295, gr - 54, 22, 6); ctx.fillRect(325, gr - 54, 22, 6);
+    ctx.fillStyle = UNI.brass; ctx.fillRect(316, gr - 32, 3, 8); ctx.fillRect(323, gr - 32, 3, 8);
+    [262, 292, 348, 378].forEach(cx => {                               // четыре колонны
+      ctx.fillStyle = '#4b4136'; ctx.fillRect(cx - 1, gr - 78, 16, 7);
+      ctx.fillStyle = '#6d5f4e'; ctx.fillRect(cx + 1, gr - 71, 12, 63);
+      ctx.fillStyle = '#7f7059'; ctx.fillRect(cx + 1, gr - 71, 4, 63);
+      ctx.fillStyle = '#574b3e'; ctx.fillRect(cx + 10, gr - 71, 3, 63);
+      ctx.fillStyle = '#4b4136'; ctx.fillRect(cx - 1, gr - 10, 16, 10);
+    });
 
-    // центральные двери и парадные ступени.
-    ctx.fillStyle='#2b211b'; ctx.fillRect(214,102,72,48);
-    ctx.fillStyle='#62452f'; ctx.fillRect(220,108,28,42); ctx.fillRect(252,108,28,42);
-    ctx.fillStyle='#c4a15e'; ctx.fillRect(244,129,4,4); ctx.fillRect(252,129,4,4);
-    ctx.fillStyle='#74614d'; ctx.fillRect(204,148,92,7);
-    for(let i=0;i<5;i++){
-      ctx.fillStyle=i%2?'#7a6754':'#685747'; ctx.fillRect(194-i*10,155+i*6,112+i*20,5);
+    /* ТЕРРИТОРИЯ: мощение, центральная ось, симметричные газоны */
+    ctx.fillStyle = '#4a4b45'; ctx.fillRect(0, gr, W, H - gr);
+    ctx.fillStyle = '#51524b';
+    for (let y = gr + 6; y < H; y += 9) ctx.fillRect(0, y, W, 1);
+    for (let x = 0; x < W; x += 18) ctx.fillRect(x, gr, 1, H - gr);
+    ctx.fillStyle = '#3a482f'; ctx.fillRect(24, 252, 196, 118); ctx.fillRect(420, 252, 196, 118);
+    ctx.fillStyle = '#41512f';
+    for (let i = 0; i < 90; i++) { ctx.fillRect(26 + (i * 43) % 192, 254 + (i * 29) % 114, 2, 2);
+                                   ctx.fillRect(422 + (i * 37) % 192, 254 + (i * 31) % 114, 2, 2); }
+    ctx.fillStyle = '#4a5a36'; ctx.fillRect(24, 252, 196, 3); ctx.fillRect(420, 252, 196, 3);
+    /* центральная дорожка расширяется к воротам */
+    ctx.fillStyle = '#7a7368';
+    ctx.beginPath();
+    ctx.moveTo(252, gr + 44); ctx.lineTo(388, gr + 44);
+    ctx.lineTo(430, H); ctx.lineTo(210, H); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(214,198,168,.12)';
+    for (let y = gr + 50; y < H; y += 9) {
+      const k = (y - gr - 44) / (H - gr - 44), x0 = 252 - 42 * k, x1 = 388 + 42 * k;
+      ctx.fillRect(x0, y, x1 - x0, 1);
     }
+    ctx.fillStyle = '#69675f'; ctx.fillRect(0, 236, W, 16);             // поперечная дорожка вдоль фасада
+    ctx.fillStyle = '#77736a'; ctx.fillRect(0, 240, W, 3);
 
-    // боковые части фасада и тёмные арки.
-    ctx.fillStyle='rgba(25,20,18,.42)'; ctx.fillRect(70,126,110,24); ctx.fillRect(320,126,110,24);
-    ctx.fillStyle='#3a3028'; ctx.fillRect(78,92,22,38); ctx.fillRect(400,92,22,38);
+    /* ПАРАДНЫЕ СТУПЕНИ с перилами: они шире внизу и ведут к портику */
+    for (let i = 0; i < 6; i++) {
+      const w = 128 + i * 22, x = 320 - w / 2, y = gr + i * 7;
+      ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(x, y + 6, w, 2);
+      ctx.fillStyle = i % 2 ? '#7a6754' : '#6d5b49'; ctx.fillRect(x, y, w, 7);
+      ctx.fillStyle = '#8d7a64'; ctx.fillRect(x, y, w, 2);
+    }
+    [[-1, 256], [1, 384]].forEach(([dir, x0]) => {                     // перила по краям марша
+      ctx.fillStyle = '#4b4136';
+      ctx.beginPath();
+      ctx.moveTo(x0, gr); ctx.lineTo(x0 + dir * 66, gr + 44);
+      ctx.lineTo(x0 + dir * 66, gr + 52); ctx.lineTo(x0, gr + 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6d5f4e';
+      ctx.beginPath();
+      ctx.moveTo(x0, gr - 3); ctx.lineTo(x0 + dir * 66, gr + 41);
+      ctx.lineTo(x0 + dir * 66, gr + 45); ctx.lineTo(x0, gr + 1); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#4b4136'; ctx.fillRect(x0 + dir * 62, gr + 40, 12, 18);
+    });
 
-    // Передний двор: широкая центральная дорожка, две симметричные газонные
-    // чаши и боковые дорожки, как на ситуационном плане.
-    ctx.fillStyle='#4a4b45'; ctx.fillRect(0,150,W,H-150);
-    ctx.fillStyle='#4f5149';
-    for(let y=158;y<H;y+=18) ctx.fillRect(0,y,W,1);
-    // газонные поля
-    ctx.fillStyle='#39472f'; ctx.fillRect(20,166,150,122); ctx.fillRect(330,166,150,122);
-    // центральная дорожка с расширением у входа
-    ctx.fillStyle='#777063'; ctx.beginPath();
-    ctx.moveTo(224,154); ctx.lineTo(276,154); ctx.lineTo(360,360); ctx.lineTo(140,360); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='rgba(210,194,165,.10)'; ctx.beginPath();
-    ctx.moveTo(232,156); ctx.lineTo(268,156); ctx.lineTo(322,360); ctx.lineTo(178,360); ctx.closePath(); ctx.fill();
-    // боковые дорожки
-    ctx.fillStyle='#69675f'; ctx.fillRect(0,292,500,14);
-    ctx.fillStyle='#77736a'; ctx.fillRect(0,296,500,3);
-
-    // небольшая клумба/фонтанная чаша перед лестницей.
-    ctx.fillStyle='#5b5a54'; ctx.beginPath(); ctx.ellipse(250,190,44,16,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#353b42'; ctx.beginPath(); ctx.ellipse(250,188,36,12,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(170,196,215,.25)'; ctx.beginPath(); ctx.ellipse(250,187,31,9,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#716c61'; ctx.fillRect(247,168,6,20);
-
-    ctx.fillStyle='#c8b8a0'; ctx.font='7px Courier New'; ctx.fillText('ГЛАВНЫЙ ВХОД',215,16);
-    ctx.font='6px Courier New'; ctx.fillText('ПЕРЕДНИЙ ДВОР',196,342);
+    /* ОГРАДА и ВОРОТА по нижнему краю: университет отделён от улицы */
+    ctx.fillStyle = '#2f2f36'; ctx.fillRect(0, 376, W, 5);
+    for (let x = 4; x < W; x += 13) {
+      if (x > 200 && x < 440) continue;                                // проём ворот
+      ctx.fillStyle = '#3a3a42'; ctx.fillRect(x, 372, 4, 26);
+      ctx.fillStyle = '#4a4a52'; ctx.fillRect(x, 372, 2, 26);
+      ctx.fillStyle = '#54545e'; ctx.fillRect(x, 370, 4, 3);
+    }
+    [196, 440].forEach(px => {                                          // столбы ворот
+      ctx.fillStyle = '#4b4136'; ctx.fillRect(px - 5, 352, 14, 48);
+      ctx.fillStyle = '#5e5245'; ctx.fillRect(px - 3, 354, 10, 44);
+      ctx.fillStyle = '#6f6152'; ctx.fillRect(px - 7, 346, 18, 8);
+      ctx.fillStyle = '#8a7a62'; ctx.fillRect(px - 7, 346, 18, 2);
+    });
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '7px Courier New';
+    ctx.fillText('ГЛАВНЫЙ ВХОД', 286, gr + 90);
+    ctx.font = '6px Courier New';
+    ctx.fillText('← НА УЛИЦУ', 210, 394);
+    ctx.fillText('К ЗАДНЕМУ ДВОРУ →', 494, 394);
   },
-  objects:[
-    {t:'tree_gold',x:42,y:196},{t:'tree_red',x:126,y:190},{t:'tree_orange',x:374,y:190},{t:'tree_rust',x:458,y:198},
-    {t:'lamp_street',x:86,y:150},{t:'lamp_street',x:414,y:150},
-    {t:'bench_stone',x:84,y:276},{t:'bench_stone',x:416,y:276},
-    {t:'bin',x:160,y:282},{t:'bin',x:340,y:282},
-    {t:'leaves_pile',x:112,y:304},{t:'leaves_pile',x:388,y:304},
-    {t:'puddle',x:56,y:246},{t:'puddle',x:444,y:248},
+  objects: [
+    { t:'tree_gold', x:60, y:288 }, { t:'tree_red', x:150, y:280 },
+    { t:'tree_orange', x:490, y:280 }, { t:'tree_rust', x:582, y:290 },
+    { t:'tree_bare', x:104, y:340 }, { t:'tree_bare', x:536, y:344 },
+    { t:'lamp_street', x:150, y:214 }, { t:'lamp_street', x:490, y:214 },
+    { t:'lamp_street', x:96, y:330 }, { t:'lamp_street', x:544, y:330 },
+    { t:'bench_stone', x:120, y:346 }, { t:'bench_stone', x:520, y:346 },
+    { t:'bench_stone', x:210, y:300 }, { t:'bench_stone', x:430, y:300 },
+    { t:'bin', x:236, y:344 }, { t:'bin', x:404, y:344 },
+    { t:'bush', x:186, y:266 }, { t:'bush', x:454, y:266 },
+    { t:'leaves_pile', x:172, y:332 }, { t:'leaves_pile', x:468, y:332 },
+    { t:'leaves_pile', x:322, y:366 },
+    { t:'puddle', x:96, y:262 }, { t:'puddle', x:544, y:264 }, { t:'puddle', x:320, y:322 },
+    { t:'signpost', x:302, y:346 },
   ],
-  walls:[
-    {x:0,y:0,w:500,h:38},
-    {x:0,y:0,w:8,h:360},{x:492,y:0,w:8,h:360},
-    {x:0,y:350,w:500,h:10},
-    // фасад ограничивает верхнюю часть, но центральный вход оставляет проход.
-    {x:58,y:38,w:156,h:116},{x:286,y:38,w:156,h:116},
+  walls: [
+    {x:0,y:0,w:640,h:200},
+    {x:0,y:0,w:8,h:400},{x:632,y:0,w:8,h:400},
+    // цоколь корпуса: пройти можно только по ступеням к портику
+    {x:0,y:200,w:252,h:8},{x:388,y:200,w:252,h:8},
+    // ограда с проёмом ворот
+    {x:0,y:376,w:200,h:24},{x:440,y:376,w:200,h:24},
+    {x:0,y:394,w:640,h:6},
   ],
-  interactables:[
-    {x:214,y:100,w:72,h:58,name:'mainEntrance',prompt:'Главный вход',action:async()=>{
+  interactables: [
+    { x:268,y:210,w:104,h:52, name:'mainEntrance', prompt:'Главный вход', action:async()=>{
       await changeRoom('uniHall', 280, 366);
     }},
-    {x:198,y:174,w:104,h:38,name:'frontFountain',prompt:'Фонтан',action(){
-      Dialogue.start([{who:'naya',expr:'normal',text:'Небольшой фонтан перед главным корпусом. Вода тёмная, но в ней отражаются окна.'},{who:'naya',expr:'talk',text:'(Сью говорила, что в этом дворе всё выглядит лучше после дождя.)'}]);
-    }},
-    {x:20,y:260,w:60,h:44,name:'frontBench',prompt:'Скамейка',action(){
-      Dialogue.start([{who:'naya',expr:'normal',text:'Каменная скамейка. На краю лежат мокрые листья, и кто-то оставил бумажный стаканчик.'}]);
-    }},
-    {x:420,y:260,w:60,h:44,name:'frontBench2',prompt:'Скамейка',action(){
-      Dialogue.start([{who:'naya',expr:'normal',text:'Отсюда хорошо видно центральный вход и окна верхнего этажа.'}]);
-    }},
-    {x:6,y:310,w:70,h:36,name:'toStreet',prompt:'На улицу',action:async()=>await changeRoom('street',210,200)},
+    { x:270,y:270,w:100,h:44, name:'frontSteps', prompt:'Парадные ступени', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Шесть ступеней, стёртых посередине до светлого камня.'},
+          {who:'naya',expr:'talk',text:'(По краям камень как новый. Все сто лет ходят по одной линии.)'},
+        ]);
+      }},
+    { x:24,y:252,w:196,h:64, name:'frontLawn', prompt:'Газон', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Газон подстрижен ровно настолько, чтобы это считалось порядком. Листья с него сгребают в кучу и забывают.'},
+        ]);
+      }},
+    { x:80,y:326,w:64,h:44, name:'frontBench', prompt:'Скамейка', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Каменная скамейка. На краю лежат мокрые листья, и кто-то оставил бумажный стаканчик.'}]);
+      }},
+    { x:490,y:326,w:64,h:44, name:'frontBench2', prompt:'Скамейка', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Отсюда хорошо видно центральный вход и окна верхнего этажа.'}]);
+      }},
+    { x:274,y:318,w:60,h:46, name:'gateSign', prompt:'Указатель у ворот', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«ГЛАВНЫЙ КОРПУС. ЗАПАДНОЕ КРЫЛО — ТЕАТРАЛЬНОЕ ОТДЕЛЕНИЕ. ВОСТОЧНОЕ — АУДИТОРИИ».'},
+          {who:'naya',expr:'talk',text:'(Про северное крыло на табличке ничего нет.)'},
+        ]);
+      }},
+    { x:200,y:372,w:80,h:28, name:'toStreet', prompt:'На улицу',
+      action: async ()=> await changeRoom('street', 210, 200) },
+    { x:466,y:352,w:80,h:44, name:'toBackYard', prompt:'В обход, к заднему двору',
+      action: async ()=> await changeRoom('uniBackYard', 44, 262) },
+    { x:250,y:140,w:140,h:66, name:'lookFacade', prompt:'Фасад', action(){
+        if (C('uniDay') >= 3) return Dialogue.start([
+          {who:'naya',expr:'talk',text:'Три этажа, два крыла, посередине фронтон с часами.'},
+          {who:'naya',expr:'normal',text:'(Северного крыла отсюда не видно вообще. Оно спрятано за всем остальным.)'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Корпус старше города вокруг: камень потемнел, а окна всё равно выше всех соседних крыш.'},
+          {who:'naya',expr:'talk',text:'(Сью ходит сюда каждый день и, кажется, уже не поднимает головы.)'},
+        ]);
+      }},
   ],
-  npcs:[
-    {x:184,y:250,sprite:'student',name:'Студент',speed:.28,path:[[184,250],[205,250],[205,280],[184,280]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Главный вход прямо по лестнице. Не перепутайте с боковым крылом.'}])},
-    {x:316,y:250,sprite:'friend',name:'Студентка',speed:.26,path:[[316,250],[296,250],[296,280],[316,280]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'friend',expr:'normal',name:'Студентка',text:'Осенью этот двор всегда забит листьями. Дворник сдаётся раньше всех.'}])},
+  npcs: [
+    {x:240,y:320,sprite:'student',name:'Студент',speed:.28,path:[[240,320],[268,320],[268,356],[240,356]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Главный вход прямо по лестнице. Не перепутайте с боковым крылом.'}])},
+    {x:400,y:320,sprite:'friend',name:'Студентка',speed:.26,path:[[400,320],[372,320],[372,356],[400,356]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'friend',expr:'normal',name:'Студентка',text:'Осенью этот двор всегда забит листьями. Дворник сдаётся раньше всех.'}])},
+    {x:160,y:300,sprite:'acolyte',name:'Студентка',speed:.30,path:[[160,300],[160,264],[236,262],[236,300]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'acolyte',expr:'normal',name:'Студентка',text:'Курить только у ворот. Тут вахтёр из окна видит всё.'}])},
   ],
   onEnter(){
     if(F('cafeSceneComplete') && F('cafeShiftFinished') && C('uniDay')===0){
@@ -9731,13 +9844,13 @@ uniHall: {
   ],
   interactables: [
     { x:232,y:372,w:96,h:34, name:'toFrontYard', prompt:'В передний двор',
-      action: async ()=> await changeRoom('uniFrontYard', 250, 318) },
+      action: async ()=> await changeRoom('uniFrontYard', 320, 268) },
     { x:0,y:238,w:44,h:64, name:'toWest', prompt:'Западное крыло (театральное)',
       action: async ()=> await changeRoom('uniWestHall', 130, 664) },
     { x:516,y:238,w:44,h:64, name:'toEast', prompt:'Восточное крыло (аудитории)',
       action: async ()=> await changeRoom('uniEastHall', 130, 704) },
     { x:240,y:60,w:80,h:62, name:'toCourtyard', prompt:'Во внутренний двор',
-      action: async ()=> await changeRoom('uniCourtyard', 210, 286) },
+      action: async ()=> await changeRoom('uniCourtyard', 240, 304) },
     { x:386,y:184,w:88,h:38, name:'toFloor2', prompt:'Наверх, на второй этаж',
       action: async ()=> await changeRoom('uniCorr2', 400, 232) },
     { x:44,y:184,w:56,h:40, name:'infoDesk', prompt:'Стойка информации', action(){
@@ -9892,7 +10005,7 @@ uniWestHall: {
     { x:70,y:644,w:120,h:44, name:'toHall', prompt:'В главный холл',
       action: async ()=> await changeRoom('uniHall', 44, 268) },
     { x:76,y:62,w:110,h:44, name:'toFloor2', prompt:'Наверх, в западное крыло',
-      action: async ()=> await changeRoom('uniWest2', 130, 280) },
+      action: async ()=> await changeRoom('uniWest2', 130, 320) },
 
     { x:62,y:UNI_W1_LEFT.mid('rehearsal')-24,w:36,h:48, name:'toRehearsal', prompt:'Репетиционный зал',
       action: async ()=> await changeRoom('uniRehearsal', 274, 176) },
@@ -10049,7 +10162,7 @@ uniEastHall: {
     { x:70,y:684,w:120,h:44, name:'toHall', prompt:'В главный холл',
       action: async ()=> await changeRoom('uniHall', 516, 268) },
     { x:76,y:62,w:110,h:44, name:'toFloor2', prompt:'Наверх, в восточное крыло',
-      action: async ()=> await changeRoom('uniEast2', 130, 280) },
+      action: async ()=> await changeRoom('uniEast2', 130, 320) },
 
     { x:162,y:UNI_E1_RIGHT.mid('library')-26,w:36,h:52, name:'toLib', prompt:'Библиотека',
       action: async ()=> await changeRoom('uniLibrary', 28, 160) },
@@ -10841,82 +10954,130 @@ uniArtRoom: {
 /* ВНУТРЕННИЙ ДВОР. Замкнут четырьмя корпусами — те самые окна, что
    игрок видел изнутри, отсюда видны снаружи. Это одно здание.        */
 uniCourtyard: {
-  name:"Университет. Внутренний двор", music:'street', w:420, h:320, wet:true, wetFrom:110,
+  name:"Университет. Внутренний двор", music:'street', w:480, h:360, wet:true, wetFrom:120,
   zone:'town', weather:{ rain:.22, fog:.12, wind:.24, leaves:.45 },
   light:{ tint:'#151a24', dark:.30 },
   lights:[
-    {x:70,y:150,r:44,c:'#ffcf7a',i:.34},{x:350,y:150,r:44,c:'#ffcf7a',i:.34},
-    {x:210,y:120,r:40,c:'#9fb0c8',i:.20},
+    {x:78,y:180,r:46,c:'#ffcf7a',i:.34},{x:402,y:180,r:46,c:'#ffcf7a',i:.34},
+    {x:240,y:140,r:44,c:'#9fb0c8',i:.20},
+    {x:78,y:290,r:40,c:'#ffcf7a',i:.30},{x:402,y:290,r:40,c:'#ffcf7a',i:.30},
   ],
   bgPaint(ctx) {
-    const W = 420, H = 320;
-    const sky = ctx.createLinearGradient(0, 0, 0, 40);
-    sky.addColorStop(0, '#1e2432'); sky.addColorStop(1, '#3f3a44');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 40);
-    // северная стена — старое крыло: тёмный этаж без единого горящего окна
-    ctx.fillStyle = '#463d34'; ctx.fillRect(0, 18, W, 74);
-    ctx.fillStyle = '#3d352d';
-    for (let y = 18; y < 92; y += 12) for (let x = ((y / 12) % 2) * 14; x < W; x += 28) ctx.fillRect(x, y, 26, 11);
-    for (let wx = 24; wx < W - 30; wx += 62) {
-      ctx.fillStyle = '#2a2620'; ctx.fillRect(wx - 3, 30, 34, 40);
-      ctx.fillStyle = '#333c46'; ctx.fillRect(wx, 33, 28, 34);
-      ctx.fillStyle = '#2b2721'; ctx.fillRect(wx + 13, 33, 3, 34); ctx.fillRect(wx, 48, 28, 3);
-    }
-    ctx.fillStyle = '#332d26'; ctx.fillRect(0, 86, W, 6);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('СТАРОЕ КРЫЛО', 168, 16);
-    // боковые галереи западного и восточного крыла с тёплыми окнами
-    [[0, 1], [W - 54, -1]].forEach(([x0, dir]) => {
-      ctx.fillStyle = '#4e453a'; ctx.fillRect(x0, 86, 54, H - 86);
+    const W = 480, H = 360;
+    const sky = ctx.createLinearGradient(0, 0, 0, 44);
+    sky.addColorStop(0, '#1e2432'); sky.addColorStop(1, '#43404a');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 44);
+
+    /* СЕВЕР — старое крыло. Тот же фасад, что и у всех, только ни одно
+       окно не горит: этаж не включают даже днём. */
+    uniFacade(ctx, 0, 22, W, 84, { storeys:2, cols:12, lit:0, wall:'#463d34', base:false });
+    ctx.fillStyle = 'rgba(10,8,14,.34)'; ctx.fillRect(0, 22, W, 84);
+    ctx.fillStyle = '#332d26'; ctx.fillRect(0, 100, W, 8);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('СТАРОЕ КРЫЛО', 198, 18);
+
+    /* ЗАПАД и ВОСТОК — галереи крыльев. Окна тёплые: за ними те самые
+       коридоры, по которым игрок только что шёл. */
+    [[0, 1], [W - 64, -1]].forEach(([x0, dir]) => {
+      ctx.fillStyle = '#4e453a'; ctx.fillRect(x0, 100, 64, H - 100);
       ctx.fillStyle = '#453d33';
-      for (let y = 92; y < H; y += 12) ctx.fillRect(x0 + ((y / 12) % 2) * 8, y, 46, 11);
-      for (let wy = 104; wy < H - 40; wy += 62) {
-        ctx.fillStyle = '#2a2620'; ctx.fillRect(x0 + (dir > 0 ? 30 : 0), wy, 26, 36);
+      for (let y = 106; y < H; y += 7)
+        for (let x = x0 + ((y / 7) | 0) % 2 * 11; x < x0 + 64; x += 22) ctx.fillRect(x, y, 20, 6);
+      ctx.fillStyle = shade('#4e453a', .68); ctx.fillRect(x0, 100, 64, 4);
+      ctx.fillStyle = shade('#4e453a', 1.20); ctx.fillRect(x0, 104, 64, 1);
+      /* два яруса окон: первый этаж горит, второй почти нет */
+      for (let wy = 122; wy < H - 46; wy += 56) {
+        const wx = x0 + (dir > 0 ? 34 : 4);
+        ctx.fillStyle = '#2a2620'; ctx.fillRect(wx - 3, wy - 3, 32, 42);
+        const lit = wy < 240;
         const gl = ctx.createLinearGradient(0, wy, 0, wy + 36);
-        gl.addColorStop(0, '#ffe6ae'); gl.addColorStop(1, '#c99a5a');
-        ctx.fillStyle = gl; ctx.fillRect(x0 + (dir > 0 ? 33 : 3), wy + 3, 20, 30);
-        ctx.fillStyle = 'rgba(40,34,26,.7)';
-        ctx.fillRect(x0 + (dir > 0 ? 42 : 12), wy + 3, 2, 30);
+        if (lit) { gl.addColorStop(0, '#ffe6ae'); gl.addColorStop(1, '#c99a5a'); }
+        else      { gl.addColorStop(0, '#4a525c'); gl.addColorStop(1, '#333941'); }
+        ctx.fillStyle = gl; ctx.fillRect(wx, wy, 26, 36);
+        ctx.fillStyle = 'rgba(40,34,26,.72)';
+        ctx.fillRect(wx + 12, wy, 2, 36); ctx.fillRect(wx, wy + 17, 26, 2);
+        ctx.fillStyle = shade('#4e453a', 1.24); ctx.fillRect(wx - 3, wy - 3, 32, 2);
+        ctx.fillStyle = UNI.sill; ctx.fillRect(wx - 5, wy + 38, 36, 3);
       }
+      /* аркада вдоль галереи: столбы и тень под ними */
+      ctx.fillStyle = 'rgba(12,10,8,.30)';
+      ctx.fillRect(dir > 0 ? 64 : W - 78, 108, 14, H - 108);
     });
-    // южная сторона: главный корпус и проход обратно в холл
-    ctx.fillStyle = '#4e453a'; ctx.fillRect(54, 296, W - 108, 24);
-    ctx.fillStyle = '#2a3020'; ctx.fillRect(186, 292, 60, 28);
-    ctx.fillStyle = 'rgba(255,220,150,.18)'; ctx.fillRect(190, 296, 52, 24);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('В ХОЛЛ ↓', 192, 290);
-    // мощёный двор, дорожки и газон
-    ctx.fillStyle = '#4a4a44'; ctx.fillRect(54, 92, W - 108, 204);
-    ctx.fillStyle = '#52524a';
-    for (let y = 100; y < 296; y += 16) ctx.fillRect(54, y, W - 108, 1);
-    for (let x = 62; x < W - 54; x += 20) ctx.fillRect(x, 92, 1, 204);
+
+    /* ЮГ — главный корпус и сквозной проём обратно в холл */
+    ctx.fillStyle = '#4e453a'; ctx.fillRect(64, 322, W - 128, 38);
+    ctx.fillStyle = '#453d33';
+    for (let y = 326; y < H; y += 7)
+      for (let x = 64 + ((y / 7) | 0) % 2 * 11; x < W - 64; x += 22) ctx.fillRect(x, y, 20, 6);
+    ctx.fillStyle = shade('#4e453a', 1.16); ctx.fillRect(64, 320, W - 128, 2);
+    ctx.fillStyle = '#241a12'; ctx.fillRect(206, 318, 68, 42);
+    const gl = ctx.createLinearGradient(0, 322, 0, 356);
+    gl.addColorStop(0, 'rgba(255,224,164,.34)'); gl.addColorStop(1, 'rgba(255,214,150,.12)');
+    ctx.fillStyle = gl; ctx.fillRect(211, 322, 58, 38);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(206, 318, 68, 6);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('В ХОЛЛ ↓', 216, 316);
+    /* тёплые окна главного корпуса по сторонам от проёма */
+    [110, 160, 320, 370].forEach(wx => {
+      ctx.fillStyle = '#2a2620'; ctx.fillRect(wx - 3, 328, 32, 26);
+      const g2 = ctx.createLinearGradient(0, 328, 0, 354);
+      g2.addColorStop(0, '#ffe6ae'); g2.addColorStop(1, '#c99a5a');
+      ctx.fillStyle = g2; ctx.fillRect(wx, 331, 26, 22);
+      ctx.fillStyle = 'rgba(40,34,26,.72)'; ctx.fillRect(wx + 12, 331, 2, 22);
+    });
+
+    /* ЗЕМЛЯ: мощение, дорожка крестом, два газона, фонтан по центру */
+    ctx.fillStyle = '#4a4a44'; ctx.fillRect(64, 108, W - 128, 214);
+    ctx.fillStyle = '#525249';
+    for (let y = 114; y < 322; y += 14) ctx.fillRect(64, y, W - 128, 1);
+    for (let x = 70; x < W - 64; x += 18) ctx.fillRect(x, 108, 1, 214);
     ctx.fillStyle = '#3d4a30';
-    ctx.fillRect(78, 118, 110, 76); ctx.fillRect(232, 118, 110, 76);
+    ctx.fillRect(88, 134, 136, 78); ctx.fillRect(256, 134, 136, 78);
+    ctx.fillRect(88, 240, 136, 62); ctx.fillRect(256, 240, 136, 62);
     ctx.fillStyle = '#46543a';
-    for (let i = 0; i < 60; i++) ctx.fillRect(80 + (i * 37) % 106, 120 + (i * 23) % 72, 2, 2);
-    for (let i = 0; i < 60; i++) ctx.fillRect(234 + (i * 31) % 106, 120 + (i * 29) % 72, 2, 2);
-    // фонтан по центру
-    ctx.fillStyle = '#5a5a54'; ctx.beginPath(); ctx.ellipse(210, 216, 40, 20, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#41414a'; ctx.beginPath(); ctx.ellipse(210, 216, 33, 15, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(140,175,200,.30)'; ctx.beginPath(); ctx.ellipse(210, 217, 30, 13, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#6a6a62'; ctx.fillRect(206, 196, 8, 20);
-    ctx.beginPath(); ctx.ellipse(210, 196, 12, 5, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(200,225,240,.16)'; ctx.beginPath(); ctx.ellipse(210, 216, 20, 9, 0, 0, Math.PI*2); ctx.fill();
+    for (let i = 0; i < 120; i++) {
+      ctx.fillRect(90 + (i * 37) % 132, 136 + (i * 23) % 74, 2, 2);
+      ctx.fillRect(258 + (i * 31) % 132, 136 + (i * 29) % 74, 2, 2);
+      ctx.fillRect(90 + (i * 41) % 132, 242 + (i * 19) % 58, 2, 2);
+      ctx.fillRect(258 + (i * 43) % 132, 242 + (i * 17) % 58, 2, 2);
+    }
+    ctx.fillStyle = '#6f6a60';                                    // дорожка крестом
+    ctx.fillRect(224, 108, 32, 214); ctx.fillRect(64, 214, W - 128, 28);
+    ctx.fillStyle = '#7b7568';
+    ctx.fillRect(228, 108, 24, 214); ctx.fillRect(64, 218, W - 128, 20);
+    ctx.fillStyle = 'rgba(0,0,0,.16)';
+    for (let y = 112; y < 322; y += 8) ctx.fillRect(224, y, 32, 1);
+    /* фонтан: чаша, тумба, стоячая вода и палые листья на ней */
+    ctx.fillStyle = '#5a5a54'; ctx.beginPath(); ctx.ellipse(240, 228, 46, 22, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#6c6c64'; ctx.beginPath(); ctx.ellipse(240, 225, 46, 21, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#41414a'; ctx.beginPath(); ctx.ellipse(240, 227, 38, 16, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(140,175,200,.32)'; ctx.beginPath(); ctx.ellipse(240, 227, 35, 14, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#6a6a62'; ctx.fillRect(235, 204, 10, 23);
+    ctx.beginPath(); ctx.ellipse(240, 204, 14, 6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#7d7d74'; ctx.beginPath(); ctx.ellipse(240, 202, 14, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#8a5a2c';
+    [[222,232],[254,224],[236,236],[248,231]].forEach(([lx,ly]) => ctx.fillRect(lx, ly, 3, 2));
+    ctx.fillStyle = 'rgba(200,225,240,.14)'; ctx.beginPath(); ctx.ellipse(240, 226, 22, 8, 0, 0, Math.PI*2); ctx.fill();
   },
   objects: [
-    { t:'tree_red', x:104, y:150 }, { t:'tree_gold', x:166, y:158 },
-    { t:'tree_orange', x:256, y:150 }, { t:'tree_rust', x:318, y:158 },
-    { t:'bench', x:132, y:250 }, { t:'bench', x:290, y:250 },
-    { t:'lamp_street', x:74, y:200 }, { t:'lamp_street', x:348, y:200 },
-    { t:'bin', x:168, y:272 }, { t:'leaves_pile', x:252, y:276 },
-    { t:'puddle', x:120, y:288 }, { t:'puddle', x:300, y:284 },
+    { t:'tree_red', x:118, y:180 }, { t:'tree_gold', x:190, y:190 },
+    { t:'tree_orange', x:290, y:180 }, { t:'tree_rust', x:362, y:190 },
+    { t:'tree_bare', x:112, y:288 }, { t:'tree_bare', x:368, y:288 },
+    { t:'bench', x:146, y:266 }, { t:'bench', x:334, y:266 },
+    { t:'bench', x:146, y:206 }, { t:'bench', x:334, y:206 },
+    { t:'lamp_street', x:82, y:200 }, { t:'lamp_street', x:398, y:200 },
+    { t:'lamp_street', x:82, y:298 }, { t:'lamp_street', x:398, y:298 },
+    { t:'bin', x:200, y:302 }, { t:'bin', x:280, y:302 },
+    { t:'leaves_pile', x:294, y:306 }, { t:'leaves_pile', x:186, y:150 },
+    { t:'puddle', x:140, y:312 }, { t:'puddle', x:340, y:308 },
+    { t:'bush', x:96, y:246 }, { t:'bush', x:384, y:246 },
   ],
   walls: [
-    {x:0,y:0,w:420,h:92},{x:0,y:92,w:54,h:228},{x:366,y:92,w:54,h:228},
-    {x:54,y:296,w:132,h:24},{x:246,y:296,w:120,h:24},{x:0,y:314,w:420,h:6},
+    {x:0,y:0,w:480,h:108},{x:0,y:108,w:64,h:252},{x:416,y:108,w:64,h:252},
+    {x:64,y:322,w:142,h:38},{x:274,y:322,w:142,h:38},{x:0,y:354,w:480,h:6},
   ],
   interactables: [
-    { x:186,y:284,w:60,h:34, name:'toHall', prompt:'В главный холл',
+    { x:206,y:306,w:68,h:36, name:'toHall', prompt:'В главный холл',
       action: async ()=> await changeRoom('uniHall', 280, 150) },
-    { x:180,y:194,w:60,h:44, name:'fountain', prompt:'Фонтан', action(){
+    { x:200,y:200,w:80,h:52, name:'fountain', prompt:'Фонтан', action(){
         if (F('learnedWitches')) return Dialogue.start([
           {who:'naya',expr:'talk',text:'Вода стоит и не двигается. Я смотрю на своё отражение и думаю, что оно теперь значит.'},
         ]);
@@ -10925,12 +11086,12 @@ uniCourtyard: {
           {who:'naya',expr:'smile',text:'(Сью бросала сюда монету перед каждым показом. Говорит, что помогает.)'},
         ]);
       }},
-    { x:110,y:228,w:48,h:34, name:'yardBench', prompt:'Скамья', action(){
+    { x:124,y:244,w:48,h:38, name:'yardBench', prompt:'Скамья', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Скамья мокрая. На спинке вырезаны инициалы, поверх — другие инициалы.'},
         ]);
       }},
-    { x:150,y:44,w:120,h:48, name:'lookOldWing', prompt:'Северная сторона', action(){
+    { x:150,y:66,w:180,h:52, name:'lookOldWing', prompt:'Северная сторона', action(){
         if (C('uniDay') >= 3) return Dialogue.start([
           {who:'naya',expr:'talk',text:'Старое крыло. Ни одного горящего окна, хотя лестница туда есть.'},
           {who:'naya',expr:'normal',text:'(Отсюда я вижу, что этаж всего один и он длинный. Туда можно попасть только со второго.)'},
@@ -10939,81 +11100,127 @@ uniCourtyard: {
           {who:'naya',expr:'normal',text:'Северная сторона двора темнее остальных. Окна не горят даже сейчас.'},
         ]);
       }},
-    { x:40,y:150,w:34,h:60, name:'lookWest', prompt:'Западная галерея', action(){
+    { x:56,y:170,w:44,h:70, name:'lookWest', prompt:'Западная галерея', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Окна театрального крыла. Через одно видно станок и край зеркальной стены.'},
           {who:'naya',expr:'smile',text:'(Значит, я только что стояла вон там.)'},
         ]);
       }},
+    { x:380,y:170,w:44,h:70, name:'lookEast', prompt:'Восточная галерея', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Восточная галерея. Второй этаж — сплошная лента окон, и за ней ходят люди.'},
+          {who:'naya',expr:'talk',text:'(Со двора видно, что это одно здание. Изнутри почему-то нет.)'},
+        ]);
+      }},
+    { x:296,y:282,w:60,h:44, name:'yardLeaves', prompt:'Куча листьев', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Листья сгребли к стене и не вывезли. Дождь прибил их в один слой.'},
+        ]);
+      }},
   ],
   npcs: [
-    { x:220, y:262, sprite:'student', name:'Студентка', speed:0.34,
-      path:[[220,262],[300,266],[300,240],[214,238]],
+    { x:250, y:290, sprite:'student', name:'Студентка', speed:0.34,
+      path:[[250,290],[330,294],[330,262],[244,260]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed(); return Dialogue.start([
         {who:'student',expr:'normal',name:'Студентка',text:'Тут всегда курят и всегда мёрзнут. Традиция.'},
       ]); } },
+    { x:150, y:160, sprite:'friend', name:'Студент', speed:0.28,
+      path:[[150,160],[204,158],[204,190],[148,192]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> Dialogue.start([{who:'friend',expr:'normal',name:'Студент',text:'Через двор быстрее в восточное крыло. Если не боишься промокнуть.'}]) },
   ],
 },
 
 /* ---------------------------------------------------------------- */
 /* ВТОРОЙ ЭТАЖ, ЦЕНТРАЛЬНЫЙ КОРИДОР. Идёт поперёк здания: аудитории и
-   кафедра по северной стене, окна во двор — по южной, посередине
-   проход в старое крыло, по краям — крылья.                          */
+   кафедра по северной стене, посередине проход в старое крыло, по краям
+   крылья. Вся южная стена — лента больших окон во внутренний двор, и
+   двор виден отсюда сверху, как и положено со второго этажа. В середине
+   южной стены эркер с лестницей вниз, в холл.                        */
 uniCorr2: {
-  name:"Университет. Второй этаж", music:'home', w:680, h:300,
+  name:"Университет. Второй этаж", music:'home', w:720, h:320,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
-  light:{ tint:'#1c1710', dark:.24 },
+  light:{ tint:'#1c1710', dark:.22 },
   lights:[
-    {x:90,y:170,r:46,c:'#ffdc9a',i:.34},{x:250,y:170,r:46,c:'#ffdc9a',i:.34},
-    {x:430,y:170,r:46,c:'#ffdc9a',i:.34},{x:590,y:170,r:46,c:'#ffdc9a',i:.34},
+    {x:90,y:186,r:48,c:'#ffdc9a',i:.32},{x:250,y:186,r:48,c:'#ffdc9a',i:.32},
+    {x:470,y:186,r:48,c:'#ffdc9a',i:.32},{x:630,y:186,r:48,c:'#ffdc9a',i:.32},
+    {x:375,y:290,r:44,c:'#e8dcc0',i:.24},
   ],
+  sun:{ x:140, y:246, w:62, len:90, tilt:-.30, a:.10 },
   bgPaint(ctx) {
-    paintCorridor(ctx, 680, 250, {
+    const W = 720, H = 320, wallH = 152, nearY = 246;
+    paintCorridor(ctx, W, H, {
       uniAtmosphere:true,
-      wallH:150, warm:'#6b5a44', floor:'#8e7448', floor2:'#7a6038',
-      layout:UNI_C2_WALL, lightA:.30, tilt:.5, vignette:.30,
-      leaf1:'#c2702c', leaf2:'#a8412c',
+      wallH, warm:'#6b5a44', floor:'#8e7448', floor2:'#7a6038',
+      layout:UNI_C2_WALL, lightA:.24, tilt:.5, vignette:.28, view:'roofs',
+      nearWall:true, nearH:H - nearY, nearLayout:UNI_C2_YARD, nearView:'yardDown',
     });
-    // южная стена: сплошная лента больших окон во внутренний двор
-    ctx.fillStyle = '#4a4136'; ctx.fillRect(0, 250, 680, 50);
-    for (let x = 14; x < 668; x += 74) paintYardWindow(ctx, x, 258, 58, 34);
-    ctx.fillStyle = '#3a332a'; ctx.fillRect(0, 248, 680, 4);
+
+    /* ЭРКЕР С ЛЕСТНИЦЕЙ ВНИЗ: южная стена здесь расступается, и марш
+       уходит к зрителю — на первый этаж, в холл. */
+    const bx = 320, bw = 110;
+    ctx.fillStyle = '#8e7448'; ctx.fillRect(bx, nearY, bw, H - nearY);
+    ctx.fillStyle = 'rgba(0,0,0,.26)'; ctx.fillRect(bx, nearY, bw, 5);
+    for (let i = 0; i < 6; i++) {                       // ступени вниз расширяются к зрителю
+      const y = nearY + 6 + i * 8, w = 62 + i * 7, x = bx + bw / 2 - w / 2;
+      ctx.fillStyle = 'rgba(0,0,0,.26)'; ctx.fillRect(x, y + 6, w, 3);
+      ctx.fillStyle = '#6b5945'; ctx.fillRect(x, y, w, 7);
+      ctx.fillStyle = '#8a7458'; ctx.fillRect(x, y, w, 3);
+      ctx.fillStyle = '#a68f6e'; ctx.fillRect(x, y, w, 1);
+      ctx.fillStyle = '#7c2b38'; ctx.fillRect(bx + bw / 2 - (13 + i * 3), y, 26 + i * 6, 5);
+      ctx.fillStyle = '#98394a'; ctx.fillRect(bx + bw / 2 - (13 + i * 3), y, 26 + i * 6, 2);
+    }
+    ctx.fillStyle = '#221a14'; ctx.fillRect(bx + 4, H - 8, bw - 8, 8);   // марш уходит вниз в тень
+    [[1, bx], [-1, bx + bw]].forEach(([dir, x0]) => {                     // перила эркера
+      ctx.fillStyle = '#4a3a2c';
+      ctx.beginPath();
+      ctx.moveTo(x0, nearY + 2); ctx.lineTo(x0 + dir * 14, H - 4);
+      ctx.lineTo(x0 + dir * 20, H - 4); ctx.lineTo(x0 + dir * 6, nearY + 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#8a6f52';
+      ctx.beginPath();
+      ctx.moveTo(x0, nearY); ctx.lineTo(x0 + dir * 14, H - 8);
+      ctx.lineTo(x0 + dir * 18, H - 8); ctx.lineTo(x0 + dir * 4, nearY); ctx.closePath(); ctx.fill();
+    });
+    ctx.fillStyle = shade('#6b5a44', 1.20); ctx.fillRect(bx - 2, nearY - 3, bw + 4, 3);
+
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('← ЗАПАДНОЕ КРЫЛО', 10, 172);
-    ctx.fillText('ВОСТОЧНОЕ КРЫЛО →', 578, 172);
-    ctx.fillText('ВИД ВО ВНУТРЕННИЙ ДВОР', 262, 246);
-    // Площадка парадной лестницы вниз. Она стоит восточнее двери в старое
-    // крыло: марш шириной 96 не помещается ни в один простенок, поэтому
-    // важно, чтобы он не вставал именно перед сюжетной дверью.
-    ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fillRect(366, 196, 88, 52);
-    ctx.fillStyle = '#c8b8a0'; ctx.fillText('ВНИЗ, В ХОЛЛ', 376, 244);
+    ctx.fillText('← ЗАПАДНОЕ КРЫЛО', 10, 182);
+    ctx.fillText('ВОСТОЧНОЕ КРЫЛО →', 618, 182);
+    ctx.fillText('ВНИЗ, В ХОЛЛ', 340, nearY - 8);
+    ctx.fillText('ВИД ВО ВНУТРЕННИЙ ДВОР', 148, nearY - 8);
+    ctx.fillText('ВИД ВО ВНУТРЕННИЙ ДВОР', 486, nearY - 8);
   },
   objects: [
-    { t:'stairs_main', x:410, y:214 },
-    { t:'lockers', x:120, y:200 }, { t:'lockers', x:166, y:200 },
-    { t:'lockers', x:512, y:200 }, { t:'lockers', x:558, y:200 },
-    { t:'bench_stone', x:246, y:196 }, { t:'bench_stone', x:446, y:246 },
-    { t:'plant_pot', x:36, y:230 }, { t:'plant_pot', x:648, y:230 },
-    { t:'bin', x:210, y:230 }, { t:'radiator', x:UNI_C2_WALL.pierMid(1), y:156 },
-    { t:'painting', x:UNI_C2_WALL.pierMid(0), y:62 },
-    { t:'painting', x:UNI_C2_WALL.pierMid(4), y:62 },
-    { t:'photo_frame', x:UNI_C2_WALL.pierMid(2), y:64 },
-    { t:'notice_board', x:UNI_C2_WALL.pierMid(5), y:68 },
-    { t:'book_stack', x:250, y:184 },
+    { t:'lockers', x:126, y:214 }, { t:'lockers', x:172, y:214 },
+    { t:'lockers', x:552, y:214 }, { t:'lockers', x:598, y:214 },
+    { t:'bench_stone', x:262, y:246 }, { t:'bench_stone', x:466, y:246 },
+    { t:'plant_pot', x:30, y:240 }, { t:'plant_pot', x:692, y:240 },
+    { t:'bin', x:224, y:242 }, { t:'bin', x:508, y:242 },
+    { t:'radiator', x:UNI_C2_WALL.pierMid(2), y:170 },
+    { t:'radiator', x:UNI_C2_WALL.pierMid(6), y:170 },
+    { t:'fire_cabinet', x:UNI_C2_WALL.pierMid(1), y:96 },
+    { t:'painting', x:UNI_C2_WALL.pierMid(3), y:74 },
+    { t:'painting', x:UNI_C2_WALL.pierMid(5), y:74 },
+    { t:'photo_frame', x:UNI_C2_WALL.pierMid(0), y:76 },
+    { t:'notice_board', x:UNI_C2_WALL.pierMid(7), y:80 },
+    { t:'book_stack', x:266, y:232 },
+    { t:'crate_stack', x:640, y:246 },
+    { t:'dir_sign', x:296, y:250 },
   ],
   walls: [
-    {x:0,y:0,w:680,h:150},{x:0,y:0,w:8,h:300},{x:672,y:0,w:8,h:300},
-    {x:0,y:250,w:680,h:50},
+    {x:0,y:0,w:720,h:152},{x:0,y:0,w:8,h:320},{x:712,y:0,w:8,h:320},
+    {x:0,y:246,w:320,h:74},{x:430,y:246,w:290,h:74},
+    {x:320,y:314,w:110,h:6},
   ],
   interactables: [
-    { x:366,y:216,w:88,h:30, name:'toFloor1', prompt:'Вниз, в главный холл',
+    { x:330,y:250,w:92,h:52, name:'toFloor1', prompt:'Вниз, в главный холл',
       action: async ()=> await changeRoom('uniHall', 430, 236) },
-    { x:8,y:154,w:44,h:60, name:'toWest2', prompt:'Западное крыло',
+    { x:8,y:164,w:44,h:64, name:'toWest2', prompt:'Западное крыло',
       action: async ()=> await changeRoom('uniWest2', 130, 44) },
-    { x:628,y:154,w:44,h:60, name:'toEast2', prompt:'Восточное крыло',
+    { x:668,y:164,w:44,h:64, name:'toEast2', prompt:'Восточное крыло',
       action: async ()=> await changeRoom('uniEast2', 130, 44) },
-    { x:UNI_C2_WALL.at('oldwing')-8,y:196,w:72,h:34, name:'serviceHint', prompt:'Служебный проход', action(){
+    { x:UNI_C2_WALL.at('oldwing')-10,y:206,w:76,h:38, name:'serviceHint', prompt:'Служебный проход', action(){
         if (C('uniDay') < 3) return Dialogue.start([
           {who:'naya',expr:'normal',text:'Служебный проход закрыт. Похоже, сюда водят только персонал.'},
         ]);
@@ -11022,56 +11229,68 @@ uniCorr2: {
           {who:'naya',expr:'talk',text:'(Если мне нужен цоколь, искать надо не подсобку на первом этаже.)'},
         ]);
       }},
-    { x:UNI_C2_WALL.at('oldwing'),y:150,w:56,h:40, name:'toOldWing', prompt:'Старое крыло', action: async ()=>{
+    { x:UNI_C2_WALL.at('oldwing'),y:158,w:56,h:44, name:'toOldWing', prompt:'Старое крыло', action: async ()=>{
         if (C('uniDay') < 3 && !F('oldWingOpen')) return Dialogue.start([
           {who:'naya',expr:'normal',text:'Проход в старое крыло. Поперёк — ленточка и табличка «ремонт».'},
           {who:'naya',expr:'talk',text:'(Пыли на ленточке столько, что ремонт идёт не первый год.)'},
         ]);
-        await changeRoom('uniOldWing', 468, 226);
+        await changeRoom('uniOldWing', 508, 246);
       }},
-    { x:UNI_C2_WALL.at('a204'),y:150,w:40,h:38, name:'aud204', prompt:'Аудитория 204', action(){
+    { x:UNI_C2_WALL.at('a204'),y:158,w:40,h:44, name:'aud204', prompt:'Аудитория 204', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Через стекло видно пустую аудиторию: парты сдвинуты к стене, на доске недостёртая схема.'},
           {who:'naya',expr:'talk',text:'(Открыто. Но там пусто и мне там нечего делать.)'},
         ]);
       }},
-    { x:UNI_C2_WALL.at('a201'),y:150,w:40,h:38, name:'aud201', prompt:'Аудитория 201', action(){
+    { x:UNI_C2_WALL.at('a201'),y:158,w:40,h:44, name:'aud201', prompt:'Аудитория 201', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'За дверью кто-то играет одно и то же место третий раз подряд. И каждый раз сбивается на одной ноте.'}]);
       }},
-    { x:UNI_C2_WALL.at('a203'),y:150,w:40,h:38, name:'aud203', prompt:'Аудитория 203', action(){
+    { x:UNI_C2_WALL.at('a203'),y:158,w:40,h:44, name:'aud203', prompt:'Аудитория 203', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. На двери график: «203 — по расписанию кафедры».'}]);
       }},
-    { x:UNI_C2_WALL.at('a206'),y:150,w:40,h:38, name:'aud206', prompt:'Аудитория 206', action(){
+    { x:UNI_C2_WALL.at('a206'),y:158,w:40,h:44, name:'aud206', prompt:'Аудитория 206', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. Через щель тянет мелом и холодом — окно внутри открыто с лета.'}]);
       }},
-    { x:UNI_C2_WALL.at('chair'),y:150,w:48,h:38, name:'chairDoor', prompt:'Кафедра', action(){
+    { x:UNI_C2_WALL.at('chair'),y:158,w:48,h:44, name:'chairDoor', prompt:'Кафедра', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'«КАФЕДРА ИСТОРИИ ТЕАТРА. Приём по расписанию».'},
           {who:'naya',expr:'talk',text:'(Расписание не приложено.)'},
         ]);
       }},
-    { x:UNI_C2_WALL.at('wc2'),y:150,w:34,h:38, name:'wc2', prompt:'Туалет', action(){
+    { x:UNI_C2_WALL.at('wc2'),y:158,w:34,h:44, name:'wc2', prompt:'Туалет', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Туалет. Кран подтекает так ровно, что это уже почти музыка.'}]);
       }},
-    { x:60,y:222,w:120,h:32, name:'yardWindows', prompt:'Окна во двор', action(){
+    { x:UNI_C2_WALL.at('c2w0'),y:158,w:44,h:42, name:'roofWin2', prompt:'Окно на крыши', action(){
         Dialogue.start([
-          {who:'naya',expr:'normal',text:'Весь южный борт коридора — окна во двор. Отсюда видно фонтан и обе галереи.'},
+          {who:'naya',expr:'normal',text:'Торцевое окно. Отсюда видно кровлю западного крыла и город за ней.'},
+          {who:'naya',expr:'talk',text:'(Здание больше, чем кажется изнутри. Крыш у него как у квартала.)'},
+        ]);
+      }},
+    { x:60,y:228,w:120,h:34, name:'yardWindows', prompt:'Окна во двор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Весь южный борт коридора — окна во двор. Сверху видно фонтан, дорожки и обе галереи.'},
           {who:'naya',expr:'talk',text:'(И северную сторону. Там не горит ни одно окно.)'},
         ]);
       }},
-    { x:100,y:178,w:88,h:34, name:'lockers2', prompt:'Шкафчики', action(){
+    { x:486,y:228,w:120,h:34, name:'yardWindows2', prompt:'Окна во двор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Двор сверху выглядит меньше, а старое крыло — длиннее.'},
+          {who:'naya',expr:'talk',text:'(Одно место, а не четыре карты.)'},
+        ]);
+      }},
+    { x:106,y:192,w:112,h:34, name:'lockers2', prompt:'Шкафчики', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Шкафчики второго этажа. На одном приклеена записка: «НЕ РАБОТАЕТ. СЕРЬЁЗНО».'}]);
       }},
   ],
   npcs: [
-    { x:220, y:210, sprite:'student', name:'Студентка', speed:0.40,
-      path:[[220,210],[470,208],[470,236],[200,238]],
+    { x:240, y:226, sprite:'student', name:'Студентка', speed:0.40,
+      path:[[240,226],[500,224],[500,250],[220,252]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed(); return Dialogue.start([
         {who:'student',expr:'normal',name:'Студентка',text:'Старое крыло? Туда не ходят. Там даже свет не включают.'},
       ]); } },
-    { x:540, y:236, sprite:'acolyte', name:'Студент', speed:0.5,
-      path:[[540,236],[300,236],[300,206],[540,206]],
+    { x:600, y:250, sprite:'acolyte', name:'Студент', speed:0.5,
+      path:[[600,250],[460,250],[460,222],[600,222]],
       when:()=> !F('sueDead') },
   ],
   /* Отметка «я тут была»: по ней цель ведёт игрока дальше. */
@@ -11080,37 +11299,42 @@ uniCorr2: {
 
 /* ---------------------------------------------------------------- */
 /* ЗАПАДНОЕ КРЫЛО, ВТОРОЙ ЭТАЖ. Театральное отделение: все двери
-   заперты, но лестница вниз работает — крылья связаны на обоих этажах. */
+   заперты, но лестница вниз работает — крылья связаны на обоих этажах.
+   Тише, чем внизу, и светлее: окон больше, людей меньше.             */
 uniWest2: {
-  name:"Университет. Западное крыло, второй этаж", music:'home', w:260, h:400,
+  name:"Университет. Западное крыло, второй этаж", music:'home', w:260, h:440,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.07, wind:0 },
-  light:{ tint:'#1d1710', dark:.28 },
-  lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.30},{x:130,y:280,r:44,c:'#ffdc9a',i:.30}],
+  light:{ tint:'#1d1710', dark:.26 },
+  lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.28},{x:130,y:250,r:44,c:'#ffdc9a',i:.28},
+          {x:130,y:396,r:44,c:'#ffdc9a',i:.30}],
   bgPaint(ctx) {
-    paintWing(ctx, 260, 400, {
+    paintWing(ctx, 260, 440, {
       uniAtmosphere:true,
       wallW:62, warm:'#665744', floor:'#8a7048', floor2:'#755c38',
-      left:UNI_W2_LEFT, right:UNI_W2_RIGHT,
-      leaf1:'#a8412c', leaf2:'#c9992f', lightA:.30, vignette:.38,
+      left:UNI_W2_LEFT, right:UNI_W2_RIGHT, view:'yardDown',
+      lightA:.30, vignette:.36,
     });
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 72, 244);
+    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 72, 356);
     ctx.fillText('КОРИДОР →', 92, 22);
+    ctx.fillText('КАБИНЕТЫ 305 — 311', 76, 116);
   },
   objects: [
-    { t:'stairs_main', x:130, y:352 },
-    { t:'bench_stone', x:96, y:230 }, { t:'plant_pot', x:182, y:190 },
-    { t:'bin', x:78, y:300 }, { t:'poster', x:42, y:150 },
-    { t:'photo_frame', x:218, y:262 },
+    { t:'stairs_main', x:130, y:392 },
+    { t:'bench_stone', x:96, y:250 }, { t:'plant_pot', x:182, y:210 },
+    { t:'bin', x:80, y:186 }, { t:'poster', x:44, y:170 }, { t:'poster', x:44, y:300 },
+    { t:'photo_frame', x:216, y:288 },
+    { t:'fire_cabinet', x:216, y:140 },
+    { t:'crate_stack', x:170, y:252 },
   ],
   walls: [
-    {x:0,y:0,w:62,h:400},{x:198,y:0,w:62,h:400},
-    {x:62,y:0,w:136,h:8},{x:62,y:392,w:136,h:8},
+    {x:0,y:0,w:62,h:440},{x:198,y:0,w:62,h:440},
+    {x:62,y:0,w:136,h:8},{x:62,y:432,w:136,h:8},
   ],
   interactables: [
     { x:76,y:14,w:110,h:44, name:'toCorr2', prompt:'В центральный коридор',
-      action: async ()=> await changeRoom('uniCorr2', 44, 214) },
-    { x:76,y:246,w:110,h:44, name:'toFloor1', prompt:'Вниз, в театральное крыло',
+      action: async ()=> await changeRoom('uniCorr2', 44, 226) },
+    { x:76,y:366,w:110,h:44, name:'toFloor1', prompt:'Вниз, в театральное крыло',
       action: async ()=> await changeRoom('uniWestHall', 130, 98) },
     { x:62,y:UNI_W2_LEFT.mid('dept')-24,w:36,h:48, name:'deptDoor', prompt:'Театральное отделение', action(){
         Dialogue.start([
@@ -11124,48 +11348,67 @@ uniWest2: {
     { x:62,y:UNI_W2_LEFT.mid('a307')-22,w:36,h:44, name:'aud307', prompt:'Аудитория 307', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. Судя по пыли на ручке — не первый месяц.'}]);
       }},
+    { x:62,y:UNI_W2_LEFT.mid('a309')-22,w:36,h:44, name:'aud309', prompt:'Аудитория 309', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«309». Заперто. Рядом на стене — выцветший план эвакуации.'},
+          {who:'naya',expr:'talk',text:'(На плане этаж больше того, по которому я хожу. Половина коридоров закрашена.)'},
+        ]);
+      }},
     { x:162,y:UNI_W2_RIGHT.mid('makeup')-22,w:36,h:44, name:'makeupDoor', prompt:'Гримёрный класс', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'«ГРИМ. КЛАСС». Заперто. Через щель пахнет спиртом и жирным гримом.'}]);
       }},
-    { x:162,y:UNI_W2_RIGHT.mid('w0')-24,w:36,h:48, name:'winW2', prompt:'Окно во двор', action(){
-        Dialogue.start([{who:'naya',expr:'normal',text:'Со второго этажа двор выглядит меньше, а старое крыло — длиннее.'}]);
+    { x:162,y:UNI_W2_RIGHT.mid('a311')-22,w:36,h:44, name:'aud311', prompt:'Кабинет 311', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'«311». Заперто. Под дверью полоска света и голос, который читает вслух.'}]);
+      }},
+    { x:162,y:UNI_W2_RIGHT.mid('w0')-26,w:36,h:52, name:'winW2', prompt:'Окно во двор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Со второго этажа двор виден сверху: фонтан, две лужайки, дорожка крестом.'},
+          {who:'naya',expr:'talk',text:'(И старое крыло. Отсюда видно, какое оно длинное.)'},
+        ]);
+      }},
+    { x:162,y:UNI_W2_RIGHT.mid('w2')-26,w:36,h:52, name:'winW2b', prompt:'Окно во двор', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Дождь идёт ровно, и во дворе от этого не осталось ни одного человека.'}]);
       }},
   ],
   npcs: [],
 },
 
 /* ---------------------------------------------------------------- */
-/* ВОСТОЧНОЕ КРЫЛО, ВТОРОЙ ЭТАЖ. Тоже почти всё заперто.             */
+/* ВОСТОЧНОЕ КРЫЛО, ВТОРОЙ ЭТАЖ. Тоже почти всё заперто: за дверями
+   кафедры и кабинеты, в которые студентов не зовут.                  */
 uniEast2: {
-  name:"Университет. Восточное крыло, второй этаж", music:'home', w:260, h:400,
+  name:"Университет. Восточное крыло, второй этаж", music:'home', w:260, h:440,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.07, wind:0 },
-  light:{ tint:'#1d1710', dark:.28 },
-  lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.30},{x:130,y:280,r:44,c:'#ffdc9a',i:.30}],
+  light:{ tint:'#1d1710', dark:.26 },
+  lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.28},{x:130,y:250,r:44,c:'#ffdc9a',i:.28},
+          {x:130,y:396,r:44,c:'#ffdc9a',i:.30}],
   bgPaint(ctx) {
-    paintWing(ctx, 260, 400, {
+    paintWing(ctx, 260, 440, {
       uniAtmosphere:true,
       wallW:62, warm:'#665744', floor:'#8a7048', floor2:'#755c38',
-      left:UNI_E2_LEFT, right:UNI_E2_RIGHT,
-      leaf1:'#c2702c', leaf2:'#a8412c', lightA:.30, vignette:.38,
+      left:UNI_E2_LEFT, right:UNI_E2_RIGHT, view:'yardDown',
+      lightA:.30, vignette:.36,
     });
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 72, 244);
+    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 72, 356);
     ctx.fillText('← КОРИДОР', 92, 22);
+    ctx.fillText('КАБИНЕТЫ 302 — 308', 76, 116);
   },
   objects: [
-    { t:'stairs_main', x:130, y:352 },
-    { t:'lockers', x:88, y:236 }, { t:'bench_stone', x:164, y:300 },
-    { t:'plant_pot', x:80, y:180 }, { t:'bin', x:180, y:346 },
-    { t:'painting', x:218, y:150 },
+    { t:'stairs_main', x:130, y:392 },
+    { t:'lockers', x:88, y:262 }, { t:'bench_stone', x:164, y:330 },
+    { t:'plant_pot', x:80, y:200 }, { t:'bin', x:178, y:196 },
+    { t:'painting', x:216, y:170 }, { t:'notice_board', x:216, y:300 },
+    { t:'fire_cabinet', x:44, y:140 },
   ],
   walls: [
-    {x:0,y:0,w:62,h:400},{x:198,y:0,w:62,h:400},
-    {x:62,y:0,w:136,h:8},{x:62,y:392,w:136,h:8},
+    {x:0,y:0,w:62,h:440},{x:198,y:0,w:62,h:440},
+    {x:62,y:0,w:136,h:8},{x:62,y:432,w:136,h:8},
   ],
   interactables: [
     { x:76,y:14,w:110,h:44, name:'toCorr2', prompt:'В центральный коридор',
-      action: async ()=> await changeRoom('uniCorr2', 636, 214) },
-    { x:76,y:246,w:110,h:44, name:'toFloor1', prompt:'Вниз, в восточное крыло',
+      action: async ()=> await changeRoom('uniCorr2', 676, 226) },
+    { x:76,y:366,w:110,h:44, name:'toFloor1', prompt:'Вниз, в восточное крыло',
       action: async ()=> await changeRoom('uniEastHall', 130, 98) },
     { x:162,y:UNI_E2_RIGHT.mid('a302')-22,w:36,h:44, name:'aud302', prompt:'Аудитория 302', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. За дверью слышно, как двигают стулья, — значит, всё-таки не заперто, а занято.'}]);
@@ -11179,11 +11422,23 @@ uniEast2: {
           {who:'naya',expr:'talk',text:'(Это здание не кончается. Мне туда точно не нужно.)'},
         ]);
       }},
+    { x:162,y:UNI_E2_RIGHT.mid('a306')-22,w:36,h:44, name:'aud306', prompt:'Аудитория 306', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'«306». Заперто. На двери расписание, где половина пар перечёркнута и переписана.'}]);
+      }},
     { x:62,y:UNI_E2_LEFT.mid('wc3')-20,w:36,h:40, name:'wc3', prompt:'Туалет', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Туалет. Зеркало заклеено бумагой — видимо, разбито.'}]);
       }},
-    { x:62,y:UNI_E2_LEFT.mid('w0')-24,w:36,h:48, name:'winE2', prompt:'Окно во двор', action(){
+    { x:62,y:UNI_E2_LEFT.mid('a308')-22,w:36,h:44, name:'aud308', prompt:'Кабинет 308', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'«308». Заперто. Рядом стоит стул — видимо, для тех, кто ждёт.'}]);
+      }},
+    { x:62,y:UNI_E2_LEFT.mid('w0')-26,w:36,h:52, name:'winE2', prompt:'Окно во двор', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Двор сверху: фонтан, две лужайки, четыре стороны здания. Одно место, а не четыре карты.'}]);
+      }},
+    { x:62,y:UNI_E2_LEFT.mid('w2')-26,w:36,h:52, name:'winE2b', prompt:'Окно во двор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Отсюда видно окна западного крыла напротив. В них тот же свет, что и здесь.'},
+          {who:'naya',expr:'talk',text:'(Одинаковые окна, одинаковые лампы. Здание собрано по одному чертежу.)'},
+        ]);
       }},
   ],
   npcs: [],
@@ -11192,44 +11447,56 @@ uniEast2: {
 /* ---------------------------------------------------------------- */
 /* СТАРОЕ КРЫЛО. Северная сторона второго этажа: запертый архив,
    закрытые аудитории и единственная работающая дверь — служебная
-   лестница, которая связывает крышу, подвал и задний двор.           */
+   лестница, которая связывает крышу, подвал и задний двор.
+   Оно ещё принадлежит университету: те же двери, те же таблички, тот
+   же карниз. Просто здесь двадцать лет никто не делал ремонт.        */
 uniOldWing: {
-  name:"Университет. Старое крыло", music:'tense', w:520, h:320,
+  name:"Университет. Старое крыло", music:'tense', w:560, h:340,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.16, wind:0 },
   light:{ tint:'#151220', dark:.42 },
-  lights:[{x:130,y:170,r:38,c:'#d8c8a0',i:.22,flicker:true},{x:370,y:170,r:38,c:'#d8c8a0',i:.20,flicker:true}],
+  lights:[{x:140,y:200,r:38,c:'#d8c8a0',i:.20,flicker:true},
+          {x:400,y:200,r:38,c:'#d8c8a0',i:.18,flicker:true}],
   bgPaint(ctx) {
-    paintCorridor(ctx, 520, 320, {
+    paintCorridor(ctx, 560, 340, {
       uniAtmosphere:true,
-      wallH:178, warm:'#4e4236', warm2:'#3f352c', floor:'#5f5040', floor2:'#4f4234',
-      layout:UNI_OLD_WALL, lightA:.08, tilt:.5, vignette:.46,
-      glass:'#8a8a7a', glassLow:'#5a5a52',
-      skyTop:'#5a6270', skyBot:'#7a7668', leaf1:'#7a3626', leaf2:'#8a6a24',
+      wallH:190, warm:'#4e4236', floor:'#6b5942', floor2:'#5a4a36',
+      layout:UNI_OLD_WALL, lightA:.10, tilt:.5, vignette:.46, wear:.7, view:'back',
     });
-    ctx.fillStyle = 'rgba(10,8,16,.30)'; ctx.fillRect(0, 178, 520, 142);
+    ctx.fillStyle = 'rgba(10,8,16,.30)'; ctx.fillRect(0, 190, 560, 150);
+    /* следы прошлого ремонта: заклеенные окна, снятые светильники */
+    ctx.fillStyle = 'rgba(160,150,120,.10)';
+    for (let i = 0; i < 9; i++) ctx.fillRect(20 + i * 62, 150 + (i % 3) * 9, 26, 2);
+    ctx.fillStyle = 'rgba(0,0,0,.34)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(70 + i * 108, 24, 10, 6);   // пустые крюки под лампы
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('В КОРИДОР →', 452, 196);
-    ctx.fillText('СЛУЖЕБНАЯ ЛЕСТНИЦА ↑', UNI_OLD_WALL.at('service') - 34, 196);
+    ctx.fillText('В КОРИДОР →', 492, 208);
+    ctx.fillText('СЛУЖЕБНАЯ ЛЕСТНИЦА ↑', UNI_OLD_WALL.at('service') - 34, 208);
+    ctx.fillStyle = 'rgba(200,184,160,.35)';
+    ctx.fillText('СЕВЕРНОЕ КРЫЛО · РЕМОНТ', 24, 208);
   },
   objects: [
-    { t:'pillar_wood', x:200, y:230 }, { t:'pillar_wood', x:352, y:230 },
-    { t:'archive_box', x:70, y:236 }, { t:'archive_box', x:96, y:242 },
-    { t:'chest', x:280, y:238 },
-    { t:'bench_stone', x:150, y:222 },
-    { t:'plant_pot', x:24, y:266 },
-    { t:'book_stack', x:112, y:258 },
-    { t:'bin', x:424, y:258 },
+    { t:'column_stone', x:210, y:258 }, { t:'column_stone', x:372, y:258 },
+    { t:'archive_box', x:74, y:256 }, { t:'archive_box', x:100, y:262 },
+    { t:'crate_stack', x:150, y:274 },
+    { t:'chest', x:296, y:258 },
+    { t:'cabinet', x:250, y:246 },
+    { t:'bench_stone', x:462, y:246 },
+    { t:'archive_box', x:26, y:290 },
+    { t:'book_stack', x:120, y:290 },
+    { t:'bin', x:440, y:290 },
+    { t:'poster', x:UNI_OLD_WALL.pierMid(1), y:120 },
+    { t:'poster', x:UNI_OLD_WALL.pierMid(5), y:120 },
   ],
-  ambient() { if (Math.random() < 0.02) FX.spawn(Math.random()*520, 90, 1, {color:'#3a3448', rise:.1, life:120, spread:10}); },
+  ambient() { if (Math.random() < 0.02) FX.spawn(Math.random()*560, 100, 1, {color:'#3a3448', rise:.1, life:120, spread:10}); },
   walls: [
-    {x:0,y:0,w:520,h:178},{x:0,y:0,w:8,h:320},{x:512,y:0,w:8,h:320},{x:0,y:314,w:520,h:6},
+    {x:0,y:0,w:560,h:190},{x:0,y:0,w:8,h:340},{x:552,y:0,w:8,h:340},{x:0,y:334,w:560,h:6},
   ],
   interactables: [
-    { x:472,y:180,w:40,h:56, name:'toCorr2', prompt:'Обратно в коридор',
-      action: async ()=> await changeRoom('uniCorr2', UNI_C2_WALL.at('oldwing') + 28, 196) },
-    { x:UNI_OLD_WALL.at('service'),y:178,w:58,h:44, name:'toService', prompt:'Служебная лестница: вверх / вниз',
+    { x:508,y:192,w:44,h:56, name:'toCorr2', prompt:'Обратно в коридор',
+      action: async ()=> await changeRoom('uniCorr2', UNI_C2_WALL.at('oldwing') + 28, 206) },
+    { x:UNI_OLD_WALL.at('service'),y:190,w:58,h:44, name:'toService', prompt:'Служебная лестница: вверх / вниз',
       action: async ()=> await changeRoom('uniServiceStair', 110, 92) },
-    { x:UNI_OLD_WALL.at('oldarch'),y:178,w:48,h:40, name:'oldArchDoor', prompt:'Дверь «АРХИВ»', action(){
+    { x:UNI_OLD_WALL.at('oldarch'),y:190,w:48,h:44, name:'oldArchDoor', prompt:'Дверь «АРХИВ»', action(){
         if (!F('basementFound')) {
           setFlag('basementFound');
           Journal.add('archiveBelow');
@@ -11241,26 +11508,37 @@ uniOldWing: {
         }
         Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. Настоящий архив — внизу, в цоколе.'}]);
       }},
-    { x:UNI_OLD_WALL.at('old1'),y:178,w:38,h:40, name:'oldRoom1', prompt:'Закрытая аудитория', action(){
+    { x:UNI_OLD_WALL.at('old1'),y:190,w:38,h:44, name:'oldRoom1', prompt:'Закрытая аудитория', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Номера на двери нет — только след от снятой таблички. За стеклом чехлы на партах.'}]);
       }},
-    { x:UNI_OLD_WALL.at('old2'),y:178,w:38,h:40, name:'oldRoom2', prompt:'Закрытая аудитория', action(){
+    { x:UNI_OLD_WALL.at('old2'),y:190,w:38,h:44, name:'oldRoom2', prompt:'Закрытая аудитория', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. Внутри что-то стоит вплотную к двери — она не идёт даже на миллиметр.'}]);
       }},
-    { x:UNI_OLD_WALL.at('old3'),y:178,w:38,h:40, name:'oldRoom3', prompt:'Закрытая аудитория', action(){
+    { x:UNI_OLD_WALL.at('old3'),y:190,w:38,h:44, name:'oldRoom3', prompt:'Закрытая аудитория', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Заперто. Из-под двери тянет сквозняком — значит, там открыто окно.'},
           {who:'naya',expr:'talk',text:'(Окно в комнате, куда никто не заходит. Кто-то же его открыл.)'},
         ]);
       }},
-    { x:56,y:212,w:60,h:40, name:'oldBoxes', prompt:'Старые коробки', action(){
+    { x:UNI_OLD_WALL.at('ow0'),y:190,w:40,h:44, name:'oldWin', prompt:'Мутное окно', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Стекло не мыли столько, что двор за ним стал приблизительным.'},
+          {who:'naya',expr:'talk',text:'(Отсюда видно задворки: старые деревья, забор и крыши. Парадной стороны с этой стороны нет.)'},
+        ]);
+      }},
+    { x:56,y:232,w:64,h:44, name:'oldBoxes', prompt:'Старые коробки', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Коробки составлены до потолка. На боках — годы, дальше семидесятых уже не разобрать.'},
           {who:'naya',expr:'talk',text:'(Программки и описи инвентаря. Не то.)'},
         ]);
       }},
-    { x:262,y:214,w:40,h:36, name:'oldChest', prompt:'Сундук', action(){
+    { x:278,y:234,w:40,h:40, name:'oldChest', prompt:'Сундук', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Театральный реквизит позапрошлого поколения. Корона из фольги, деревянный меч.'}]);
+      }},
+    { x:230,y:222,w:44,h:38, name:'oldCabinet', prompt:'Шкаф', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Шкаф с выломанной дверцей. Внутри стопка методичек, склеенных сыростью в один кирпич.'},
+        ]);
       }},
   ],
   npcs: [],
@@ -11271,7 +11549,8 @@ uniOldWing: {
 /* ---------------------------------------------------------------- */
 /* СЛУЖЕБНАЯ ЛЕСТНИЦА. Вертикальная связка всего здания: крыша сверху,
    старое крыло сбоку, подвал внизу — и низкое окно на задний двор,
-   через которое Ная возвращается в корпус мимо охраны.               */
+   через которое Ная возвращается в корпус мимо охраны. Бетон, металл,
+   трубы: парадной отделки здесь никогда и не было.                   */
 uniServiceStair: {
   name:"Университет. Служебная лестница", music:'tense', w:220, h:420,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.20, wind:0 },
@@ -11279,51 +11558,67 @@ uniServiceStair: {
   lights:[
     {x:110,y:60,r:40,c:'#c8d0a0',i:.30,flicker:true},
     {x:110,y:340,r:40,c:'#c8d0a0',i:.28,flicker:true},
-    {x:30,y:224,r:30,c:'#8fa4bc',i:.26},
+    {x:30,y:224,r:32,c:'#8fa4bc',i:.28},
   ],
   bgPaint(ctx) {
     const W = 220, H = 420;
-    ctx.fillStyle = '#2f2f36'; ctx.fillRect(0, 0, W, H);              // бетонная шахта
+    /* бетонная шахта: блоки со швами и потёками */
+    ctx.fillStyle = '#2f2f36'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#373740';
-    for (let y = 0; y < H; y += 12) for (let x = ((y / 12) % 2) * 14; x < W; x += 28) ctx.fillRect(x, y, 26, 11);
-    ctx.fillStyle = '#3c3c46'; ctx.fillRect(34, 0, 152, H);            // пролёт
+    for (let y = 0; y < H; y += 14)
+      for (let x = ((y / 14) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 13);
+    ctx.fillStyle = 'rgba(20,20,26,.5)';
+    for (let y = 13; y < H; y += 14) ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = 'rgba(90,110,120,.10)';                       // потёки по бетону
+    for (let i = 0; i < 10; i++) ctx.fillRect((i * 47) % W, (i * 83) % H, 3, 20 + (i % 4) * 14);
+
+    /* пролёт: площадка посередине, марши вверх и вниз */
+    ctx.fillStyle = '#3c3c46'; ctx.fillRect(34, 0, 152, H);
     ctx.fillStyle = '#45454f';
     for (let y = 8; y < H; y += 18) ctx.fillRect(34, y, 152, 2);
-    // марш наверх сужается кверху, марш вниз — книзу; ступени с бликом,
-    // иначе в темноте шахты лестница читается как ровный пол
-    for (let i = 0; i < 7; i++) {
-      const w = 128 - i * 8, x = 46 + i * 4;
+    ctx.fillStyle = '#42424c'; ctx.fillRect(34, 176, 152, 92);     // площадка
+    ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fillRect(34, 176, 152, 4);
+    for (let i = 0; i < 8; i++) {                                  // марш вверх сужается
+      const w = 132 - i * 9, x = 44 + i * 4.5;
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x, 26 + i * 9 + 7, w, 2);
       ctx.fillStyle = '#575764'; ctx.fillRect(x, 26 + i * 9, w, 8);
       ctx.fillStyle = '#6d6d7c'; ctx.fillRect(x, 26 + i * 9, w, 2);
-      ctx.fillStyle = '#2e2e38'; ctx.fillRect(x, 32 + i * 9, w, 2);
     }
-    for (let i = 6; i >= 0; i--) {
-      const w = 128 - i * 8, x = 46 + i * 4;
-      ctx.fillStyle = '#4c4c58'; ctx.fillRect(x, 300 + (6 - i) * 9, w, 8);
-      ctx.fillStyle = '#61616e'; ctx.fillRect(x, 300 + (6 - i) * 9, w, 2);
-      ctx.fillStyle = '#292932'; ctx.fillRect(x, 306 + (6 - i) * 9, w, 2);
+    for (let i = 7; i >= 0; i--) {                                 // марш вниз расширяется
+      const w = 132 - i * 9, x = 44 + i * 4.5;
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x, 292 + (7 - i) * 9 + 7, w, 2);
+      ctx.fillStyle = '#4c4c58'; ctx.fillRect(x, 292 + (7 - i) * 9, w, 8);
+      ctx.fillStyle = '#61616e'; ctx.fillRect(x, 292 + (7 - i) * 9, w, 2);
     }
-    // перила
-    ctx.fillStyle = '#5c5c66'; ctx.fillRect(34, 0, 4, H); ctx.fillRect(182, 0, 4, H);
-    // низкое окно на задний двор — в левой стене
-    ctx.fillStyle = '#20202a'; ctx.fillRect(0, 196, 34, 56);
-    const gl = ctx.createLinearGradient(0, 196, 0, 252);
-    gl.addColorStop(0, '#5a6470'); gl.addColorStop(1, '#3a4048');
-    ctx.fillStyle = gl; ctx.fillRect(4, 200, 26, 48);
-    ctx.fillStyle = '#2a2e34'; ctx.fillRect(4, 222, 26, 3); ctx.fillRect(16, 200, 3, 48);
-    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(6, 236, 9, 5);             // книга в щели
-    // дверь в старое крыло — в правой стене
-    ctx.fillStyle = '#241a12'; ctx.fillRect(186, 70, 34, 54);
-    ctx.fillStyle = '#0f0b08'; ctx.fillRect(190, 74, 30, 46);
+    /* металлические перила со стойками — не сплошная полоса */
+    [36, 182].forEach(x => {
+      ctx.fillStyle = '#5c5c66'; ctx.fillRect(x, 0, 3, H);
+      ctx.fillStyle = '#74747e'; ctx.fillRect(x, 0, 1, H);
+      ctx.fillStyle = '#4a4a54';
+      for (let y = 6; y < H; y += 22) ctx.fillRect(x - 1, y, 5, 3);
+    });
+    /* низкое окно на задний двор — в левой стене, у самого пола */
+    uniWindow(ctx, 4, 200, 26, 48, { view:'back', wall:'#3a3a44', reveal:4, cols:2, rows:4, dir:1 });
+    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(6, 236, 9, 5);          // книга, подпирающая створку
+    /* дверь в старое крыло — служебная, металлическая */
+    uniDoorInWall(ctx, 190, 70, 28, 54, { style:'service', warm:'#3a3a44', threshold:false });
+    /* технические лампы в решётчатых плафонах */
+    [[110, 22], [110, 356]].forEach(([lx, ly]) => {
+      ctx.fillStyle = '#3a3a42'; ctx.fillRect(lx - 9, ly - 5, 18, 9);
+      ctx.fillStyle = '#c8d0a0'; ctx.fillRect(lx - 7, ly - 3, 14, 5);
+      ctx.fillStyle = '#3a3a42'; ctx.fillRect(lx - 7, ly - 3, 14, 1); ctx.fillRect(lx - 1, ly - 3, 2, 5);
+    });
     ctx.fillStyle = '#b8c0a0'; ctx.font = '6px Courier New';
-    ctx.fillText('КРЫША ↑', 82, 20);
+    ctx.fillText('КРЫША ↑', 82, 16);
     ctx.fillText('ЦОКОЛЬ ↓', 78, 414);
-    ctx.fillText('СТАРОЕ КРЫЛО →', 128, 66);
-    ctx.fillText('ОКНО', 4, 194);
+    ctx.fillText('СТАРОЕ КРЫЛО →', 120, 66);
+    ctx.fillText('ОКНО', 4, 196);
   },
   objects: [
-    { t:'bin', x:60, y:180 }, { t:'archive_box', x:160, y:186 },
+    { t:'pipe_run', x:110, y:0 },
+    { t:'bin', x:60, y:180 }, { t:'archive_box', x:162, y:190 },
     { t:'book_stack', x:64, y:284 },
+    { t:'crate_stack', x:158, y:266 },
   ],
   ambient() { if (Math.random() < 0.015) FX.spawn(110, 200, 1, {color:'#6a7a88', rise:.3, life:80, spread:6}); },
   walls: [
@@ -11333,7 +11628,7 @@ uniServiceStair: {
   ],
   interactables: [
     { x:44,y:16,w:132,h:44, name:'up', prompt:'Наверх, на крышу',
-      action: async ()=> await changeRoom('uniRoof', 60, 210) },
+      action: async ()=> await changeRoom('uniRoof', 70, 244) },
     { x:38,y:346,w:144,h:64, name:'down', prompt:'Спуститься в цоколь',
       action: async ()=> {
         if (C('uniDay') < 3) return Dialogue.start([
@@ -11342,7 +11637,7 @@ uniServiceStair: {
         await changeRoom('uniBasement', 60, 190);
       }},
     { x:150,y:74,w:52,h:48, name:'toOldWing', prompt:'В старое крыло',
-      action: async ()=> await changeRoom('uniOldWing', UNI_OLD_WALL.at('service') + 24, 208) },
+      action: async ()=> await changeRoom('uniOldWing', UNI_OLD_WALL.at('service') + 24, 228) },
     /* Обходной путь: низкое окно во двор. Работает в обе стороны, но
        только после того, как Ная им один раз воспользовалась снаружи. */
     { x:6,y:198,w:46,h:52, name:'window', prompt:'Низкое окно', action: async ()=>{
@@ -11355,14 +11650,21 @@ uniServiceStair: {
           ]);
         }
         Audio.door();
-        await changeRoom('uniBackYard', 214, 214);
+        await changeRoom('uniBackYard', 240, 236);
+      }},
+    { x:140,y:250,w:52,h:40, name:'stairCrates', prompt:'Ящики на площадке', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Ящики стоят на площадке так, чтобы не мешать двери. Значит, дверью пользуются.'},
+        ]);
       }},
   ],
   npcs: [],
 },
 
 /* ---------------------------------------------------------------- */
-/* ЦОКОЛЬ / ТЕХНИЧЕСКИЕ ПОМЕЩЕНИЯ.                                   */
+/* ЦОКОЛЬ / ТЕХНИЧЕСКИЕ ПОМЕЩЕНИЯ. Отсюда греется весь корпус, и
+   никто из тех, кто наверху, об этом не думает. Бетон, трубы под
+   потолком, железные двери, влага по стенам.                        */
 uniBasement: {
   name:"Университет. Цоколь", music:'tense', w:440, h:280,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.22, wind:0 },
@@ -11373,65 +11675,90 @@ uniBasement: {
     {x:386,y:130,r:36,c:'#c8d0a0',i:.24,flicker:true},
   ],
   bgPaint(ctx) {
-    const W = 440, H = 280;
-    ctx.fillStyle = '#2a2a30'; ctx.fillRect(0, 0, W, 62);
+    const W = 440, H = 280, wallH = 74;
+    /* стена: бетонные блоки, ниже — сырое пятно по всей длине */
+    ctx.fillStyle = '#2a2a30'; ctx.fillRect(0, 0, W, wallH);
     ctx.fillStyle = '#31313a';
-    for (let y = 0; y < 62; y += 10) for (let x = ((y / 10) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 9);
-    ctx.fillStyle = '#1d1d24'; ctx.fillRect(0, 58, W, 4);
-    ctx.fillStyle = '#4a4a54'; ctx.fillRect(0, 56, W, 2);
-    ctx.fillStyle = '#3a3a42'; ctx.fillRect(0, 62, W, H - 62);
+    for (let y = 0; y < wallH; y += 12)
+      for (let x = ((y / 12) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 11);
+    ctx.fillStyle = 'rgba(16,16,22,.55)';
+    for (let y = 11; y < wallH; y += 12) ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = 'rgba(70,95,105,.14)';                          // влага
+    for (let i = 0; i < 12; i++) ctx.fillRect((i * 53) % W, 18 + (i % 4) * 8, 5, 16 + (i % 5) * 10);
+    ctx.fillStyle = '#1d1d24'; ctx.fillRect(0, wallH - 4, W, 4);
+    ctx.fillStyle = '#4a4a54'; ctx.fillRect(0, wallH - 6, W, 2);
+    /* пол: бетонные карты со швами и лужами */
+    ctx.fillStyle = '#3a3a42'; ctx.fillRect(0, wallH, W, H - wallH);
     ctx.fillStyle = '#333340';
-    for (let y = 70; y < H; y += 22) ctx.fillRect(0, y, W, 1);
-    for (let x = 0; x < W; x += 44) ctx.fillRect(x, 62, 1, H - 62);
-    ctx.fillStyle = '#5a5a62'; ctx.fillRect(0, 16, W, 6); ctx.fillRect(0, 30, W, 4);
-    ctx.fillStyle = '#6e6e78'; ctx.fillRect(0, 16, W, 2); ctx.fillRect(0, 30, W, 1);
-    for (let x = 30; x < W; x += 88) { ctx.fillStyle = '#4a4a52'; ctx.fillRect(x, 12, 6, 26); }
+    for (let y = wallH + 8; y < H; y += 26) ctx.fillRect(0, y, W, 1);
+    for (let x = 0; x < W; x += 52) ctx.fillRect(x, wallH, 1, H - wallH);
+    ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fillRect(0, wallH, W, 7);
     ctx.fillStyle = 'rgba(120,150,170,.10)';
-    ctx.beginPath(); ctx.ellipse(160, 208, 30, 10, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(156, 34, 6, 24);
-    // запертые технические двери
-    [[196,'ЩИТОВАЯ'],[268,'БОЙЛЕРНАЯ']].forEach(([x,l]) => {
-      ctx.fillStyle = '#2b2018'; ctx.fillRect(x, 18, 44, 44);
-      ctx.fillStyle = '#413020'; ctx.fillRect(x + 3, 22, 38, 40);
-      ctx.fillStyle = '#c9a05a'; ctx.fillRect(x + 35, 42, 3, 4);
-      ctx.fillStyle = '#b8c0a0'; ctx.font = '5px Courier New'; ctx.fillText(l, x + 2, 16);
+    ctx.beginPath(); ctx.ellipse(168, 212, 34, 11, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(330, 236, 22, 8, 0, 0, Math.PI*2); ctx.fill();
+    /* магистрали под потолком идут через всю комнату */
+    ctx.fillStyle = '#5a5a62'; ctx.fillRect(0, 12, W, 7); ctx.fillRect(0, 28, W, 5);
+    ctx.fillStyle = '#6e6e78'; ctx.fillRect(0, 12, W, 2); ctx.fillRect(0, 28, W, 1);
+    ctx.fillStyle = '#4a4a52'; ctx.fillRect(0, 40, W, 4);
+    ctx.fillStyle = '#7a6a3a';                                       // ржавчина на стыках
+    for (let x = 26; x < W; x += 88) { ctx.fillStyle = '#39393f'; ctx.fillRect(x, 8, 5, 38);
+                                       ctx.fillStyle = '#7a6a3a'; ctx.fillRect(x + 1, 14, 3, 4); }
+    /* железные двери технических помещений */
+    [[186, 'ЩИТОВАЯ'], [268, 'БОЙЛЕРНАЯ']].forEach(([x, l]) => {
+      uniDoorInWall(ctx, x, wallH - 46, 44, 46, { style:'metal', warm:'#33333c', label:l, threshold:true });
     });
+    /* вентиляционная решётка */
+    ctx.fillStyle = '#3a3a44'; ctx.fillRect(348, 20, 40, 26);
+    ctx.fillStyle = '#4c4c58';
+    for (let y = 23; y < 44; y += 5) ctx.fillRect(350, y, 36, 3);
+    ctx.fillStyle = '#2c2c34'; ctx.fillRect(348, 20, 40, 2);
     ctx.fillStyle = '#b8c0a0'; ctx.font = '6px Courier New';
-    ctx.fillText('← ЛЕСТНИЦА НАВЕРХ', 14, 80);
-    ctx.fillText('АРХИВ →', 384, 80);
+    ctx.fillText('← ЛЕСТНИЦА НАВЕРХ', 14, 90);
+    ctx.fillText('АРХИВ →', 384, 90);
+    ctx.fillStyle = 'rgba(184,192,160,.4)';
+    ctx.fillText('ПОСТОРОННИМ ВХОД ВОСПРЕЩЁН', 132, 90);
   },
   objects: [
-    { t:'stairs_main', x:58, y:150 },
-    { t:'cabinet', x:120, y:130 }, { t:'cabinet', x:156, y:130 },
-    { t:'archive_box', x:322, y:140 }, { t:'archive_box', x:348, y:146 },
-    { t:'chest', x:296, y:154 },
-    { t:'library_shelf', x:416, y:150 },
+    { t:'stairs_service', x:56, y:146 },
+    { t:'pipe_run', x:110, y:48 }, { t:'pipe_run', x:300, y:48 },
+    { t:'cabinet', x:122, y:136 }, { t:'cabinet', x:158, y:136 },
+    { t:'metal_shelf', x:340, y:150 },
+    { t:'crate_stack', x:296, y:160 },
+    { t:'archive_box', x:246, y:150 },
+    { t:'library_shelf', x:416, y:156 },
     { t:'bin', x:100, y:250 }, { t:'book_stack', x:250, y:250 },
     { t:'stool', x:200, y:246 },
+    { t:'puddle', x:168, y:212 }, { t:'puddle', x:330, y:236 },
   ],
   ambient() { if (Math.random() < 0.02) FX.spawn(160, 60, 1, {color:'#7a90a0', rise:.4, life:70, spread:2}); },
   walls: [
-    {x:0,y:0,w:440,h:62},{x:0,y:0,w:8,h:280},{x:432,y:0,w:8,h:280},{x:0,y:275,w:440,h:5},
+    {x:0,y:0,w:440,h:74},{x:0,y:0,w:8,h:280},{x:432,y:0,w:8,h:280},{x:0,y:275,w:440,h:5},
   ],
   interactables: [
     { x:26,y:120,w:64,h:44, name:'up', prompt:'Наверх, по служебной лестнице',
       action: async ()=> await changeRoom('uniServiceStair', 110, 340) },
     { x:396,y:120,w:40,h:52, name:'toArchive', prompt:'Цокольный архив',
       action: async ()=> await changeRoom('uniArchive', 42, 220) },
-    { x:190,y:20,w:52,h:42, name:'switchRoom', prompt:'Щитовая', action(){
+    { x:180,y:32,w:56,h:52, name:'switchRoom', prompt:'Щитовая', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'«ЩИТОВАЯ. ПОСТОРОННИМ ВХОД ВОСПРЕЩЁН». Дверь железная и заперта на два оборота.'}]);
       }},
-    { x:262,y:20,w:52,h:42, name:'boilerRoom', prompt:'Бойлерная', action(){
+    { x:262,y:32,w:56,h:52, name:'boilerRoom', prompt:'Бойлерная', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Бойлерная. Заперта, но за дверью что-то гудит на одной ноте.'},
           {who:'naya',expr:'talk',text:'(Всё здание греется отсюда. И никто про это не думает.)'},
         ]);
       }},
-    { x:110,y:106,w:82,h:38, name:'lockers', prompt:'Шкафы', action(){
+    { x:104,y:112,w:82,h:40, name:'lockers', prompt:'Шкафы', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Металлические шкафы с инвентарными номерами. Половина не заперта, и там пусто.'}]);
       }},
-    { x:276,y:130,w:56,h:40, name:'oldProps', prompt:'Старый реквизит', action(){
+    { x:276,y:136,w:56,h:40, name:'oldProps', prompt:'Старый реквизит', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Декорации, которые уже не поднимут наверх. Крашеный картон, из которого вылезла проволока.'}]);
+      }},
+    { x:96,y:34,w:60,h:44, name:'pipes', prompt:'Трубы', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Магистрали идут через весь цоколь и уходят в стену под театральное крыло.'},
+          {who:'naya',expr:'talk',text:'(Отсюда греется весь корпус. Значит, отсюда можно дойти куда угодно.)'},
+        ]);
       }},
   ],
   npcs: [
@@ -11448,52 +11775,74 @@ uniBasement: {
 },
 
 /* ---------------------------------------------------------------- */
-/* ЦОКОЛЬНЫЙ АРХИВ — то самое место, где Ная находит имя матери.     */
+/* ЦОКОЛЬНЫЙ АРХИВ — то самое место, где Ная находит имя матери.
+   Не библиотека: металлические стеллажи, коробки без описи, одна
+   лампа и пыль, которая висит в её свете.                           */
 uniArchive: {
   name:"Университет. Цокольный архив", music:'tense', w:320, h:280,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.26, wind:0 },
   light:{ tint:'#0c0e16', dark:.56 },
   lights:[{x:160,y:110,r:44,c:'#d8c890',i:.30,flicker:true}],
   bgPaint(ctx) {
-    const W = 320, H = 280;
-    ctx.fillStyle = '#26242c'; ctx.fillRect(0, 0, W, 58);
+    const W = 320, H = 280, wallH = 66;
+    ctx.fillStyle = '#26242c'; ctx.fillRect(0, 0, W, wallH);
     ctx.fillStyle = '#2d2b35';
-    for (let y = 0; y < 58; y += 10) for (let x = ((y / 10) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 9);
-    ctx.fillStyle = '#1a1820'; ctx.fillRect(0, 54, W, 4);
-    ctx.fillStyle = '#37343e'; ctx.fillRect(0, 58, W, H - 58);
-    ctx.fillStyle = '#302d38'; for (let y = 66; y < H; y += 20) ctx.fillRect(0, y, W, 1);
-    ctx.fillStyle = '#2a2731';
-    for (let x = 24; x < W; x += 68) ctx.fillRect(x, 58, 44, 26);
-    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 58, W, 10);
+    for (let y = 0; y < wallH; y += 11)
+      for (let x = ((y / 11) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 10);
+    ctx.fillStyle = 'rgba(14,12,18,.55)';
+    for (let y = 10; y < wallH; y += 11) ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = 'rgba(70,95,105,.10)';
+    for (let i = 0; i < 8; i++) ctx.fillRect((i * 61) % W, 14 + (i % 3) * 9, 4, 18 + (i % 4) * 9);
+    ctx.fillStyle = '#1a1820'; ctx.fillRect(0, wallH - 4, W, 4);
+    ctx.fillStyle = '#37343e'; ctx.fillRect(0, wallH, W, H - wallH);
+    ctx.fillStyle = '#302d38'; for (let y = wallH + 8; y < H; y += 22) ctx.fillRect(0, y, W, 1);
+    for (let x = 0; x < W; x += 48) ctx.fillRect(x, wallH, 1, H - wallH);
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, wallH, W, 9);
+    /* низкая техническая дверь обратно в цоколь */
+    uniDoorInWall(ctx, 12, wallH - 44, 34, 44, { style:'metal', warm:'#2e2c36', threshold:true });
+    /* лампа в решётке под потолком: единственный источник света */
+    ctx.fillStyle = '#3a3a42'; ctx.fillRect(150, 6, 22, 10);
+    ctx.fillStyle = '#d8c890'; ctx.fillRect(153, 8, 16, 6);
+    ctx.fillStyle = '#3a3a42'; ctx.fillRect(153, 8, 16, 1); ctx.fillRect(160, 8, 2, 6);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';           // конус света от лампы
+    const cg = ctx.createLinearGradient(161, 16, 161, 170);
+    cg.addColorStop(0, 'rgba(255,232,170,.16)'); cg.addColorStop(1, 'rgba(255,224,160,0)');
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.moveTo(152, 16); ctx.lineTo(170, 16);
+    ctx.lineTo(216, 170); ctx.lineTo(106, 170); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    /* стеллажные ряды подписаны по годам — по ним Ная и ищет */
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('← ЦОКОЛЬ', 12, 78);
-    ctx.fillText('30      ·      15      ·      5   ЛЕТ НАЗАД', 96, 78);
+    ctx.fillText('← ЦОКОЛЬ', 12, 84);
+    ctx.fillStyle = 'rgba(200,184,160,.55)';
+    ctx.fillText('30', 76, 96); ctx.fillText('15', 156, 96); ctx.fillText('5  ЛЕТ НАЗАД', 232, 96);
   },
   objects: [
-    { t:'library_shelf', x:80,  y:150 }, { t:'library_shelf', x:160, y:150 },
-    { t:'library_shelf', x:240, y:150 },
-    { t:'archive_box', x:60, y:210 }, { t:'archive_box', x:86, y:216 },
-    { t:'archive_box', x:236, y:212 },
-    { t:'desk', x:160, y:236 },
-    { t:'lib_ladder', x:206, y:200 },
-    { t:'book_stack', x:124, y:222 },
+    { t:'metal_shelf', x:80,  y:158 }, { t:'metal_shelf', x:160, y:158 },
+    { t:'metal_shelf', x:240, y:158 },
+    { t:'archive_box', x:60, y:216 }, { t:'archive_box', x:86, y:222 },
+    { t:'archive_box', x:236, y:218 },
+    { t:'crate_stack', x:286, y:210 },
+    { t:'desk', x:160, y:240 },
+    { t:'lib_ladder', x:206, y:204 },
+    { t:'book_stack', x:124, y:228 },
   ],
-  ambient() { if (Math.random() < 0.02) FX.spawn(Math.random()*320, 56, 1, {color:'#3a3448', rise:.08, life:140, spread:8}); },
+  ambient() { if (Math.random() < 0.02) FX.spawn(Math.random()*320, 60, 1, {color:'#3a3448', rise:.08, life:140, spread:8}); },
   walls: [
-    {x:0,y:0,w:320,h:58},{x:0,y:0,w:8,h:280},{x:312,y:0,w:8,h:280},{x:0,y:275,w:320,h:5},
+    {x:0,y:0,w:320,h:66},{x:0,y:0,w:8,h:280},{x:312,y:0,w:8,h:280},{x:0,y:275,w:320,h:5},
   ],
   interactables: [
     { x:14,y:200,w:44,h:44, name:'back', prompt:'Обратно в цоколь',
       action: async ()=> await changeRoom('uniBasement', 404, 200) },
-    { x:54,y:122,w:56,h:44, name:'arch30', prompt:'Папки: 30 лет назад',
+    { x:54,y:126,w:56,h:44, name:'arch30', prompt:'Папки: 30 лет назад',
       action(){ Scene.play('archiveFolder30'); }},
-    { x:134,y:122,w:56,h:44, name:'arch15', prompt:'Папки: 15 лет назад',
+    { x:134,y:126,w:56,h:44, name:'arch15', prompt:'Папки: 15 лет назад',
       action(){ Scene.play('archiveFolder15'); }},
-    { x:214,y:122,w:56,h:44, name:'arch5', prompt:'Папки: 5 лет назад',
+    { x:214,y:126,w:56,h:44, name:'arch5', prompt:'Папки: 5 лет назад',
       action(){ Scene.play('archiveFolder5'); }},
-    { x:136,y:210,w:52,h:38, name:'archDesk', prompt:'Стол архива',
+    { x:136,y:214,w:52,h:38, name:'archDesk', prompt:'Стол архива',
       action(){ Scene.play('archiveDesk'); }},
-    { x:44,y:186,w:64,h:38, name:'archBoxes', prompt:'Коробки без описи', action(){
+    { x:44,y:192,w:64,h:38, name:'archBoxes', prompt:'Коробки без описи', action(){
         /* Условие — состояние расследования, а не то, попалась ли Ная
            охране: в корпус на четвёртый день можно вернуться и знакомой
            дорогой через старое крыло, минуя холл и высылку. */
@@ -11505,62 +11854,100 @@ uniArchive: {
 },
 
 /* ---------------------------------------------------------------- */
-/* КРЫША. Над старым крылом, выход по служебной лестнице.            */
+/* КРЫША. Над старым крылом, выход по служебной лестнице. Каменный
+   парапет, вентиляция, антенны и полгорода внизу — место, ради
+   которого сюда и поднимаются. Здесь Морель говорит правду.          */
 uniRoof: {
-  name:"Университет. Крыша", music:'sad', w:340, h:260, wet:true, wetFrom:60,
+  name:"Университет. Крыша", music:'sad', w:420, h:300, wet:true, wetFrom:70,
   zone:'town', weather:{ rain:.18, fog:.20, wind:.5, leaves:.1 },
   light:{ tint:'#141824', dark:.34 },
-  lights:[{x:66,y:96,r:44,c:'#ffcf7a',i:.36},{x:282,y:96,r:36,c:'#9fb0c8',i:.22}],
+  lights:[{x:76,y:110,r:44,c:'#ffcf7a',i:.36},{x:340,y:110,r:36,c:'#9fb0c8',i:.22}],
   bgPaint(ctx) {
-    const W = 340, H = 260;
-    const sky = ctx.createLinearGradient(0, 0, 0, 70);
+    const W = 420, H = 300;
+    /* небо и город: крыша выше всего вокруг, поэтому горизонт низкий */
+    const sky = ctx.createLinearGradient(0, 0, 0, 78);
     sky.addColorStop(0, '#1a2030'); sky.addColorStop(1, '#4a3a44');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 70);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 78);
     ctx.fillStyle = '#20202c';
-    for (let x = -8; x < W; x += 26) { const h = 14 + ((x * 7) % 22); ctx.fillRect(x, 70 - h, 22, h); }
-    ctx.fillStyle = '#e8c880';
-    for (let i = 0; i < 44; i++) ctx.fillRect((i * 37) % W, 52 + ((i * 13) % 16), 2, 2);
-    ctx.fillStyle = '#4a4650'; ctx.fillRect(0, 66, W, 14);
-    ctx.fillStyle = '#5e5a66'; ctx.fillRect(0, 66, W, 3);
-    ctx.fillStyle = '#33303a'; ctx.fillRect(0, 80, W, 4);
-    ctx.fillStyle = '#3d3a44'; ctx.fillRect(0, 84, W, H - 84);
+    for (let x = -8; x < W; x += 24) { const h = 12 + ((x * 7) % 26); ctx.fillRect(x, 78 - h, 20, h);
+      if ((x / 24 | 0) % 3 === 0) ctx.fillRect(x + 6, 78 - h - 6, 4, 6); }
+    ctx.fillStyle = '#e8c880';                                         // огни в окнах города
+    for (let i = 0; i < 52; i++) ctx.fillRect((i * 37) % W, 58 + ((i * 13) % 18), 2, 2);
+    /* парапет по дальнему краю: за ним обрыв */
+    ctx.fillStyle = '#4a4650'; ctx.fillRect(0, 72, W, 16);
+    ctx.fillStyle = '#5e5a66'; ctx.fillRect(0, 72, W, 3);
+    ctx.fillStyle = '#39363f';
+    for (let x = 3; x < W; x += 11) ctx.fillRect(x, 76, 8, 11);
+    ctx.fillStyle = '#33303a'; ctx.fillRect(0, 88, W, 5);
+    /* кровля: рулонное покрытие, швы внахлёст, лужи в понижениях */
+    ctx.fillStyle = '#3d3a44'; ctx.fillRect(0, 93, W, H - 93);
     ctx.fillStyle = '#454250';
-    for (let y = 92; y < H; y += 16) ctx.fillRect(0, y, W, 2);
-    ctx.fillStyle = 'rgba(150,180,200,.08)';
-    ctx.beginPath(); ctx.ellipse(224, 190, 44, 14, 0, 0, Math.PI*2); ctx.fill();
-    // будка служебной лестницы
-    ctx.fillStyle = '#4a4048'; ctx.fillRect(28, 96, 58, 56);
-    ctx.fillStyle = '#574c56'; ctx.fillRect(31, 99, 52, 50);
-    ctx.fillStyle = '#2a242c'; ctx.fillRect(48, 118, 20, 34);
-    ctx.fillStyle = '#c9a05a'; ctx.fillRect(64, 136, 3, 4);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('ВНИЗ', 44, 112);
+    for (let y = 100; y < H; y += 17) ctx.fillRect(0, y, W, 2);
+    ctx.fillStyle = 'rgba(0,0,0,.20)';
+    for (let y = 102; y < H; y += 17) ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = '#4c4956';
+    for (let x = 0; x < W; x += 74) ctx.fillRect(x, 93, 2, H - 93);
+    ctx.fillStyle = 'rgba(150,180,200,.09)';
+    ctx.beginPath(); ctx.ellipse(268, 214, 48, 15, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(120, 262, 34, 10, 0, 0, Math.PI*2); ctx.fill();
+    /* будка служебной лестницы: та же кирпичная кладка, что и внизу */
+    ctx.fillStyle = '#4a4048'; ctx.fillRect(32, 108, 66, 62);
+    ctx.fillStyle = '#574c56'; ctx.fillRect(35, 111, 60, 56);
+    ctx.fillStyle = '#413841';
+    for (let y = 113; y < 167; y += 9) for (let x = 35 + ((y / 9) % 2) * 8; x < 93; x += 16) ctx.fillRect(x, y, 14, 8);
+    ctx.fillStyle = '#3a3440'; ctx.fillRect(30, 104, 70, 6);
+    ctx.fillStyle = '#635868'; ctx.fillRect(30, 104, 70, 2);
+    uniDoorInWall(ctx, 52, 126, 26, 44, { style:'service', warm:'#4a4048' });
+    /* парапет двора: с этой стороны крыша смотрит вниз, во двор */
+    ctx.fillStyle = '#44414c'; ctx.fillRect(0, H - 16, W, 16);
+    ctx.fillStyle = '#565260'; ctx.fillRect(0, H - 16, W, 3);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('ВНИЗ', 56, 122);
+    ctx.fillText('ГОРОД', 336, 70);
+    ctx.fillStyle = 'rgba(200,184,160,.45)';
+    ctx.fillText('ВНУТРЕННИЙ ДВОР ВНИЗУ', 132, H - 20);
   },
   objects: [
-    { t:'pole_power', x:300, y:130 },
-    { t:'bin', x:130, y:150 },
-    { t:'bench_stone', x:196, y:214 },
-    { t:'archive_box', x:104, y:206 },
-    { t:'puddle', x:224, y:190 },
+    { t:'parapet', x:200, y:96 }, { t:'parapet', x:290, y:96 }, { t:'parapet', x:380, y:96 },
+    { t:'vent_block', x:186, y:150 }, { t:'vent_block', x:336, y:170 },
+    { t:'pole_power', x:388, y:150 },
+    { t:'crate_stack', x:130, y:196 },
+    { t:'bin', x:158, y:250 },
+    { t:'bench_stone', x:238, y:262 },
+    { t:'archive_box', x:104, y:236 },
+    { t:'puddle', x:268, y:214 }, { t:'puddle', x:120, y:262 },
   ],
   walls: [
-    {x:0,y:0,w:340,h:84},{x:0,y:0,w:8,h:260},{x:332,y:0,w:8,h:260},{x:0,y:255,w:340,h:5},
-    {x:28,y:84,w:58,h:36},
+    {x:0,y:0,w:420,h:93},{x:0,y:0,w:8,h:300},{x:412,y:0,w:8,h:300},{x:0,y:290,w:420,h:10},
+    {x:32,y:93,w:66,h:44},
   ],
   interactables: [
-    { x:38,y:120,w:44,h:40, name:'down', prompt:'Вниз, по служебной лестнице',
+    { x:44,y:138,w:44,h:40, name:'down', prompt:'Вниз, по служебной лестнице',
       action: async ()=> await changeRoom('uniServiceStair', 110, 68) },
-    { x:130,y:88,w:80,h:26, name:'edge', prompt:'Парапет', action(){
+    { x:150,y:96,w:100,h:32, name:'edge', prompt:'Парапет', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Отсюда видно полгорода. Кафе, где я работаю, — вон та жёлтая точка.'},
           {who:'naya',expr:'talk',text:'(Раньше мне казалось, что мой мир большой.)'},
         ]);
       }},
-    { x:90,y:186,w:44,h:34, name:'roofBox', prompt:'Ящик', action(){
+    { x:120,y:262,w:180,h:30, name:'yardEdge', prompt:'Край над двором', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'С этой стороны крыша обрывается во внутренний двор. Фонтан отсюда размером с монету.'},
+          {who:'naya',expr:'talk',text:'(Я обошла это здание по всем этажам. И только сверху вижу его целиком.)'},
+        ]);
+      }},
+    { x:106,y:212,w:52,h:40, name:'roofBox', prompt:'Ящик', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Ящик с кабелем и старым прожектором. Сюда таскали свет для какого-то представления.'}]);
+      }},
+    { x:164,y:126,w:52,h:40, name:'roofVent', prompt:'Вентиляция', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Вентиляционный короб гудит и тёплый. Из него пахнет столовой.'},
+          {who:'naya',expr:'talk',text:'(Здание дышит. Даже когда в нём никого нет.)'},
+        ]);
       }},
   ],
   npcs: [
-    { x:252, y:172, sprite:'genevieve', name:'Морель',
+    { x:300, y:210, sprite:'genevieve', name:'Морель',
       when:()=> (C('uniDay') === 3 && F('archiveMorelFound') && !F('roofPromise'))
              || (C('uniDay') === 4 && F('premiereDone') && !F('morelTruth')),
       dialogue:()=> Scene.play(C('uniDay') >= 4 ? 'roofTruth' : 'roofPromise') },
@@ -11575,87 +11962,121 @@ uniRoof: {
 /* ЗАДНИЙ ДВОР. Забор, вход для сотрудников (закрыт) и низкое окно
    служебной лестницы — единственный путь в корпус мимо охраны.       */
 uniBackYard: {
-  name:"Университет. Задний двор", music:'street', w:420, h:290, wet:true, wetFrom:120,
+  name:"Университет. Задний двор", music:'street', w:480, h:310, wet:true, wetFrom:140,
   zone:'town', weather:{ rain:.24, fog:.20, wind:.3, leaves:.3 },
   light:{ tint:'#12141e', dark:.38 },
-  lights:[{x:344,y:130,r:44,c:'#ffcf7a',i:.34},{x:214,y:150,r:26,c:'#9fb0c8',i:.20}],
+  lights:[{x:392,y:150,r:44,c:'#ffcf7a',i:.32},{x:240,y:172,r:26,c:'#9fb0c8',i:.20},
+          {x:96,y:214,r:34,c:'#ffcf7a',i:.22}],
   bgPaint(ctx) {
-    const W = 420, H = 290;
-    const sky = ctx.createLinearGradient(0, 0, 0, 60);
-    sky.addColorStop(0, '#1c2230'); sky.addColorStop(1, '#3f3a44');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 60);
-    // глухая северная стена старого крыла
-    ctx.fillStyle = '#4a4238'; ctx.fillRect(0, 30, W, 140);
-    ctx.fillStyle = '#413a31';
-    for (let y = 30; y < 170; y += 12) for (let x = ((y / 12) % 2) * 14; x < W; x += 28) ctx.fillRect(x, y, 26, 11);
-    ctx.fillStyle = '#332d26'; ctx.fillRect(0, 164, W, 6);
-    [66, 140, 300, 372].forEach(wx => {
-      ctx.fillStyle = '#2a2620'; ctx.fillRect(wx - 3, 54, 40, 46);
-      ctx.fillStyle = '#3a4450'; ctx.fillRect(wx, 57, 34, 40);
-      ctx.fillStyle = '#2f2921'; ctx.fillRect(wx + 16, 57, 3, 40); ctx.fillRect(wx, 76, 34, 3);
-    });
-    // то самое низкое окно служебной лестницы: подпёрто книгой
-    ctx.fillStyle = '#2a2620'; ctx.fillRect(196, 110, 48, 58);
-    ctx.fillStyle = '#59616e'; ctx.fillRect(200, 114, 40, 50);
-    ctx.fillStyle = '#6e7886'; ctx.fillRect(200, 114, 40, 13);
-    ctx.fillStyle = '#2f2921'; ctx.fillRect(218, 114, 3, 50);
-    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(203, 124, 10, 5);
+    const W = 480, H = 310;
+    const sky = ctx.createLinearGradient(0, 0, 0, 64);
+    sky.addColorStop(0, '#1c2230'); sky.addColorStop(1, '#3b3842');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 64);
+    ctx.fillStyle = '#23232e';
+    for (let x = -6; x < W; x += 22) { const h = 8 + ((x * 13) % 16); ctx.fillRect(x, 56 - h, 18, h); }
+
+    /* ЗАДНИЙ ФАСАД СТАРОГО КРЫЛА. Тот же корпус, но со служебной
+       стороны: окна не мыли, водосток течёт, штукатурка в потёках. */
+    uniFacade(ctx, 0, 38, W, 142, { storeys:2, cols:10, lit:.08, wall:'#4a4238', base:true, baseH:22 });
+    ctx.fillStyle = 'rgba(12,10,14,.28)'; ctx.fillRect(0, 38, W, 142);
+    ctx.fillStyle = 'rgba(70,90,100,.14)';                        // потёки под водостоком
+    for (let i = 0; i < 7; i++) ctx.fillRect(30 + i * 66, 46, 6, 40 + (i % 3) * 22);
+    ctx.fillStyle = '#3a3a42';                                     // водосточные трубы
+    [92, 288, 430].forEach(px => { ctx.fillRect(px, 40, 7, 140);
+      ctx.fillStyle = '#4a4a52'; ctx.fillRect(px, 40, 2, 140);
+      ctx.fillStyle = '#2f2f36'; ctx.fillRect(px - 2, 172, 11, 8);
+      ctx.fillStyle = '#3a3a42'; });
+
+    /* НИЗКОЕ ОКНО СЛУЖЕБНОЙ ЛЕСТНИЦЫ — вровень с землёй, подпёрто книгой */
+    uniWindow(ctx, 214, 122, 52, 58, { view:'far', wall:'#4a4238', reveal:5, cols:3, rows:4, dir:1 });
+    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(218, 134, 11, 6);
+    ctx.fillStyle = 'rgba(200,220,160,.22)'; ctx.fillRect(218, 126, 44, 50);
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('СЛУЖЕБНАЯ ЛЕСТНИЦА', 182, 106);
-    // вход для сотрудников
-    ctx.fillStyle = '#2b2018'; ctx.fillRect(320, 106, 48, 62);
-    ctx.fillStyle = '#413020'; ctx.fillRect(324, 110, 40, 58);
-    ctx.fillStyle = '#7a8a70'; ctx.fillRect(356, 130, 6, 8);
-    ctx.fillStyle = '#c8b8a0'; ctx.fillText('ДЛЯ СОТРУДНИКОВ', 312, 102);
-    // двор, забор, ворота
-    ctx.fillStyle = '#4e4a4c'; ctx.fillRect(0, 170, W, H - 170);
-    ctx.fillStyle = '#565254'; for (let y = 178; y < H; y += 18) ctx.fillRect(0, y, W, 1);
-    ctx.fillStyle = '#3a3a40'; ctx.fillRect(0, 252, W, 4);
-    for (let x = 4; x < W; x += 16) { ctx.fillStyle = '#44444c'; ctx.fillRect(x, 246, 4, 36); }
-    ctx.fillStyle = '#2f2f36'; ctx.fillRect(28, 244, 6, 40); ctx.fillRect(96, 244, 6, 40);
-    ctx.fillStyle = '#c8b8a0'; ctx.fillText('← К ГЛАВНОМУ ВХОДУ', 12, 276);
-    ctx.fillText('ЗАБОР', 200, 276);
+    ctx.fillText('СЛУЖЕБНАЯ ЛЕСТНИЦА', 196, 116);
+
+    /* вход для сотрудников: металлическая дверь с картой доступа */
+    uniDoorInWall(ctx, 366, 122, 44, 58, { style:'metal', warm:'#4a4238', threshold:true });
+    ctx.fillStyle = '#7a8a70'; ctx.fillRect(414, 142, 7, 10);
+    ctx.fillStyle = '#a8c090'; ctx.fillRect(415, 143, 5, 3);
+    ctx.fillStyle = '#c8b8a0'; ctx.fillText('ДЛЯ СОТРУДНИКОВ', 356, 116);
+
+    /* ЗЕМЛЯ: не мощение, а укатанный грунт с остатками асфальта */
+    ctx.fillStyle = '#46443f'; ctx.fillRect(0, 180, W, H - 180);
+    ctx.fillStyle = '#4e4c46';
+    for (let y = 188; y < H; y += 11) ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = '#3f3d38';
+    for (let i = 0; i < 40; i++) ctx.fillRect((i * 61) % W, 186 + (i * 37) % 100, 6 + (i % 5) * 4, 2);
+    ctx.fillStyle = '#5c5850'; ctx.fillRect(0, 196, W, 18);         // проезд вдоль корпуса
+    ctx.fillStyle = '#66625a'; ctx.fillRect(0, 200, W, 3);
+    ctx.fillStyle = '#3d4a30';                                       // заросшая полоса у забора
+    ctx.fillRect(0, 250, W, 22);
+    ctx.fillStyle = '#46543a';
+    for (let i = 0; i < 90; i++) ctx.fillRect((i * 43) % W, 252 + (i * 17) % 18, 2, 2);
+
+    /* ЗАБОР с выломанной секцией: через него и ходят все, кому лень кругом */
+    ctx.fillStyle = '#2f2f36'; ctx.fillRect(0, 272, W, 4);
+    for (let x = 4; x < W; x += 14) {
+      if (x > 176 && x < 244) continue;                              // пролом
+      ctx.fillStyle = '#44444c'; ctx.fillRect(x, 266, 5, 34);
+      ctx.fillStyle = '#52525c'; ctx.fillRect(x, 266, 2, 34);
+    }
+    ctx.fillStyle = '#2f2f36'; ctx.fillRect(170, 262, 7, 42); ctx.fillRect(242, 262, 7, 42);
+    ctx.fillStyle = '#3f3f48'; ctx.fillRect(178, 288, 64, 4);        // сорванная доска валяется
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('← К ГЛАВНОМУ ВХОДУ', 12, 302);
+    ctx.fillText('ПРОЛОМ', 190, 262);
   },
   objects: [
-    { t:'bin', x:104, y:212 }, { t:'bin', x:130, y:216 },
-    { t:'archive_box', x:330, y:206 }, { t:'archive_box', x:356, y:212 },
-    { t:'chest', x:158, y:222 },
-    { t:'lamp_street', x:344, y:192 },
-    { t:'puddle', x:226, y:222 }, { t:'puddle', x:88, y:242 },
-    { t:'bush', x:396, y:186 },
+    { t:'bin', x:118, y:224 }, { t:'bin', x:144, y:228 },
+    { t:'crate_stack', x:262, y:212 }, { t:'crate_stack', x:292, y:220 },
+    { t:'archive_box', x:378, y:216 }, { t:'archive_box', x:404, y:222 },
+    { t:'chest', x:172, y:232 },
+    { t:'lamp_street', x:392, y:190 }, { t:'lamp_street', x:96, y:214 },
+    { t:'tree_bare', x:52, y:246 }, { t:'tree_bare', x:440, y:250 },
+    { t:'bush', x:330, y:252 }, { t:'bush', x:76, y:256 },
+    { t:'puddle', x:246, y:238 }, { t:'puddle', x:96, y:258 }, { t:'puddle', x:350, y:230 },
+    { t:'leaves_pile', x:196, y:254 },
   ],
   walls: [
-    {x:0,y:0,w:420,h:170},{x:0,y:0,w:8,h:290},{x:412,y:0,w:8,h:290},{x:0,y:284,w:420,h:6},
+    {x:0,y:0,w:480,h:180},{x:0,y:0,w:8,h:310},{x:472,y:0,w:8,h:310},
+    {x:0,y:272,w:170,h:34},{x:248,y:272,w:232,h:34},
+    {x:0,y:300,w:480,h:10},
   ],
   interactables: [
-    { x:12,y:244,w:56,h:40, name:'toStreet', prompt:'К главному входу',
+    { x:12,y:250,w:70,h:44, name:'toStreet', prompt:'К главному входу',
       action: async ()=> await changeRoom('street', 218, 178) },
     /* Физический обходной путь: подойти к окну, увидеть, что оно
        приоткрыто, и пролезть. Первый раз — сценой, дальше — переходом. */
-    { x:196,y:172,w:52,h:38, name:'window', prompt:'Приоткрытое окно', action: async ()=>{
+    { x:212,y:182,w:56,h:38, name:'window', prompt:'Приоткрытое окно', action: async ()=>{
         if (!F('backWindowUsed')) return Scene.play('uniWindowEntry');
         Audio.door();
         await changeRoom('uniServiceStair', 62, 224);
       }},
-    { x:140,y:198,w:52,h:38, name:'yardCrates', prompt:'Ящики', action(){
+    { x:250,y:196,w:60,h:40, name:'yardCrates', prompt:'Ящики', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Ящики из-под декораций, сложенные под самое окно.'},
           {who:'naya',expr:'talk',text:'(Удобно. Слишком удобно, чтобы это было случайно.)'},
         ]);
       }},
-    { x:320,y:172,w:52,h:38, name:'staffDoor', prompt:'Вход для сотрудников', action(){
+    { x:362,y:182,w:56,h:38, name:'staffDoor', prompt:'Вход для сотрудников', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Дверь для сотрудников. Электронный замок, карточки у меня нет и не будет.'}]);
       }},
-    { x:180,y:252,w:80,h:34, name:'fence', prompt:'Забор', action(){
+    { x:172,y:252,w:80,h:40, name:'fence', prompt:'Пролом в заборе', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Забор из штакетника, между двумя столбами доски выломаны и не прибиты обратно.'},
           {who:'naya',expr:'talk',text:'(Отсюда во двор проходят все, кому лень идти кругом.)'},
         ]);
       }},
+    { x:60,y:190,w:120,h:44, name:'backFacade', prompt:'Задняя стена корпуса', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'С этой стороны корпус никто не украшал: те же окна, но мытые в последний раз при другом ректоре.'},
+          {who:'naya',expr:'talk',text:'(Это северное крыло. Изнутри я до него добиралась через два этажа и служебную лестницу.)'},
+        ]);
+      }},
   ],
   npcs: [
-    { x:266, y:242, sprite:'student', name:'Студент', speed:0.24,
-      path:[[266,242],[300,248],[300,264],[252,260]],
+    { x:306, y:262, sprite:'student', name:'Студент', speed:0.24,
+      path:[[306,262],[340,268],[340,286],[292,280]],
       when:()=> !F('sueDead'),
       dialogue:()=> Dialogue.start([
         {who:'student',expr:'normal',name:'Студент',text:'Не сдавай окно, ладно? Иначе придётся бегать курить через весь корпус.'},
@@ -11664,6 +12085,7 @@ uniBackYard: {
       ]) },
   ],
 },
+
 };   /* ===== end Rooms ===== */
 
 /* Rune disarm helper for witch3House */
