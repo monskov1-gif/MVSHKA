@@ -11072,6 +11072,20 @@ const Dialogue = {
     this._loadLine();
   },
 
+  /* Жёсткое закрытие без onComplete: сцену обрывают снаружи (dev-меню),
+     и продолжать её шаги уже нельзя. */
+  cancel() {
+    this.queue = []; this.index = 0; this.onComplete = null;
+    this.active = false; this.currentLine = null; this.awaitingChoice = false;
+    document.getElementById('dialogueBox').classList.remove('active');
+    document.getElementById('dialogueBox').classList.remove('shakeText');
+    document.getElementById('tapCatcher').classList.remove('show');
+    document.getElementById('choiceBox').classList.remove('show');
+    document.getElementById('gameContainer').classList.remove('choosing');
+    document.getElementById('gateHint').classList.remove('show');
+    this._restoreDialogueBox();
+  },
+
   end() {
     this.active = false; this.currentLine = null; this.awaitingChoice = false;
     document.getElementById('dialogueBox').classList.remove('active');
@@ -11136,6 +11150,24 @@ const Scene = {
     'persuadeSue','persuadeResolve','sueHint','distractWitch2','dorothy',
     'dorothyHall','postRevival','lonerDoor','lonerCaughtScene',
   ]),
+  /* Сцена — это цепочка await'ов, и одним `active = false` её не
+     остановить: она продолжит менять комнаты, гасить экран и открывать
+     диалоги поверх того, куда игрока уже перенесли. Поэтому у сцен есть
+     поколение: abort() его меняет, и все шаги старого поколения молча
+     выходят. */
+  epoch: 0,
+  abort() {
+    this.epoch++;
+    this.active = false;
+    this.pending = null;
+    this._cur = null;
+    Dialogue.cancel();
+    Game.cast = [];
+    if (Game.mode === 'cutscene' || Game.mode === 'transition' || Game.mode === 'dialogue')
+      Game.mode = 'explore';
+    UI.dimControls(false);
+  },
+
   seen(name) { return !!(gameState && gameState.scenesSeen && gameState.scenesSeen.includes(name)); },
   mark(name) {
     if (!gameState) return;
@@ -11151,7 +11183,9 @@ const Scene = {
     this.active = true;
     Game.mode = 'cutscene';
     UI.dimControls(true);
-    this._runList(scr).then(() => {
+    const era = this.epoch;
+    this._runList(scr).then(res => {
+      if (era !== this.epoch || (res && res.aborted)) return;   // сцену оборвали
       this.mark(name);
       this.active = false;
       Game.cast = [];
@@ -11164,6 +11198,7 @@ const Scene = {
       saveGame();
       if (this.pending) { const p = this.pending; this.pending = null; this.play(p); }
     }).catch(e => {
+      if (era !== this.epoch) return;
       console.error('Scene error', e);
       this.active = false;
       const cardUp = document.getElementById('endingScreen').classList.contains('show');
@@ -11182,9 +11217,12 @@ const Scene = {
 
   async _runList(list) {
     let cur = list, i = 0, guard = 0;
+    const era = this.epoch;
     while (i < cur.length) {
       if (++guard > 4000) { console.warn('Scene guard tripped'); break; }
+      if (era !== this.epoch) return { aborted:true };
       const r = await this._exec(cur[i]);
+      if (era !== this.epoch) return { aborted:true };
       if (r && r.goto) {
         const nxt = Scripts[r.goto];
         if (!nxt) { console.warn('No script:', r.goto); break; }
@@ -16604,15 +16642,30 @@ const DevTools = {
     if (C('uniDay') >= 4)      { f.chrisCovering = true; f.cafeShiftFinished = true; }
   },
 
+  /* Из главного меню игровой цикл ещё не запущен: Game.running = false,
+     tick() не вызывается, и после перехода остаётся чёрный холст с
+     кнопками управления. Поднимаем цикл сами, но без beginPlay(), чтобы
+     не запустить заново пролог. */
+  ensureRunning() {
+    hideMenu();
+    document.getElementById('endingScreen').classList.remove('show');
+    if (!Game.running) {
+      Game.running = true;
+      Game.lastT = 0;
+      requestAnimationFrame(tick);
+    }
+    if (gameState) applySettings();
+  },
+
   async applyPoint(point) {
-    Scene.active = false; Scene.pending = null;
-    Dialogue.active = false;
+    Scene.abort();
     Game.chase = null;
     Game.endingShown = false;
 
     // Сначала формируем тестовое сюжетное состояние.
     point.apply.call(this);
     this.normalize();
+    this.ensureRunning();     // состояние уже есть — можно поднимать цикл
 
     // ВАЖНО: не меняем currentRoom вручную. Используем штатный changeRoom(),
     // чтобы сработали fade, камера, collision, Patrol, Weather, Ambience,
@@ -16624,6 +16677,7 @@ const DevTools = {
     Game.paused = false;
     try {
       await changeRoom(target, x, y);
+      this.afterTravel();
       this.updateReadout();
     } catch (e) {
       console.error('[DEV] Ошибка перехода:', e);
@@ -16640,10 +16694,10 @@ const DevTools = {
     if (!gameState) {
       this.baseUni(Math.max(1, C('uniDay') || 1));
     }
-    Scene.active = false; Scene.pending = null;
-    Dialogue.active = false;
+    Scene.abort();
     Game.chase = null;
     Game.endingShown = false;
+    this.ensureRunning();
 
     const room = Rooms[roomKey];
     const spot = this.freeSpot(room);
@@ -16653,6 +16707,7 @@ const DevTools = {
     Game.paused = false;
     try {
       await changeRoom(roomKey, x, y);
+      this.afterTravel();
       this.updateReadout();
     } catch (e) {
       console.error('[DEV] Ошибка телепорта:', e);
@@ -16661,6 +16716,20 @@ const DevTools = {
       drawRoom();
       UI.toast('DEV: ошибка перехода, см. консоль', 2600);
     }
+  },
+
+  /* onEnter() комнаты может открыть свою сцену — это нормально. Но игрок
+     не должен остаться под чёрной заливкой или на паузе. */
+  afterTravel() {
+    if (!Scene.active && !Dialogue.active) {
+      if (Game.mode !== 'explore') Game.mode = 'explore';
+      const f = document.getElementById('fade');
+      f.style.transition = 'opacity 200ms';
+      f.classList.remove('show');
+    }
+    Game.paused = false;
+    World.invalidate();
+    drawRoom();
   },
 
   /* Центр комнаты не везде свободен (в прологе там стена), поэтому
@@ -16688,6 +16757,10 @@ const DevTools = {
 
   closeOverlayForTravel() {
     document.getElementById('devToolsScreen').classList.remove('show');
+    const f = document.getElementById('fade');
+    f.style.transition = 'none';
+    f.classList.remove('show');
+    requestAnimationFrame(() => { f.style.transition = 'opacity .5s'; });
     document.getElementById('endingScreen').classList.remove('show');
     document.getElementById('dialogueBox').classList.remove('active');
     document.getElementById('choiceBox').classList.remove('show');
@@ -16710,8 +16783,7 @@ const DevTools = {
   },
 
   fresh() {
-    Scene.active = false; Scene.pending = null;
-    Dialogue.active = false;
+    Scene.abort();
     Game.chase = null;
     Game.endingShown = false;
     gameState = freshState();
@@ -16803,6 +16875,10 @@ function hideMenu() {
 }
 
 function beginPlay() {
+  /* Новая игра, загрузка и перемотка к чекпоинту могут прийтись на
+     середину катсцены. Её надо оборвать, иначе она продолжит менять
+     комнаты и гасить экран поверх уже загруженного состояния. */
+  Scene.abort();
   hideMenu();
   Game.endingShown = false;
   Game.running = true;
