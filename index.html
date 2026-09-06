@@ -3072,16 +3072,19 @@ function woodGrain(g, x, y, w, h, col) {
   /* ---- университет и библиотека ---- */
   D('lockers', {w:44,h:44,ax:22,ay:42,foot:{x:-22,y:-8,w:44,h:10}}, g => {
     shadowEllipse(g, 22, 42, 18, 3);
-    g.fillStyle = '#3f4a52'; g.fillRect(0, 0, 44, 42);
+    /* цвет казённой краски, а не синего пластика: шкафчики должны
+       принадлежать той же тёплой палитре, что и весь корпус */
+    g.fillStyle = '#3f4640'; g.fillRect(0, 0, 44, 42);
     for (let i = 0; i < 3; i++) {
       const x = 1 + i * 14.5;
-      g.fillStyle = '#4d5a63'; g.fillRect(x, 1, 13, 40);
-      g.fillStyle = '#5c6a74'; g.fillRect(x, 1, 13, 2);
-      g.fillStyle = '#333c43'; g.fillRect(x, 20, 13, 1);
-      g.fillStyle = '#2b3238'; for (let k = 0; k < 3; k++) g.fillRect(x + 3, 5 + k * 2, 7, 1);
+      g.fillStyle = '#525c50'; g.fillRect(x, 1, 13, 40);
+      g.fillStyle = '#626c5c'; g.fillRect(x, 1, 13, 2);
+      g.fillStyle = '#39413a'; g.fillRect(x, 20, 13, 1);
+      g.fillStyle = '#2e352f'; for (let k = 0; k < 3; k++) g.fillRect(x + 3, 5 + k * 2, 7, 1);
+      g.fillStyle = '#d8cfae'; g.fillRect(x + 3, 24, 5, 3);
       g.fillStyle = '#c9a05a'; g.fillRect(x + 10, 24, 2, 4);
     }
-    g.fillStyle = '#2b3238'; g.fillRect(0, 41, 44, 3);
+    g.fillStyle = '#2e352f'; g.fillRect(0, 41, 44, 3);
   });
   D('radiator', {w:26,h:18,ax:13,ay:16,foot:{x:-13,y:-8,w:26,h:10}}, g => {
     g.fillStyle = '#b8b4ac'; g.fillRect(0, 2, 26, 12);
@@ -3135,24 +3138,42 @@ function woodGrain(g, x, y, w, h, col) {
   });
 
   /* ---- главная лестница холла ---- */
+  /* ---- парадный марш: ступени сужаются кверху, по краям балюстрада,
+          посередине ковровая дорожка с латунными прутьями ---- */
   D('stairs_main', {w:96,h:64,ax:48,ay:60,foot:{x:-48,y:-60,w:96,h:62}}, g => {
-    for (let i = 0; i < 6; i++) {
-      const y = 2 + i * 9, w = 66 + i * 5, x = 48 - w / 2;
-      g.fillStyle = '#5a4636'; g.fillRect(x, y, w, 6);
-      g.fillStyle = '#7d6248'; g.fillRect(x, y, w, 3);
-      g.fillStyle = '#8d7154'; g.fillRect(x, y, w, 1);
-      g.fillStyle = '#3f3126'; g.fillRect(x, y + 6, w, 2);
+    g.fillStyle = '#221a14'; g.fillRect(24, 0, 48, 8);                 // площадка наверху уходит в тень
+    g.fillStyle = 'rgba(255,226,170,.10)'; g.fillRect(28, 1, 40, 4);
+    for (let i = 0; i < 7; i++) {                                       // i=0 — верхняя, самая узкая
+      const y = 4 + i * 8, w = 58 + i * 6, x = 48 - w / 2;
+      g.fillStyle = 'rgba(0,0,0,.30)'; g.fillRect(x, y + 6, w, 3);      // тень под ступенью
+      g.fillStyle = '#6b5945'; g.fillRect(x, y, w, 7);                  // подступёнок
+      g.fillStyle = '#8a7458'; g.fillRect(x, y, w, 3);                  // проступь
+      g.fillStyle = '#a68f6e'; g.fillRect(x, y, w, 1);                  // светлая кромка
     }
-    g.fillStyle = '#8a3040'; for (let i = 0; i < 6; i++) g.fillRect(48 - 14, 2 + i * 9, 28, 8);   // ковровая дорожка
-    g.fillStyle = '#9c3a4c'; for (let i = 0; i < 6; i++) g.fillRect(48 - 12, 2 + i * 9, 24, 3);
-    g.fillStyle = '#4a3a2c';                                                        // перила
-    g.beginPath(); g.moveTo(6, 60); g.lineTo(16, 2); g.lineTo(21, 2); g.lineTo(12, 60); g.closePath(); g.fill();
-    g.beginPath(); g.moveTo(90, 60); g.lineTo(80, 2); g.lineTo(75, 2); g.lineTo(84, 60); g.closePath(); g.fill();
-    g.fillStyle = '#6b543f';
-    for (let i = 0; i < 5; i++) { g.fillRect(9 + i * 2, 54 - i * 11, 3, 9); g.fillRect(85 - i * 2, 54 - i * 11, 3, 9); }
+    for (let i = 0; i < 7; i++) {                                       // ковровая дорожка
+      const y = 4 + i * 8, w = 24 + i * 3, x = 48 - w / 2;
+      g.fillStyle = '#7c2b38'; g.fillRect(x, y, w, 7);
+      g.fillStyle = '#98394a'; g.fillRect(x, y, w, 3);
+      g.fillStyle = '#c9a05a'; g.fillRect(x, y + 3, w, 1);              // прут
+    }
+    /* балюстрады: наклонная тетива, столбики и поручень */
+    [[1, 0], [-1, 95]].forEach(([dir, x0]) => {
+      g.fillStyle = '#4a3a2c';
+      g.beginPath();
+      g.moveTo(x0, 60); g.lineTo(x0 + dir * 15, 4); g.lineTo(x0 + dir * 21, 4);
+      g.lineTo(x0 + dir * 7, 60); g.closePath(); g.fill();
+      g.fillStyle = '#6b543f';                                          // балясины
+      for (let i = 0; i < 6; i++) g.fillRect(x0 + dir * (3 + i * 2.6) - (dir < 0 ? 3 : 0), 52 - i * 8, 3, 8);
+      g.fillStyle = '#8a6f52';                                          // поручень
+      g.beginPath();
+      g.moveTo(x0, 56); g.lineTo(x0 + dir * 16, 2); g.lineTo(x0 + dir * 20, 2);
+      g.lineTo(x0 + dir * 4, 56); g.closePath(); g.fill();
+      g.fillStyle = '#3a2c1e'; g.fillRect(x0 - (dir < 0 ? 7 : 0), 52, 8, 12);   // тумба внизу
+      g.fillStyle = '#5f4530'; g.fillRect(x0 - (dir < 0 ? 6 : 1), 50, 7, 4);
+      g.fillStyle = '#c9a05a'; g.fillRect(x0 - (dir < 0 ? 5 : 2), 49, 5, 1);
+    });
   });
 
-  /* ---- фонтан во внутреннем дворе ---- */
   D('fountain', {w:70,h:44,ax:35,ay:38,foot:{x:-35,y:-34,w:70,h:36}}, g => {
     shadowEllipse(g, 35, 40, 30, 5, .22);
     g.fillStyle = '#5f5c56'; g.beginPath(); g.ellipse(35, 26, 34, 16, 0, 0, Math.PI*2); g.fill();
@@ -3204,6 +3225,228 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#cfd8d0'; g.fillRect(14, 3, 9, 5); g.fillRect(44, 2, 9, 5);
     g.fillStyle = '#8d949c'; g.fillRect(26, 4, 6, 2); g.fillRect(56, 3, 6, 2);
   });
+/* ================================================================
+   АРХИТЕКТУРНАЯ МЕБЕЛЬ УНИВЕРСИТЕТА
+
+   Каждый предмет здесь несёт архитектурный смысл: колонна держит
+   потолок, стойка отделяет служебную зону от публичной, стеллаж
+   задаёт ряд, парапет ограждает крышу. Случайного декора нет.
+   ================================================================ */
+
+  /* ---- каменная колонна парадного холла ---- */
+  D('column_stone', {w:28,h:104,ax:14,ay:100,foot:{x:-11,y:-12,w:22,h:14}, fade:true}, g => {
+    shadowEllipse(g, 14, 100, 12, 4, .30);
+    g.fillStyle = '#4b4136'; g.fillRect(1, 90, 26, 10);            // база
+    g.fillStyle = '#5e5244'; g.fillRect(3, 88, 22, 4);
+    g.fillStyle = '#6d5f4e'; g.fillRect(5, 14, 18, 76);            // ствол
+    g.fillStyle = '#7d6e5a'; g.fillRect(5, 14, 5, 76);             // освещённая сторона
+    g.fillStyle = '#584c3e'; g.fillRect(19, 14, 4, 76);
+    g.fillStyle = '#5f5344';                                        // каннелюры
+    for (let i = 0; i < 3; i++) g.fillRect(9 + i * 4, 16, 1, 72);
+    g.fillStyle = '#4b4136'; g.fillRect(0, 4, 28, 11);             // капитель
+    g.fillStyle = '#6d5f4e'; g.fillRect(2, 6, 24, 5);
+    g.fillStyle = '#8a7a62'; g.fillRect(0, 4, 28, 2);
+    g.fillStyle = '#c9a05a'; g.fillRect(4, 15, 20, 1);
+  });
+
+  /* ---- стойка информации: отделяет вахту от публичной части холла ---- */
+  D('hall_counter', {w:72,h:36,ax:36,ay:33,foot:{x:-36,y:-22,w:72,h:24}}, g => {
+    shadowEllipse(g, 36, 33, 32, 4, .22);
+    g.fillStyle = '#4a3a2a'; g.fillRect(2, 10, 68, 23);
+    g.fillStyle = '#5f4a34'; g.fillRect(4, 12, 64, 19);
+    g.fillStyle = '#4a3a2a'; for (let x = 10; x < 64; x += 16) g.fillRect(x, 15, 10, 13);
+    g.fillStyle = '#7c6448'; g.fillRect(0, 6, 72, 6);              // столешница
+    g.fillStyle = '#9a7f5e'; g.fillRect(0, 6, 72, 2);
+    g.fillStyle = '#2f2820'; g.fillRect(0, 12, 72, 2);
+    g.fillStyle = '#d8d0bc'; g.fillRect(12, 2, 14, 5);             // журнал и лампа
+    g.fillStyle = '#8a8070'; g.fillRect(13, 3, 12, 1);
+    g.fillStyle = '#3a3128'; g.fillRect(52, 0, 3, 7);
+    g.fillStyle = '#e8c890'; g.fillRect(48, 0, 11, 3);
+  });
+
+  /* ---- витрина с наградами: их не выбрасывают сорок лет ---- */
+  D('display_case', {w:42,h:58,ax:21,ay:55,foot:{x:-21,y:-12,w:42,h:14}}, g => {
+    shadowEllipse(g, 21, 55, 18, 3, .24);
+    g.fillStyle = '#3a2e22'; g.fillRect(0, 0, 42, 55);
+    g.fillStyle = '#503f2d'; g.fillRect(2, 2, 38, 49);
+    g.fillStyle = '#2a2118'; g.fillRect(4, 4, 34, 45);
+    [8, 24].forEach((sy, r) => {
+      g.fillStyle = '#4a3a2a'; g.fillRect(4, sy + 13, 34, 2);
+      g.fillStyle = '#c9a05a';                                      // кубки
+      for (let i = 0; i < 3; i++) {
+        const x = 8 + i * 11 + r * 3;
+        g.fillRect(x, sy + 5, 5, 6); g.fillRect(x + 1, sy + 11, 3, 2); g.fillRect(x - 1, sy + 12, 7, 1);
+      }
+      g.fillStyle = '#a8412c'; g.fillRect(30, sy + 4, 3, 9);        // лента
+    });
+    g.fillStyle = 'rgba(200,225,255,.16)'; g.fillRect(6, 5, 12, 43);
+    g.fillStyle = 'rgba(255,255,255,.10)'; g.fillRect(22, 5, 5, 43);
+    g.fillStyle = '#3a2e22'; g.fillRect(0, 51, 42, 4);
+  });
+
+  /* ---- пожарный шкаф: в каждом коридоре, потому что так положено ---- */
+  D('fire_cabinet', {w:20,h:28,ax:10,ay:0,foot:null,wall:true}, g => {
+    g.fillStyle = '#3a2620'; g.fillRect(0, 0, 20, 28);
+    g.fillStyle = '#8a2f24'; g.fillRect(1, 1, 18, 26);
+    g.fillStyle = '#a03a2c'; g.fillRect(2, 2, 16, 12);
+    g.fillStyle = '#6f241c'; g.fillRect(2, 15, 16, 11);
+    g.fillStyle = '#e8d8c0'; g.fillRect(6, 5, 8, 6);
+    g.fillStyle = '#8a2f24'; g.fillRect(8, 6, 4, 4);
+    g.fillStyle = '#c9a05a'; g.fillRect(15, 13, 3, 3);
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(1, 1, 18, 2);
+  });
+
+  /* ---- указатель факультетов: по нему в холле и ориентируются ---- */
+  D('dir_sign', {w:28,h:46,ax:14,ay:44,foot:{x:-6,y:-5,w:12,h:7}}, g => {
+    shadowEllipse(g, 14, 44, 8, 2, .22);
+    g.fillStyle = '#3a3128'; g.fillRect(12, 20, 4, 24);
+    g.fillStyle = '#4a3f32'; g.fillRect(10, 42, 8, 3);
+    [0, 8, 16].forEach((y, i) => {
+      g.fillStyle = i % 2 ? '#5a4c3a' : '#6b5b46'; g.fillRect(i % 2 ? 2 : 0, y, 26, 7);
+      g.fillStyle = '#d8cfae'; g.fillRect((i % 2 ? 2 : 0) + 2, y + 2, 18, 3);
+      g.fillStyle = '#3a3026'; g.fillRect((i % 2 ? 2 : 0) + 3, y + 3, 14, 1);
+      g.fillStyle = '#c9a05a'; g.fillRect((i % 2 ? 2 : 0) + 22, y + 2, 3, 3);
+    });
+  });
+
+  /* ---- металлический стеллаж архива: не библиотека, а хранилище ---- */
+  D('metal_shelf', {w:54,h:60,ax:27,ay:57,foot:{x:-27,y:-14,w:54,h:16}}, g => {
+    shadowEllipse(g, 27, 57, 24, 3, .26);
+    g.fillStyle = '#3c4048'; g.fillRect(0, 0, 54, 57);
+    g.fillStyle = '#4a4e57'; g.fillRect(2, 2, 50, 53);
+    for (let r = 0; r < 3; r++) {
+      const y = 4 + r * 17;
+      g.fillStyle = '#5a5f69'; g.fillRect(3, y + 14, 48, 3);
+      g.fillStyle = '#7b6a50';                                       // ряды папок
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = ['#6f5a44','#7d6a4e','#5f4c38','#8a7156'][(i + r) % 4];
+        g.fillRect(5 + i * 6, y + 3, 5, 11);
+      }
+      g.fillStyle = '#d8cfae'; g.fillRect(6, y + 5, 3, 2);           // ярлык
+    }
+    g.fillStyle = '#2f333a'; g.fillRect(0, 0, 3, 57); g.fillRect(51, 0, 3, 57);
+    g.fillStyle = '#585d66'; g.fillRect(0, 0, 54, 2);
+  });
+
+  /* ---- трубы под потолком цоколя ---- */
+  D('pipe_run', {w:64,h:18,ax:32,ay:0,foot:null,wall:true}, g => {
+    g.fillStyle = '#5a5a62'; g.fillRect(0, 2, 64, 6);
+    g.fillStyle = '#6e6e78'; g.fillRect(0, 2, 64, 2);
+    g.fillStyle = '#3f3f47'; g.fillRect(0, 7, 64, 2);
+    g.fillStyle = '#4a4a52'; g.fillRect(0, 12, 64, 4);
+    g.fillStyle = '#5e5e66'; g.fillRect(0, 12, 64, 1);
+    g.fillStyle = '#39393f';                                          // хомуты
+    for (let x = 6; x < 60; x += 22) { g.fillRect(x, 0, 4, 10); g.fillRect(x, 11, 4, 6); }
+    g.fillStyle = '#7a6a3a'; g.fillRect(28, 3, 5, 5);                 // след ржавчины
+  });
+
+  /* ---- вентиляционный блок на крыше ---- */
+  D('vent_block', {w:36,h:32,ax:18,ay:29,foot:{x:-18,y:-12,w:36,h:14}}, g => {
+    shadowEllipse(g, 18, 29, 16, 3, .28);
+    g.fillStyle = '#3e3b46'; g.fillRect(0, 8, 36, 21);
+    g.fillStyle = '#4e4a56'; g.fillRect(2, 10, 32, 17);
+    g.fillStyle = '#39363f'; for (let y = 12; y < 26; y += 4) g.fillRect(4, y, 28, 2);
+    g.fillStyle = '#5a5664'; g.fillRect(0, 8, 36, 2);
+    g.fillStyle = '#45414c'; g.fillRect(8, 0, 20, 9);                 // грибок
+    g.fillStyle = '#565260'; g.fillRect(6, 0, 24, 3);
+    g.fillStyle = '#6a5a3a'; g.fillRect(3, 24, 6, 4);
+  });
+
+  /* ---- штабель ящиков: их всегда некуда деть ---- */
+  D('crate_stack', {w:38,h:38,ax:19,ay:35,foot:{x:-19,y:-12,w:38,h:14}}, g => {
+    shadowEllipse(g, 19, 35, 17, 3, .24);
+    g.fillStyle = '#6a5236'; g.fillRect(2, 16, 34, 19);
+    g.fillStyle = '#7d6242'; g.fillRect(4, 18, 30, 15);
+    g.fillStyle = '#54402a'; g.fillRect(4, 24, 30, 2); g.fillRect(18, 18, 2, 15);
+    g.fillStyle = '#6a5236'; g.fillRect(6, 2, 26, 15);
+    g.fillStyle = '#7d6242'; g.fillRect(8, 4, 22, 11);
+    g.fillStyle = '#54402a'; g.fillRect(8, 9, 22, 2);
+    g.fillStyle = '#8a7a5e'; g.fillRect(10, 5, 9, 3);                 // наклейка
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(2, 16, 34, 2);
+  });
+
+  /* ---- рейл с костюмами ---- */
+  D('costume_rail', {w:64,h:50,ax:32,ay:47,foot:{x:-32,y:-8,w:64,h:10}}, g => {
+    shadowEllipse(g, 32, 47, 28, 3, .22);
+    g.fillStyle = '#4a4550'; g.fillRect(2, 4, 60, 3);
+    g.fillStyle = '#5f5a66'; g.fillRect(2, 4, 60, 1);
+    g.fillStyle = '#3f3a46'; g.fillRect(4, 6, 3, 41); g.fillRect(57, 6, 3, 41);
+    const cols = ['#6a4a52','#4a5a6a','#6a6a4a','#5a4a6a','#7a5a44','#4a6a5a'];
+    for (let i = 0; i < 9; i++) {
+      const x = 8 + i * 6;
+      g.fillStyle = '#8a8290'; g.fillRect(x + 2, 2, 1, 5);            // плечики
+      g.fillStyle = cols[i % 6]; g.fillRect(x, 7, 6, 26);
+      g.fillStyle = shade(cols[i % 6], 1.20); g.fillRect(x, 7, 2, 26);
+      g.fillStyle = shade(cols[i % 6], .74); g.fillRect(x, 30, 6, 3);
+    }
+  });
+
+  /* ---- гримёрный стол: зеркало в лампах ---- */
+  D('makeup_table', {w:50,h:52,ax:25,ay:49,foot:{x:-25,y:-16,w:50,h:18}}, g => {
+    shadowEllipse(g, 25, 49, 22, 3, .22);
+    g.fillStyle = '#3a3128'; g.fillRect(2, 0, 46, 30);               // зеркало в раме
+    g.fillStyle = '#7d8c94'; g.fillRect(6, 4, 38, 24);
+    g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(9, 4, 10, 24);
+    g.fillStyle = '#e8d090';                                         // лампы по контуру
+    for (let i = 0; i < 5; i++) { g.fillRect(5 + i * 9, 0, 4, 3); g.fillRect(5 + i * 9, 28, 4, 3); }
+    g.fillRect(2, 8, 3, 4); g.fillRect(45, 8, 3, 4);
+    g.fillStyle = '#6b543f'; g.fillRect(0, 31, 50, 7);               // столешница
+    g.fillStyle = '#8a6f52'; g.fillRect(0, 31, 50, 2);
+    g.fillStyle = '#4a3a2a'; g.fillRect(3, 38, 44, 8);
+    legs(g, 4, 44, 42, 5, '#4a3a2a');
+    g.fillStyle = '#c05a5a'; g.fillRect(8, 27, 4, 4);                // мелочь на столе
+    g.fillStyle = '#d8cfae'; g.fillRect(34, 27, 8, 4);
+  });
+
+  /* ---- ряд зрительских кресел ---- */
+  D('seat_row', {w:74,h:26,ax:37,ay:23,foot:{x:-37,y:-12,w:74,h:14}}, g => {
+    shadowEllipse(g, 37, 23, 32, 3, .20);
+    for (let i = 0; i < 4; i++) {
+      const x = 2 + i * 18;
+      g.fillStyle = '#3a2e3c'; g.fillRect(x, 2, 16, 14);
+      g.fillStyle = '#4e3e52'; g.fillRect(x + 1, 3, 14, 12);
+      g.fillStyle = '#5f4c64'; g.fillRect(x + 1, 3, 14, 3);
+      g.fillStyle = '#33293a'; g.fillRect(x, 16, 16, 5);
+      g.fillStyle = '#2a2230'; g.fillRect(x + 2, 21, 3, 3); g.fillRect(x + 11, 21, 3, 3);
+      g.fillStyle = '#c9a05a'; g.fillRect(x + 6, 17, 4, 1);           // номерок
+    }
+  });
+
+  /* ---- каталожный шкаф библиотеки ---- */
+  D('card_catalog', {w:38,h:44,ax:19,ay:41,foot:{x:-19,y:-12,w:38,h:14}}, g => {
+    shadowEllipse(g, 19, 41, 16, 3, .24);
+    g.fillStyle = '#4a3a28'; g.fillRect(0, 2, 38, 39);
+    g.fillStyle = '#5f4a34'; g.fillRect(2, 4, 34, 35);
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) {
+      const x = 4 + c * 11, y = 6 + r * 8;
+      g.fillStyle = '#6f5840'; g.fillRect(x, y, 9, 6);
+      g.fillStyle = '#513e2c'; g.fillRect(x, y + 6, 9, 1);
+      g.fillStyle = '#c9a05a'; g.fillRect(x + 3, y + 2, 3, 2);
+    }
+    g.fillStyle = '#7c6448'; g.fillRect(0, 0, 38, 4);
+    g.fillStyle = '#9a7f5e'; g.fillRect(0, 0, 38, 1);
+  });
+
+  /* ---- балетный станок у зеркальной стены ---- */
+  D('ballet_barre', {w:68,h:22,ax:34,ay:19,foot:{x:-34,y:-5,w:68,h:7}}, g => {
+    g.fillStyle = '#3f3a32'; g.fillRect(4, 6, 4, 13); g.fillRect(60, 6, 4, 13);
+    g.fillStyle = '#8a6f4e'; g.fillRect(0, 2, 68, 5);
+    g.fillStyle = '#a98a63'; g.fillRect(0, 2, 68, 2);
+    g.fillStyle = '#6a533a'; g.fillRect(0, 6, 68, 1);
+    g.fillStyle = 'rgba(0,0,0,.20)'; g.fillRect(4, 18, 60, 2);
+  });
+
+  /* ---- парапет крыши: ограждает и задаёт край здания ---- */
+  D('parapet', {w:72,h:26,ax:36,ay:22,foot:{x:-36,y:-8,w:72,h:10}}, g => {
+    g.fillStyle = '#4a4650'; g.fillRect(0, 4, 72, 18);
+    g.fillStyle = '#565260';
+    for (let x = 2; x < 70; x += 9) g.fillRect(x, 6, 7, 14);
+    g.fillStyle = '#605c6c'; g.fillRect(0, 0, 72, 5);
+    g.fillStyle = '#726e80'; g.fillRect(0, 0, 72, 2);
+    g.fillStyle = '#33303a'; g.fillRect(0, 20, 72, 3);
+    g.fillStyle = 'rgba(120,150,170,.10)'; g.fillRect(0, 2, 72, 1);
+  });
+
 })();
 
 /* =====================================================================
@@ -3807,6 +4050,408 @@ function paintUniAtmosphere(ctx, w, h, o) {
   ctx.restore();
 }
 
+/* =====================================================================
+   АРХИТЕКТУРНЫЙ ИНСТРУМЕНТАРИЙ УНИВЕРСИТЕТА
+
+   Корпус собирается не из нарисованных по месту картинок, а из деталей:
+   проём, окно, дверь, фасад, вид наружу. Поэтому все окна здания одной
+   системы, а двор за ними — один и тот же двор с любой стороны, и
+   здание читается как кольцо, а не как набор отдельных экранов.
+===================================================================== */
+
+/* Палитра корпуса: одна на все помещения, иначе крылья расходятся в цвете
+   и перестают выглядеть частями одного дома. */
+const UNI = {
+  wall:'#6b5a44', wain:'#54462f', plinth:'#3b3025', cornice:'#8f795c',
+  wood:'#5f4530', woodLo:'#43301f', woodHi:'#7a5c3e', frame:'#4a3a2a',
+  brass:'#c9a05a', sill:'#8c7157', sillHi:'#b29572',
+  stone:'#5b4c3e', stoneLo:'#473b30', stoneHi:'#6f5d4a',
+  skyTop:'#3d4453', skyBot:'#8d8574',            // пасмурное осеннее небо
+  leafRed:'#a8412c', leafGold:'#c9992f', leafRust:'#8a5524',
+  grass:'#3f4c33', grassLo:'#35402b', paving:'#6a655c', pavingLo:'#5b574f',
+};
+
+/* ВИД НАРУЖУ. Четыре плана: небо, дальний силуэт, противоположный корпус,
+   земля. Окно — не плоская картинка: за ним есть глубина, и она разная
+   с разных сторон здания. */
+function uniOutside(g, x, y, w, h, kind, o) {
+  o = o || {};
+  if (w < 4 || h < 4) return;
+  g.save();
+  g.beginPath(); g.rect(x, y, w, h); g.clip();
+  const R = (a, b, c, d) => g.fillRect(Math.round(a), Math.round(b), Math.round(c), Math.round(d));
+
+  const sky = (hh, top, bot) => {
+    const s = g.createLinearGradient(0, y, 0, y + hh);
+    s.addColorStop(0, top || UNI.skyTop); s.addColorStop(1, bot || UNI.skyBot);
+    g.fillStyle = s; R(x, y, w, hh);
+  };
+  /* Крона: три пятна и подсветка сверху — дерево, а не круг. */
+  const crown = (cx, cy, r, c1, c2) => {
+    if (r < 2) return;
+    g.fillStyle = c1;
+    g.beginPath(); g.arc(cx, cy, r, 0, 6.3); g.fill();
+    g.beginPath(); g.arc(cx - r * .62, cy + r * .34, r * .64, 0, 6.3); g.fill();
+    g.beginPath(); g.arc(cx + r * .60, cy + r * .30, r * .58, 0, 6.3); g.fill();
+    g.fillStyle = c2;
+    g.beginPath(); g.arc(cx - r * .28, cy - r * .34, r * .44, 0, 6.3); g.fill();
+    /* фактура кроны: без неё дерево читается как шар */
+    g.fillStyle = shade(c1, .74);
+    for (let i = 0; i < Math.round(r * 1.6); i++) {
+      const a = i * 2.39, rr = r * (.25 + (i % 5) * .16);
+      g.fillRect(Math.round(cx + Math.cos(a) * rr), Math.round(cy + Math.sin(a) * rr * .9), 2, 1);
+    }
+    g.fillStyle = shade(c2, 1.18);
+    for (let i = 0; i < Math.round(r * .8); i++) {
+      const a = 1.1 + i * 1.7, rr = r * (.2 + (i % 4) * .18);
+      g.fillRect(Math.round(cx + Math.cos(a) * rr), Math.round(cy - Math.abs(Math.sin(a)) * rr * .8), 1, 1);
+    }
+  };
+  const trunk = (cx, top, bot, ww) => {
+    g.fillStyle = '#3a2c20'; R(cx - ww / 2, top, ww, bot - top);
+  };
+  /* Дальние крыши города — силуэт, а не здания: за окном второго этажа
+     город должен читаться одним движением глаза. */
+  const roofline = (baseY, col, step, lo, hi) => {
+    g.fillStyle = col;
+    for (let i = -1; i * step < w + step; i++) {
+      const bx = x + i * step + ((i * 37) % 7);
+      const bh = lo + ((i * 53) % Math.max(1, hi - lo));
+      R(bx, baseY - bh, step - 2, bh);
+      if ((i * 17) % 3 === 0) R(bx + step * .3, baseY - bh - 5, 4, 5);   // труба
+    }
+  };
+  /* Противоположный корпус: кладка, пояса этажей и сетка окон.
+     Часть окон горит — по ним видно, что в здании кто-то есть. */
+  const wing = (x0, ww, top, bot, col, lit) => {
+    g.fillStyle = col; R(x0, top, ww, bot - top);
+    g.fillStyle = shade(col, .90);
+    for (let yy = top; yy < bot; yy += 7)
+      for (let xx = x0 + ((yy / 7) | 0) % 2 * 9; xx < x0 + ww; xx += 18) R(xx, yy, 16, 6);
+    g.fillStyle = shade(col, .74); R(x0, top, ww, 3);                    // карниз
+    g.fillStyle = shade(col, 1.16); R(x0, top + 3, ww, 1);
+    const rows = Math.max(1, Math.floor((bot - top - 14) / 26));
+    for (let r = 0; r < rows; r++) {
+      const wy = top + 10 + r * 26;
+      for (let c = 0, cx = x0 + 7; cx < x0 + ww - 12; c++, cx += 24) {
+        g.fillStyle = shade(col, .58); R(cx - 2, wy - 2, 17, 21);
+        const on = lit && ((c * 5 + r * 3) % 4 === 0);
+        if (on) {
+          const gl = g.createLinearGradient(0, wy, 0, wy + 17);
+          gl.addColorStop(0, '#ffe8b4'); gl.addColorStop(1, '#c08c4c');
+          g.fillStyle = gl;
+        } else g.fillStyle = '#39404a';
+        R(cx, wy, 13, 17);
+        g.fillStyle = 'rgba(30,24,18,.6)'; R(cx + 6, wy, 1, 17); R(cx, wy + 8, 13, 1);
+      }
+    }
+  };
+  const ground = (y0, c1, c2) => {
+    g.fillStyle = c1; R(x, y0, w, y + h - y0);
+    g.fillStyle = c2;
+    for (let yy = y0 + 4; yy < y + h; yy += 6) R(x, yy, w, 1);
+  };
+
+  if (kind === 'front' || kind === 'street') {
+    /* Передний двор: дорожка, газоны, деревья, фонарь, за ними город. */
+    const hz = y + h * .50;
+    sky(h * .52);
+    roofline(hz + 2, '#2f333d', 15, 6, 16);
+    g.fillStyle = '#4b4b44'; R(x, hz, w, y + h - hz);                    // мощение
+    g.fillStyle = UNI.grass; R(x, hz + 2, w * .38, h * .16); R(x + w * .60, hz + 2, w * .40, h * .16);
+    g.fillStyle = '#7a7368';                                             // центральная дорожка
+    g.beginPath();
+    g.moveTo(x + w * .40, hz); g.lineTo(x + w * .60, hz);
+    g.lineTo(x + w * .74, y + h); g.lineTo(x + w * .26, y + h); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(210,194,165,.12)';
+    for (let yy = hz + 6; yy < y + h; yy += 7) R(x + w * .28, yy, w * .44, 1);
+    trunk(x + w * .17, hz - h * .12, hz + 2, 3);
+    crown(x + w * .17, hz - h * .20, Math.max(4, w * .13), UNI.leafRed, '#c2562f');
+    trunk(x + w * .84, hz - h * .10, hz + 2, 3);
+    crown(x + w * .84, hz - h * .17, Math.max(4, w * .11), UNI.leafGold, '#e0b447');
+    g.fillStyle = '#31333a'; R(x + w * .68, hz - h * .30, 2, h * .30);   // фонарь
+    g.fillStyle = '#ffd08a'; R(x + w * .66, hz - h * .34, 6, 5);
+  }
+
+  else if (kind === 'yard') {
+    /* Внутренний двор с уровня первого этажа: напротив — другое крыло,
+       между ним и окном фонтан, дорожки и деревья. */
+    const hz = y + h * .58;
+    sky(h * .22, '#3a4150', '#6f6a63');
+    wing(x - 4, w + 8, y + h * .12, hz, '#54483c', true);
+    ground(hz, UNI.paving, UNI.pavingLo);
+    g.fillStyle = UNI.grass; R(x, hz + h * .10, w * .42, h * .22); R(x + w * .58, hz + h * .10, w * .42, h * .22);
+    g.fillStyle = '#585850';                                             // чаша фонтана
+    g.beginPath(); g.ellipse(x + w * .50, hz + h * .22, Math.max(5, w * .20), Math.max(2, h * .07), 0, 0, 6.3); g.fill();
+    g.fillStyle = 'rgba(150,180,205,.35)';
+    g.beginPath(); g.ellipse(x + w * .50, hz + h * .21, Math.max(4, w * .16), Math.max(2, h * .05), 0, 0, 6.3); g.fill();
+    trunk(x + w * .20, hz - h * .14, hz + h * .06, 3);
+    crown(x + w * .20, hz - h * .20, Math.max(3, w * .11), UNI.leafRed, '#c2562f');
+    trunk(x + w * .80, hz - h * .11, hz + h * .05, 3);
+    crown(x + w * .80, hz - h * .16, Math.max(3, w * .09), UNI.leafGold, '#e0b447');
+    g.fillStyle = '#4a4a44';                                            // скамьи у дорожки
+    R(x + w * .34, hz + h * .12, w * .10, 2); R(x + w * .58, hz + h * .12, w * .10, 2);
+  }
+
+  else if (kind === 'yardDown') {
+    /* Двор со второго этажа: смотришь вниз, поэтому земли много, а от
+       противоположного крыла видно только крышу и верх стены. */
+    const rf = y + h * .30;
+    sky(h * .10, '#39404e', '#5d5a56');
+    g.fillStyle = '#4a4038'; R(x, y + h * .08, w, rf - y - h * .08);     // крыша напротив
+    g.fillStyle = '#565043';
+    for (let xx = x; xx < x + w; xx += 9) R(xx, y + h * .09, 4, rf - y - h * .09);
+    g.fillStyle = '#39322a'; R(x, rf - 4, w, 4);
+    g.fillStyle = '#6b6256'; R(x, rf, w, 3);                              // карниз
+    ground(rf + 3, UNI.paving, UNI.pavingLo);
+    g.fillStyle = UNI.grass; R(x + w * .04, rf + h * .14, w * .40, h * .30);
+    g.fillStyle = UNI.grassLo; R(x + w * .56, rf + h * .14, w * .40, h * .30);
+    g.fillStyle = '#585850';                                              // фонтан сверху
+    g.beginPath(); g.ellipse(x + w * .50, rf + h * .40, Math.max(5, w * .17), Math.max(3, h * .10), 0, 0, 6.3); g.fill();
+    g.fillStyle = 'rgba(150,180,205,.34)';
+    g.beginPath(); g.ellipse(x + w * .50, rf + h * .40, Math.max(4, w * .13), Math.max(2, h * .07), 0, 0, 6.3); g.fill();
+    crown(x + w * .18, rf + h * .26, Math.max(4, w * .13), '#8e4a2c', '#b06238');   // кроны сверху
+    crown(x + w * .82, rf + h * .30, Math.max(4, w * .12), '#9c7a2c', '#c39a3c');
+  }
+
+  else if (kind === 'back' || kind === 'oldyard') {
+    /* Задняя сторона: та же осень, но никто не убирает. */
+    const hz = y + h * .46;
+    sky(h * .48, '#343a47', '#7b7466');
+    roofline(hz + 1, '#2b2f38', 19, 5, 13);
+    trunk(x + w * .28, y + h * .10, hz + 3, 4);
+    crown(x + w * .28, y + h * .16, Math.max(5, w * .20), '#6f4526', '#8a5a30');
+    trunk(x + w * .74, y + h * .16, hz + 3, 3);
+    crown(x + w * .74, y + h * .22, Math.max(4, w * .15), '#7a5a24', '#98762e');
+    ground(hz, '#4a4a42', '#3f4038');
+    g.fillStyle = '#3f3a33';                                              // забор
+    for (let xx = x; xx < x + w; xx += 7) R(xx, hz + h * .16, 4, h * .30);
+    g.fillStyle = '#8a6a3a';                                              // палая листва
+    for (let i = 0; i < 14; i++) R(x + ((i * 43) % w), hz + h * .10 + ((i * 29) % Math.max(1, h * .30)), 2, 1);
+  }
+
+  else if (kind === 'roofs') {
+    /* Из старого крыла и с верхних этажей виден не двор, а собственные
+       крыши и город за ними. */
+    sky(h * .46, '#333a48', '#6e6a64');
+    roofline(y + h * .48, '#2a2e37', 13, 8, 20);
+    g.fillStyle = '#4a4650'; R(x, y + h * .48, w, h * .18);               // своя кровля
+    g.fillStyle = '#565260';
+    for (let xx = x; xx < x + w; xx += 11) R(xx, y + h * .48, 5, h * .18);
+    g.fillStyle = '#3a3742'; R(x, y + h * .64, w, h * .36);
+    g.fillStyle = '#514c58';
+    for (let yy = y + h * .68; yy < y + h; yy += 7) R(x, yy, w, 1);
+    g.fillStyle = '#2f2c36'; R(x + w * .22, y + h * .38, 7, h * .12);     // труба
+    R(x + w * .70, y + h * .42, 6, h * .09);
+  }
+
+  else {                                                                  // 'far' — просто небо и город
+    sky(h * .58);
+    roofline(y + h * .60, '#2c303a', 16, 6, 18);
+    ground(y + h * .60, '#43443e', '#3a3b36');
+  }
+
+  /* Дождь по стеклу — та же осень, что и во всей игре. */
+  if (o.rain !== false) {
+    g.globalAlpha = .18; g.fillStyle = '#cfe0ee';
+    for (let i = 0; i < Math.max(4, (w * h) / 90); i++) {
+      const rx = x + ((i * 61) % w), ry = y + ((i * 37) % h);
+      g.fillRect(Math.round(rx), Math.round(ry), 1, 2);
+    }
+    g.globalAlpha = 1;
+  }
+  g.restore();
+}
+
+/* ОКНО — ЧАСТЬ СТЕНЫ, А НЕ КАРТИНКА НА НЕЙ.
+
+   Проём вырезан в толще: сверху перемычка с тенью, по бокам откосы (тот,
+   что против света, светлее), внизу подоконник, который выступает в
+   помещение. За стеклом — вид с глубиной, поверх — переплёт и блик.     */
+function uniWindow(g, x, y, w, h, o) {
+  o = o || {};
+  const view = o.view || 'yard';
+  const rev  = o.reveal === undefined ? 5 : o.reveal;   // глубина откоса
+  const wall = o.wall || UNI.wall;
+  const dir  = o.dir === undefined ? 1 : o.dir;          // куда падает свет: 1 — вправо
+  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+
+  /* толща стены вокруг проёма */
+  g.fillStyle = shade(wall, .52); g.fillRect(x - rev - 2, y - rev - 2, w + rev * 2 + 4, h + rev * 2 + 4);
+  /* стекло с видом */
+  uniOutside(g, x, y, w, h, view, o);
+  /* откосы: боковые скосы внутрь проёма */
+  const jl = g.createLinearGradient(x - rev, 0, x, 0);
+  jl.addColorStop(0, shade(wall, dir > 0 ? 1.14 : .58)); jl.addColorStop(1, shade(wall, dir > 0 ? .92 : .46));
+  g.fillStyle = jl; g.fillRect(x - rev, y - rev, rev, h + rev);
+  const jr = g.createLinearGradient(x + w, 0, x + w + rev, 0);
+  jr.addColorStop(0, shade(wall, dir > 0 ? .48 : .94)); jr.addColorStop(1, shade(wall, dir > 0 ? .40 : 1.14));
+  g.fillStyle = jr; g.fillRect(x + w, y - rev, rev, h + rev);
+  /* перемычка и её тень на стекло */
+  g.fillStyle = shade(wall, .40); g.fillRect(x - rev, y - rev, w + rev * 2, rev);
+  g.fillStyle = 'rgba(0,0,0,.30)'; g.fillRect(x, y, w, 3);
+  /* рама */
+  g.fillStyle = o.frame || UNI.frame;
+  g.fillRect(x - 2, y - 2, w + 4, 2); g.fillRect(x - 2, y + h, w + 4, 2);
+  g.fillRect(x - 2, y - 2, 2, h + 4); g.fillRect(x + w, y - 2, 2, h + 4);
+  /* переплёт: старые окна дробные, это половина их характера */
+  const cols = o.cols || Math.max(2, Math.round(w / 15));
+  const rows = o.rows || Math.max(2, Math.round(h / 13));
+  g.fillStyle = shade(o.frame || UNI.frame, 1.05);
+  for (let i = 1; i < cols; i++) g.fillRect(x + Math.round(i * w / cols) - 1, y, 2, h);
+  for (let i = 1; i < rows; i++) g.fillRect(x, y + Math.round(i * h / rows) - 1, w, 2);
+  if (o.transom) {                                        // фрамуга: толстая горизонталь
+    const ty = y + Math.round(h * (o.transom === true ? .30 : o.transom));
+    g.fillStyle = o.frame || UNI.frame; g.fillRect(x - 1, ty - 2, w + 2, 4);
+  }
+  /* блик по стеклу — окно должно быть стеклянным */
+  g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = .16;
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  g.moveTo(x + w * .10, y + h); g.lineTo(x + w * .44, y);
+  g.lineTo(x + w * .62, y); g.lineTo(x + w * .28, y + h); g.closePath(); g.fill();
+  g.restore();
+  /* подоконник выступает в помещение */
+  if (o.sill !== false) {
+    g.fillStyle = UNI.sill;    g.fillRect(x - rev - 3, y + h + rev - 2, w + rev * 2 + 6, 5);
+    g.fillStyle = UNI.sillHi;  g.fillRect(x - rev - 3, y + h + rev - 2, w + rev * 2 + 6, 2);
+    g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(x - rev - 3, y + h + rev + 3, w + rev * 2 + 6, 2);
+  }
+  /* арочная перемычка старого корпуса */
+  if (o.arch) {
+    g.fillStyle = shade(wall, .46);
+    g.beginPath(); g.moveTo(x - rev, y - rev);
+    g.quadraticCurveTo(x + w / 2, y - rev - h * .30, x + w + rev, y - rev);
+    g.closePath(); g.fill();
+    g.fillStyle = shade(wall, 1.10);
+    g.beginPath(); g.moveTo(x - rev, y - rev - 1);
+    g.quadraticCurveTo(x + w / 2, y - rev - h * .30 - 1, x + w + rev, y - rev - 1);
+    g.lineTo(x + w + rev, y - rev - 3);
+    g.quadraticCurveTo(x + w / 2, y - rev - h * .30 - 3, x - rev, y - rev - 3);
+    g.closePath(); g.fill();
+  }
+  if (o.curtain) {                                        // штора сбоку, не поперёк света
+    g.fillStyle = o.curtain === true ? '#7a6250' : o.curtain;
+    g.fillRect(x - rev - 2, y - rev, 7, h + rev + 2);
+    g.fillStyle = 'rgba(255,236,196,.14)'; g.fillRect(x - rev - 2, y - rev, 2, h + rev + 2);
+  }
+}
+
+/* СВЕТ ИЗ ОКНА НА ПОЛ. У света есть направление: пятно уезжает вбок и
+   гаснет вглубь помещения, а внутри пятна виден след переплёта. */
+function uniBeam(g, x, w, top, len, o) {
+  o = o || {};
+  if (len <= 0) return;
+  const a = o.a === undefined ? .22 : o.a;
+  const tilt = o.tilt === undefined ? .45 : o.tilt;
+  const cols = o.cols || 3;
+  g.save(); g.globalCompositeOperation = 'lighter';
+  const gr = g.createLinearGradient(0, top, 0, top + len);
+  gr.addColorStop(0, `rgba(255,242,208,${a.toFixed(3)})`);
+  gr.addColorStop(.45, `rgba(255,230,184,${(a * .45).toFixed(3)})`);
+  gr.addColorStop(1, 'rgba(255,224,168,0)');
+  g.fillStyle = gr;
+  g.beginPath();
+  g.moveTo(x, top); g.lineTo(x + w, top);
+  g.lineTo(x + w + len * tilt, top + len); g.lineTo(x + len * tilt, top + len);
+  g.closePath(); g.fill();
+  g.globalAlpha = .40;                                   // след переплёта в пятне
+  for (let i = 0; i < cols; i++) {
+    const px = x + 1 + Math.round(i * w / cols);
+    g.beginPath();
+    g.moveTo(px, top); g.lineTo(px + Math.max(3, w / cols - 5), top);
+    g.lineTo(px + Math.max(3, w / cols - 5) + len * tilt, top + len); g.lineTo(px + len * tilt, top + len);
+    g.closePath(); g.fill();
+  }
+  g.restore();
+}
+
+/* ДВЕРИ. Один набор на всё здание: створки разные, но система одна —
+   иначе крылья выглядят как разные дома. */
+const UNI_DOOR_SKIN = {
+  plain:  { frame:'#372a1c', leaf:'#5f4530', panel:'#4a3524' },  // обычная учебная
+  heavy:  { frame:'#33261a', leaf:'#553f2a', panel:'#3f2c1c' },  // двустворчатая парадная
+  office: { frame:'#33261a', leaf:'#4f3a26', panel:'#3d2c1e' },  // кабинет
+  glass:  { frame:'#372a1c', leaf:'#5f4530', panel:'#e8c489' },  // аудитория со стеклом
+  stage:  { frame:'#3a2c1e', leaf:'#5a1024', panel:'#7a1830' },  // выход на сцену
+  shut:   { frame:'#2b2018', leaf:'#413020', panel:'#33251a' },  // закрытое помещение
+  old:    { frame:'#2a2119', leaf:'#4a3b2a', panel:'#382b1e', worn:true },   // старое крыло
+  metal:  { frame:'#2e3138', leaf:'#4a4e57', panel:'#3c4048', metal:true },  // техническая
+  service:{ frame:'#33342f', leaf:'#565a4e', panel:'#43473d', metal:true },  // служебная
+};
+
+/* ФАСАД КОРПУСА. Процедурный: этажи, сетка окон, пояса, карниз, цоколь.
+   Им нарисованы и главный фасад с улицы, и три стены внутреннего двора,
+   и глухая стена сзади — поэтому это одно здание с любой стороны. */
+function uniFacade(g, x, y, w, h, o) {
+  o = o || {};
+  const col = o.wall || UNI.stone;
+  const storeys = o.storeys || 3;
+  const lit = o.lit === undefined ? .35 : o.lit;
+  const baseH = o.baseH === undefined ? Math.round(h * .12) : o.baseH;
+  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+
+  g.fillStyle = col; g.fillRect(x, y, w, h);
+  g.fillStyle = shade(col, .90);                                  // кладка
+  for (let yy = y + 3; yy < y + h; yy += 6)
+    for (let xx = x + ((yy / 6) | 0) % 2 * 11; xx < x + w; xx += 22) g.fillRect(xx, yy, 20, 5);
+  /* карниз и кровля */
+  if (o.cornice !== false) {
+    g.fillStyle = shade(col, .52); g.fillRect(x - 3, y - 5, w + 6, 6);
+    g.fillStyle = shade(col, 1.24); g.fillRect(x - 3, y - 5, w + 6, 2);
+    g.fillStyle = '#2f2a26'; g.fillRect(x - 5, y - 9, w + 10, 5);
+  }
+  /* цоколь */
+  if (o.base !== false) {
+    g.fillStyle = shade(col, .62); g.fillRect(x, y + h - baseH, w, baseH);
+    g.fillStyle = shade(col, .84);
+    for (let xx = x; xx < x + w; xx += 16) g.fillRect(xx, y + h - baseH + 2, 14, baseH - 4);
+    g.fillStyle = shade(col, 1.12); g.fillRect(x, y + h - baseH - 2, w, 2);
+  }
+  /* окна по этажам: верхние меньше нижних — так читается высота */
+  const top0 = y + (o.cornice === false ? 4 : 8);
+  const usable = h - baseH - (top0 - y) - 6;
+  const stepY = usable / storeys;
+  const cols = o.cols || Math.max(2, Math.floor(w / 30));
+  const gapX = w / cols;
+  for (let s = 0; s < storeys; s++) {
+    const wh = Math.max(8, Math.round(stepY * (s === 0 ? .62 : .54)));
+    const ww = Math.max(7, Math.round(gapX * .46));
+    const wy = Math.round(top0 + s * stepY + stepY * .18);
+    for (let c = 0; c < cols; c++) {
+      const wx = Math.round(x + gapX * (c + .5) - ww / 2);
+      g.fillStyle = shade(col, .48); g.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
+      g.fillStyle = shade(col, 1.18); g.fillRect(wx - 3, wy - 3, ww + 6, 1);
+      const on = ((c * 7 + s * 5) % 10) < lit * 10;
+      if (on) {
+        const gl = g.createLinearGradient(0, wy, 0, wy + wh);
+        gl.addColorStop(0, '#fff2ce'); gl.addColorStop(.5, '#e8c27c'); gl.addColorStop(1, '#b07846');
+        g.fillStyle = gl;
+      } else {
+        const gl = g.createLinearGradient(0, wy, 0, wy + wh);
+        gl.addColorStop(0, '#5d6874'); gl.addColorStop(1, '#333941');
+        g.fillStyle = gl;
+      }
+      g.fillRect(wx, wy, ww, wh);
+      g.fillStyle = shade(col, .44);                             // переплёт
+      g.fillRect(wx + Math.round(ww / 2) - 1, wy, 1, wh);
+      for (let i = 1; i < 3; i++) g.fillRect(wx, wy + Math.round(i * wh / 3), ww, 1);
+      g.fillStyle = shade(col, .70); g.fillRect(wx - 4, wy + wh + 2, ww + 8, 2);   // отлив
+    }
+    if (s < storeys - 1) {                                       // междуэтажный пояс
+      g.fillStyle = shade(col, .74); g.fillRect(x, Math.round(top0 + (s + 1) * stepY - 3), w, 3);
+      g.fillStyle = shade(col, 1.10); g.fillRect(x, Math.round(top0 + (s + 1) * stepY - 4), w, 1);
+    }
+  }
+  /* пилястры по краям — здание должно иметь углы */
+  if (o.pilasters !== false) {
+    [x, x + w - 7].forEach(px => {
+      g.fillStyle = shade(col, 1.08); g.fillRect(px, y, 7, h - baseH);
+      g.fillStyle = shade(col, .70);  g.fillRect(px + (px === x ? 6 : 0), y, 1, h - baseH);
+    });
+  }
+}
+
 /* Длинный университетский коридор: стена с ритмом высоких окон, полосы
    света на полу под ними и ряд дверей с табличками. Рисуется один раз в
    кэш фона, поэтому окон может быть сколько угодно. */
@@ -3841,135 +4486,208 @@ function wallLayout(W, items, opts) {
   };
 }
 
-/* Общий художник длинных коридоров университета.
+/* СТЕНА КОРИДОРА, ВИДНАЯ С ЛИЦА.
 
-   Свет собран по референсу: высокие окна с частым переплётом, стекло выбито
-   почти в белое золото, а на пол ложатся длинные косые полосы — все с одним
-   наклоном, иначе коридор читается плоско. Низ стены — деревянные панели,
-   по углам комнаты подмешана тень.
+   Не заливка одним цветом: сверху карниз и потолочная тень, посередине
+   штукатурка со следами ремонтов, снизу деревянные панели с рамками и
+   плинтус. Именно это отличает старое учебное здание от коробки.
+   dirY — где у стены пол: 1 — внизу (дальняя стена), -1 — вверху
+   (ближняя стена, поднимающаяся к зрителю).                            */
+function paintWallFace(g, x0, top, w, h, o) {
+  o = o || {};
+  const warm = o.warm || UNI.wall;
+  const down = o.up ? -1 : 1;                       // 1: пол внизу
+  const wainH = o.wainH === undefined ? Math.max(10, Math.round(h * .26)) : o.wainH;
+  const wear = o.wear || 0;
+  const fy = down > 0 ? top + h : top;              // линия пола
+  const cy = down > 0 ? top : top + h;              // линия потолка
+  /* штукатурка: к потолку темнее, к панелям светлее */
+  const gr = g.createLinearGradient(0, cy, 0, fy);
+  gr.addColorStop(0, shade(warm, .70)); gr.addColorStop(.62, warm); gr.addColorStop(1, shade(warm, .86));
+  g.fillStyle = gr; g.fillRect(x0, top, w, h);
+  /* следы времени: пятна и подтёки, чуть заметные */
+  g.globalAlpha = .06 + wear * .12;
+  g.fillStyle = shade(warm, .62);
+  for (let i = 0; i < Math.round(w / 26); i++) {
+    const px = x0 + ((i * 71) % w), pw = 8 + (i * 13) % 22;
+    g.fillRect(px, cy + down * (4 + (i * 17) % Math.max(4, h * .5)), pw, 1 + (i % 3));
+  }
+  g.globalAlpha = 1;
+  if (wear > .3) {                                   // отслоившаяся краска старого крыла
+    g.fillStyle = shade(warm, 1.16); g.globalAlpha = .16;
+    for (let i = 0; i < Math.round(w / 40); i++)
+      g.fillRect(x0 + ((i * 97) % w), cy + down * (6 + (i * 31) % Math.max(6, h * .55)), 5 + i % 7, 3);
+    g.globalAlpha = 1;
+  }
+  /* потолочная тень и карниз */
+  g.fillStyle = 'rgba(12,8,10,.34)'; g.fillRect(x0, down > 0 ? cy : cy - 7, w, 7);
+  g.fillStyle = shade(warm, 1.20); g.fillRect(x0, down > 0 ? cy + 7 : cy - 8, w, 2);
+  g.fillStyle = shade(warm, .58);   g.fillRect(x0, down > 0 ? cy + 9 : cy - 10, w, 2);
+  /* панели и плинтус у пола */
+  const wy = down > 0 ? fy - wainH : fy;
+  g.fillStyle = shade(warm, .64); g.fillRect(x0, wy, w, wainH);
+  g.fillStyle = shade(warm, .52);
+  for (let x = x0 + 5; x < x0 + w - 8; x += 24) g.fillRect(x, wy + 3, 16, wainH - 7);
+  g.fillStyle = shade(warm, .78);
+  for (let x = x0 + 5; x < x0 + w - 8; x += 24) g.fillRect(x, wy + 3, 16, 1);
+  g.fillStyle = shade(warm, .98); g.fillRect(x0, down > 0 ? wy - 3 : wy + wainH, w, 3);
+  g.fillStyle = shade(warm, 1.14); g.fillRect(x0, down > 0 ? wy - 4 : wy + wainH + 2, w, 1);
+  g.fillStyle = shade(warm, .40); g.fillRect(x0, down > 0 ? fy - 4 : fy, w, 4);   // плинтус
+}
 
-   Коридор умеет заворачивать: armH задаёт, где кончается горизонтальный
-   рукав, а bend:{x0,x1} прорезает в стене под ним проход вниз. Всё
-   остальное ниже armH становится стеной, и получается угол.                 */
+/* ПОЛ КОРИДОРА: доски вдоль движения, стыки, потёртость по центру. */
+function paintCorridorFloor(g, x0, y0, w, h, o) {
+  o = o || {};
+  const floor = o.floor || '#8e7448', floor2 = o.floor2 || '#7a6038';
+  g.fillStyle = floor; g.fillRect(x0, y0, w, h);
+  g.fillStyle = floor2;
+  for (let y = y0 + 7; y < y0 + h; y += 13) g.fillRect(x0, y, w, 1);
+  for (let x = x0; x < x0 + w; x += 64) {
+    const off = ((x / 64) | 0) % 2 ? 6 : 0;
+    for (let y = y0 + off; y < y0 + h; y += 26) g.fillRect(x, y, 1, 13);
+  }
+  /* натоптанная дорожка по середине — здание, по которому ходят */
+  g.save(); g.globalAlpha = .10; g.fillStyle = shade(floor, 1.22);
+  g.fillRect(x0, y0 + h * .34, w, h * .34); g.restore();
+  if (o.edge !== false) { g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x0, y0, w, 7); }
+}
+
+/* ДВЕРЬ В ТОЛЩЕ СТЕНЫ. Не наклейка: сначала ниша с откосами, потом
+   створка в глубине, потом наличник, табличка и порог на полу.        */
+function uniDoorInWall(g, dx, dy, dw, dh, o) {
+  o = o || {};
+  const sk = UNI_DOOR_SKIN[o.style] || UNI_DOOR_SKIN.plain;
+  const warm = o.warm || UNI.wall;
+  const inset = o.inset === undefined ? 4 : o.inset;
+  /* ниша */
+  g.fillStyle = shade(warm, .46); g.fillRect(dx - inset, dy - inset, dw + inset * 2, dh + inset);
+  g.fillStyle = shade(warm, .96); g.fillRect(dx - inset, dy - inset, inset, dh + inset);
+  g.fillStyle = shade(warm, .38); g.fillRect(dx + dw, dy - inset, inset, dh + inset);
+  g.fillStyle = 'rgba(0,0,0,.36)'; g.fillRect(dx - inset, dy - inset, dw + inset * 2, 4);
+  /* наличник */
+  g.fillStyle = sk.frame; g.fillRect(dx - 3, dy - 3, dw + 6, dh + 3);
+  /* створка */
+  g.fillStyle = sk.leaf; g.fillRect(dx, dy, dw, dh);
+  if (o.double || dw > 46) {                              // двустворчатая
+    const half = Math.round(dw / 2);
+    g.fillStyle = sk.panel;
+    [0, half].forEach(hx => {
+      g.fillRect(dx + hx + 3, dy + 5, half - 6, Math.round(dh * .36));
+      g.fillRect(dx + hx + 3, dy + Math.round(dh * .50), half - 6, Math.round(dh * .38));
+    });
+    g.fillStyle = sk.frame; g.fillRect(dx + half - 1, dy, 2, dh);
+    g.fillStyle = UNI.brass;
+    g.fillRect(dx + half - 6, dy + Math.round(dh * .54), 3, 5);
+    g.fillRect(dx + half + 3, dy + Math.round(dh * .54), 3, 5);
+  } else {
+    g.fillStyle = sk.panel;
+    g.fillRect(dx + 4, dy + 5, dw - 8, Math.round(dh * .36));
+    g.fillRect(dx + 4, dy + Math.round(dh * .50), dw - 8, Math.round(dh * .38));
+    if (sk.panel === '#e8c489') {                         // матовое стекло аудитории
+      g.fillStyle = 'rgba(255,255,255,.16)'; g.fillRect(dx + 6, dy + 7, Math.round(dw * .30), Math.round(dh * .30));
+    }
+    g.fillStyle = UNI.brass; g.fillRect(dx + dw - 7, dy + Math.round(dh * .54), 3, 5);
+  }
+  if (sk.metal) {                                          // клёпки технической двери
+    g.fillStyle = shade(sk.leaf, .72);
+    for (let i = 0; i < 4; i++) { g.fillRect(dx + 3, dy + 6 + i * Math.round(dh / 4), 2, 2); g.fillRect(dx + dw - 5, dy + 6 + i * Math.round(dh / 4), 2, 2); }
+  }
+  if (sk.worn) {                                           // облупленная старая створка
+    g.globalAlpha = .18; g.fillStyle = '#8a7a5e';
+    for (let i = 0; i < 5; i++) g.fillRect(dx + 3 + (i * 29) % Math.max(4, dw - 8), dy + 6 + (i * 41) % Math.max(6, dh - 12), 4, 3);
+    g.globalAlpha = 1;
+  }
+  g.fillStyle = shade(warm, 1.26); g.fillRect(dx - 3, dy - 3, dw + 6, 2);
+  /* порог на полу */
+  if (o.threshold !== false) {
+    g.fillStyle = 'rgba(0,0,0,.26)'; g.fillRect(dx - 2, dy + dh, dw + 4, 3);
+    g.fillStyle = shade(UNI.sill, .86); g.fillRect(dx, dy + dh, dw, 2);
+  }
+  /* табличка с номером */
+  if (o.label) {
+    const lw = Math.max(16, o.label.length * 4 + 6);
+    g.fillStyle = '#d8cfae'; g.fillRect(dx + dw / 2 - lw / 2, dy - 15, lw, 9);
+    g.fillStyle = 'rgba(0,0,0,.30)'; g.fillRect(dx + dw / 2 - lw / 2, dy - 6, lw, 1);
+    g.fillStyle = '#3a3026'; g.font = '5px Courier New'; g.textAlign = 'center';
+    g.fillText(o.label, dx + dw / 2, dy - 8); g.textAlign = 'left';
+  }
+}
+
+/* ДЛИННЫЙ КОРИДОР УНИВЕРСИТЕТА.
+
+   Дальняя стена с ритмом окон и дверей, пол с полосами света, ближняя
+   стена (если задана) — та, что поднимается к зрителю: в ней окна во
+   двор, и через них двор виден внизу. Коридор умеет заворачивать:
+   armH задаёт конец горизонтального рукава, bend прорезает под ним
+   проход вниз.                                                        */
 function paintCorridor(ctx, W, H, o) {
   o = o || {};
   const wallH  = o.wallH || 74;
   const armH   = o.armH  || H;
   const bend   = o.bend  || null;
-  const warm   = o.warm  || '#6f6152';
+  const warm   = o.warm  || UNI.wall;
   const floor  = o.floor || '#8a7454';
   const floor2 = o.floor2|| '#77603f';
-  const wainH  = o.wainH === undefined ? Math.round(wallH * .18) : o.wainH;   // панели низкие: окна должны быть высокими
+  const wainH  = o.wainH === undefined ? Math.round(wallH * .22) : o.wainH;
   const tilt   = o.tilt  === undefined ? .5 : o.tilt;
   const lightA = o.lightA === undefined ? .30 : o.lightA;
+  const view   = o.view || 'yard';
+  const wear   = o.wear || 0;
+  const nearH  = o.nearWall ? (o.nearH || 50) : 0;      // ближняя стена внизу кадра
+  const floorBot = armH - nearH;
 
-  /* стена: штукатурка сверху, панели снизу, карниз и плинтус */
-  const wallFace = (x0, w, top, h) => {
-    const g = ctx.createLinearGradient(0, top, 0, top + h);
-    g.addColorStop(0, shade(warm, .74)); g.addColorStop(.7, warm); g.addColorStop(1, shade(warm, .88));
-    ctx.fillStyle = g; ctx.fillRect(x0, top, w, h);
-    const wy = top + h - wainH;
-    ctx.fillStyle = shade(warm, .68); ctx.fillRect(x0, wy, w, wainH);
-    ctx.fillStyle = shade(warm, .56);
-    for (let x = x0 + 6; x < x0 + w - 8; x += 22) ctx.fillRect(x, wy + 4, 14, wainH - 9);
-    ctx.fillStyle = shade(warm, .94); ctx.fillRect(x0, wy - 3, w, 3);
-    ctx.fillStyle = shade(warm, 1.10); ctx.fillRect(x0, wy - 4, w, 1);
-    ctx.fillStyle = shade(warm, .44); ctx.fillRect(x0, top + h - 3, w, 3);
-  };
+  paintWallFace(ctx, 0, 0, W, wallH, { warm, wainH, wear });
+  paintCorridorFloor(ctx, 0, wallH, W, Math.max(0, floorBot - wallH), { floor, floor2 });
 
-  const floorArea = (x0, y0, w, h, edge) => {
-    ctx.fillStyle = floor; ctx.fillRect(x0, y0, w, h);
-    ctx.fillStyle = floor2;
-    for (let y = y0 + 7; y < y0 + h; y += 13) ctx.fillRect(x0, y, w, 1);
-    for (let x = x0; x < x0 + w; x += 64) {
-      const off = ((x / 64) | 0) % 2 ? 6 : 0;
-      for (let y = y0 + off; y < y0 + h; y += 26) ctx.fillRect(x, y, 1, 13);
-    }
-    if (edge !== false) { ctx.fillStyle = 'rgba(0,0,0,.20)'; ctx.fillRect(x0, y0, w, 7); }
-  };
-
-  wallFace(0, W, 0, wallH);
-  floorArea(0, wallH, W, armH - wallH);
-
-  /* окна: узкие переплёты, стекло на просвет */
+  /* ОКНА дальней стены: настоящие проёмы, за ними вид с глубиной */
   const L = o.layout || null;
-  const wins = L ? L.items.filter(it => it.k === 'win').map(it => it.x) : (o.windows || []);
-  const winTop = Math.max(6, Math.round(wallH * .10));
-  const winH   = wallH - wainH - winTop - 8;
-  const winW   = 34;
-  wins.forEach(wx => {
-    ctx.fillStyle = shade(warm, .48); ctx.fillRect(wx - 4, winTop - 3, winW + 8, winH + 8);
-    const gl = ctx.createLinearGradient(0, winTop, 0, winTop + winH);
-    gl.addColorStop(0, '#fff7e2'); gl.addColorStop(.45, o.glass || '#ffe6ae'); gl.addColorStop(1, o.glassLow || '#eab873');
-    ctx.fillStyle = gl; ctx.fillRect(wx, winTop, winW, winH);
-    ctx.save();                                        // двор за стеклом, съеденный светом
-    ctx.globalAlpha = .20; ctx.fillStyle = o.leaf1 || '#8a4a24';
-    ctx.beginPath(); ctx.arc(wx + 10, winTop + winH * .40, 9, 0, 6.3); ctx.fill();
-    ctx.fillStyle = o.leaf2 || '#a8702c';
-    ctx.beginPath(); ctx.arc(wx + 25, winTop + winH * .32, 7, 0, 6.3); ctx.fill();
-    ctx.fillStyle = '#4a4028'; ctx.fillRect(wx, winTop + winH - 7, winW, 7);
-    ctx.restore();
-    ctx.fillStyle = shade(warm, .40);                  // частый переплёт
-    for (let i = 1; i < 3; i++) ctx.fillRect(wx + Math.round(i * winW / 3) - 1, winTop, 2, winH);
-    for (let i = 1; i < 5; i++) ctx.fillRect(wx, winTop + Math.round(i * winH / 5) - 1, winW, 2);
-    ctx.fillStyle = shade(warm, 1.28); ctx.fillRect(wx - 4, winTop - 3, winW + 8, 3);
-    ctx.fillStyle = shade(warm, .64);  ctx.fillRect(wx - 6, winTop + winH + 3, winW + 12, 5);
+  const winTop = Math.max(6, Math.round(wallH * .13));
+  const winH   = Math.max(16, wallH - wainH - winTop - 10);
+  const wins = L ? L.items.filter(it => it.k === 'win')
+                 : (o.windows || []).map(wx => ({ x:wx, w:34 }));
+  wins.forEach(it => {
+    const ww = it.w || 34;
+    uniWindow(ctx, it.x, winTop, ww, winH, {
+      view: it.view || view, wall:warm, reveal:5, dir:1,
+      cols:Math.max(2, Math.round(ww / 12)), rows:4, arch:o.arch, curtain:it.curtain,
+    });
+    uniBeam(ctx, it.x, ww, wallH, Math.max(0, floorBot - wallH), { a:lightA, tilt, cols:3 });
   });
 
-  /* полосы света на полу: одна на окно, все с одинаковым наклоном */
-  const len = armH - wallH;
-  if (len > 0) wins.forEach(wx => {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createLinearGradient(0, wallH, 0, armH);
-    g.addColorStop(0, `rgba(255,242,208,${lightA.toFixed(3)})`);
-    g.addColorStop(.5, `rgba(255,232,186,${(lightA * .5).toFixed(3)})`);
-    g.addColorStop(1, 'rgba(255,226,170,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(wx - 2, wallH); ctx.lineTo(wx + winW + 2, wallH);
-    ctx.lineTo(wx + winW + 2 + len * tilt, armH); ctx.lineTo(wx - 2 + len * tilt, armH);
-    ctx.closePath(); ctx.fill();
-    ctx.globalAlpha = .45;                             // след переплёта внутри пятна
-    for (let i = 0; i < 3; i++) {
-      const px = wx + 1 + Math.round(i * winW / 3);
-      ctx.beginPath();
-      ctx.moveTo(px, wallH); ctx.lineTo(px + 8, wallH);
-      ctx.lineTo(px + 8 + len * tilt, armH); ctx.lineTo(px + len * tilt, armH);
-      ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
-  });
-
-  /* двери с табличками — стоят в простенке, дверной проём до самого пола */
-  const doorH = o.doorH || Math.min(78, wallH - 12);
-  const DOOR_SKIN = {
-    plain:  { frame:'#372a1c', leaf:'#5f4530', panel:'#4a3524' },
-    heavy:  { frame:'#33261a', leaf:'#553f2a', panel:'#3f2c1c' },   // библиотека
-    office: { frame:'#33261a', leaf:'#4f3a26', panel:'#3d2c1e' },   // кабинет
-    glass:  { frame:'#372a1c', leaf:'#5f4530', panel:'#e8c489' },   // аудитория со стеклом
-    stage:  { frame:'#3a2c1e', leaf:'#5a1024', panel:'#7a1830' },   // выход на сцену
-  };
+  /* ДВЕРИ дальней стены */
+  const doorH = o.doorH || Math.min(84, wallH - wainH - 6);
   const doors = L ? L.items.filter(it => it.k === 'door')
                   : (o.doors || []).map(([dx, label]) => ({ x:dx, w:32, label }));
   doors.forEach(d => {
-    const dw = Math.max(24, (d.w || 40) - 8), dx = d.x + 4;
-    const dh = d.h || doorH, dy = wallH - dh;
-    const sk = DOOR_SKIN[d.style] || DOOR_SKIN.plain;
-    ctx.fillStyle = sk.frame; ctx.fillRect(dx - 4, dy - 4, dw + 8, dh + 4);
-    ctx.fillStyle = sk.leaf;  ctx.fillRect(dx, dy, dw, dh);
-    ctx.fillStyle = sk.panel;
-    ctx.fillRect(dx + 4, dy + 5, dw - 8, Math.round(dh * .38));
-    ctx.fillRect(dx + 4, dy + Math.round(dh * .52), dw - 8, Math.round(dh * .36));
-    ctx.fillStyle = shade(warm, 1.3); ctx.fillRect(dx - 4, dy - 4, dw + 8, 2);
-    ctx.fillStyle = '#c9a05a'; ctx.fillRect(dx + dw - 7, dy + Math.round(dh * .55), 3, 4);
-    if (d.label) {
-      const lw = Math.max(16, d.label.length * 4 + 6);
-      ctx.fillStyle = '#d8cfae'; ctx.fillRect(dx + dw / 2 - lw / 2, dy - 14, lw, 9);
-      ctx.fillStyle = '#3a3026'; ctx.font = '5px Courier New'; ctx.textAlign = 'center';
-      ctx.fillText(d.label, dx + dw / 2, dy - 7); ctx.textAlign = 'left';
-    }
+    const dw = Math.max(24, (d.w || 40) - 6);
+    const dh = d.h || doorH;
+    uniDoorInWall(ctx, d.x + 3, wallH - dh, dw, dh, {
+      style:d.style, label:d.label, warm, double:d.double || dw > 46,
+    });
   });
+
+  /* БЛИЖНЯЯ СТЕНА: поднимается к зрителю, поэтому пол у неё сверху.
+     Через её окна виден двор — и виден он снизу, как и положено со
+     второго этажа. */
+  if (nearH > 0) {
+    const NL = o.nearLayout || null;
+    paintWallFace(ctx, 0, floorBot, W, nearH, { warm:shade(warm, .94), wainH:Math.round(nearH * .28), wear, up:true });
+    const nwTop = floorBot + Math.round(nearH * .30);
+    const nwH   = Math.max(14, Math.round(nearH * .44));
+    const nwins = NL ? NL.items.filter(it => it.k === 'win')
+                     : (o.nearWindows || []).map(wx => ({ x:wx, w:52 }));
+    nwins.forEach(it => {
+      const ww = it.w || 52;
+      uniWindow(ctx, it.x, nwTop, ww, nwH, {
+        view:o.nearView || 'yardDown', wall:shade(warm, .94), reveal:4, dir:-1,
+        cols:Math.max(3, Math.round(ww / 14)), rows:3, sill:false,
+      });
+      ctx.fillStyle = UNI.sill;   ctx.fillRect(it.x - 6, nwTop - 6, ww + 12, 4);  // подоконник со стороны пола
+      ctx.fillStyle = UNI.sillHi; ctx.fillRect(it.x - 6, nwTop - 6, ww + 12, 1);
+      uniBeam(ctx, it.x, ww, floorBot - Math.min(70, floorBot - wallH), Math.min(70, floorBot - wallH),
+              { a:lightA * .8, tilt:-tilt * .5, cols:3 });
+    });
+  }
 
   /* поворот: проход вниз, всё остальное под рукавом — стена */
   if (bend) {
@@ -3980,8 +4698,8 @@ function paintCorridor(ctx, W, H, o) {
       ctx.fillStyle = shade(warm, 1.04); ctx.fillRect(sx, armH, sw, 2);
       ctx.fillStyle = shade(warm, .30); ctx.fillRect(sx, armH + cap, sw, H - armH - cap);
     });
-    floorArea(bend.x0, armH, bend.x1 - bend.x0, H - armH, false);
-    ctx.fillStyle = 'rgba(0,0,0,.30)';                 // тени от стен прохода
+    paintCorridorFloor(ctx, bend.x0, armH, bend.x1 - bend.x0, H - armH, { floor, floor2, edge:false });
+    ctx.fillStyle = 'rgba(0,0,0,.30)';
     ctx.fillRect(bend.x0, armH, 5, H - armH);
     ctx.fillRect(bend.x1 - 5, armH, 5, H - armH);
     const gd = ctx.createLinearGradient(0, armH, 0, H);
@@ -3991,7 +4709,7 @@ function paintCorridor(ctx, W, H, o) {
 
   if (o.uniAtmosphere) paintUniAtmosphere(ctx, W, H, { wallH });
 
-  /* виньетка — углы коридора должны уходить в темноту */
+  /* виньетка — торцы коридора уходят в темноту, и он кажется длиннее */
   const vg = ctx.createRadialGradient(W / 2, armH - 20, Math.min(W, H) * .22,
                                       W / 2, armH - 20, Math.max(W, H) * .70);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
@@ -4027,106 +4745,145 @@ function wingLayout(H, items, opts) {
   };
 }
 
-/* КРЫЛО УНИВЕРСИТЕТА СВЕРХУ.
+/* КРЫЛО — коридор, идущий вглубь кадра.
 
-   Коридор во всю высоту комнаты, толстые стены по бокам, в них — проёмы
-   дверей и оконные ниши. Дверь рисуется как ниша в толще стены со
-   створкой и табличкой на простенке рядом: понятно, что за дверью есть
-   помещение, а не пустота. Окна выходят во внутренний двор и кладут на
-   пол длинные косые пятна света — тот же язык, что и в остальной игре. */
+   Стены слева и справа: толща с кладкой, обращённая в коридор грань с
+   панелями и карнизом, в толще — оконные ниши и дверные проёмы. Свет
+   ложится поперёк коридора и гаснет к противоположной стене.          */
 function paintWing(ctx, W, H, o) {
   o = o || {};
   const wallW  = o.wallW  || 62;
-  const warm   = o.warm   || '#6b5a44';
+  const warm   = o.warm   || UNI.wall;
   const floor  = o.floor  || '#8e7448';
   const floor2 = o.floor2 || '#7a6038';
+  const wear   = o.wear || 0;
+  const lightA = o.lightA === undefined ? .34 : o.lightA;
   const rx = W - wallW;
-  const DOOR_SKIN = {
-    plain:  { frame:'#372a1c', leaf:'#5f4530', panel:'#4a3524' },
-    heavy:  { frame:'#33261a', leaf:'#553f2a', panel:'#3f2c1c' },
-    office: { frame:'#33261a', leaf:'#4f3a26', panel:'#3d2c1e' },
-    glass:  { frame:'#372a1c', leaf:'#5f4530', panel:'#e8c489' },
-    stage:  { frame:'#3a2c1e', leaf:'#5a1024', panel:'#7a1830' },
-    shut:   { frame:'#2b2018', leaf:'#413020', panel:'#33251a' },   // закрытое помещение
-  };
+  const inner = rx - wallW;                     // ширина прохода
 
-  /* пол */
-  ctx.fillStyle = floor; ctx.fillRect(wallW, 0, rx - wallW, H);
+  /* ПОЛ: доски идут вдоль движения — длинные, с редкими торцевыми
+     стыками вразбежку. Посередине натоптано светлее, чем у стен. */
+  ctx.fillStyle = floor; ctx.fillRect(wallW, 0, inner, H);
   ctx.fillStyle = floor2;
-  for (let y = 0; y < H; y += 24) ctx.fillRect(wallW, y, rx - wallW, 1);
-  for (let x = wallW + 16; x < rx; x += 30) ctx.fillRect(x, 0, 1, H);
+  for (let x = wallW + 13; x < rx; x += 13) ctx.fillRect(x, 0, 1, H);   // кромки досок
+  ctx.fillStyle = shade(floor, .84);
+  for (let x = wallW, i = 0; x < rx; x += 13, i++) {                     // торцевые стыки
+    const off = (i % 3) * 34;
+    for (let y = off; y < H; y += 102) ctx.fillRect(x, y, 13, 1);
+  }
+  ctx.save(); ctx.globalAlpha = .09; ctx.fillStyle = shade(floor, 1.26);
+  ctx.fillRect(wallW + inner * .26, 0, inner * .48, H); ctx.restore();
+  ctx.save(); ctx.globalAlpha = .12; ctx.fillStyle = '#000';             // тень вдоль стен
+  ctx.fillRect(wallW, 0, 8, H); ctx.fillRect(rx - 8, 0, 8, H); ctx.restore();
 
-  /* толща стены с внутренней панелью */
+  /* ТОЛЩА СТЕНЫ: кладка, панели на обращённой грани, карниз и плинтус */
   const band = (x0, dir) => {
     const g = ctx.createLinearGradient(x0, 0, x0 + wallW, 0);
-    g.addColorStop(dir > 0 ? 0 : 1, shade(warm, .60));
-    g.addColorStop(dir > 0 ? 1 : 0, shade(warm, .94));
+    g.addColorStop(dir > 0 ? 0 : 1, shade(warm, .56));
+    g.addColorStop(dir > 0 ? 1 : 0, shade(warm, .96));
     ctx.fillStyle = g; ctx.fillRect(x0, 0, wallW, H);
-    ctx.fillStyle = shade(warm, .50);                       // кладка
-    for (let y = 6; y < H; y += 14) ctx.fillRect(x0 + ((y / 14) | 0) % 2 * 10, y, wallW - 12, 1);
-    const face = dir > 0 ? x0 + wallW : x0;                 // грань, обращённая в коридор
-    ctx.fillStyle = shade(warm, .72); ctx.fillRect(face - (dir > 0 ? 9 : 0), 0, 9, H);
-    ctx.fillStyle = shade(warm, 1.20); ctx.fillRect(face - (dir > 0 ? 10 : -9), 0, 1, H);
-    ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(face - (dir > 0 ? 1 : 0), 0, 1, H);
+    ctx.fillStyle = shade(warm, .48);                              // кладка в глубине
+    for (let y = 6; y < H; y += 14) ctx.fillRect(x0 + ((y / 14) | 0) % 2 * 10, y, wallW - 14, 1);
+    if (wear > .3) {                                               // облупленная краска
+      ctx.globalAlpha = .16; ctx.fillStyle = shade(warm, 1.20);
+      for (let i = 0; i < Math.round(H / 34); i++)
+        ctx.fillRect(x0 + 6 + (i * 23) % Math.max(6, wallW - 18), (i * 79) % H, 6 + i % 6, 3);
+      ctx.globalAlpha = 1;
+    }
+    const face = dir > 0 ? x0 + wallW : x0;                        // грань в коридор
+    const fx = dir > 0 ? face - 13 : face;
+    ctx.fillStyle = shade(warm, .70); ctx.fillRect(fx, 0, 13, H);  // панели
+    ctx.fillStyle = shade(warm, .56);
+    for (let y = 8; y < H; y += 26) ctx.fillRect(fx + 3, y, 7, 18);
+    ctx.fillStyle = shade(warm, .86);
+    for (let y = 8; y < H; y += 26) ctx.fillRect(fx + 3, y, 7, 1);
+    ctx.fillStyle = shade(warm, 1.22); ctx.fillRect(dir > 0 ? face - 1 : face, 0, 1, H);   // карниз-ребро
+    ctx.fillStyle = shade(warm, .34);  ctx.fillRect(dir > 0 ? face - 3 : face + 2, 0, 2, H); // плинтус
+    ctx.fillStyle = 'rgba(0,0,0,.30)'; ctx.fillRect(dir > 0 ? face : face - 1, 0, 1, H);
   };
   band(0, 1); band(rx, -1);
 
-  /* окна: ниша в стене, стекло на просвет и косое пятно на полу */
+  /* ОКНО в толще стены: ниша, стекло с видом, подоконник в коридор */
   const win = (it, dir) => {
     const face = dir > 0 ? wallW : rx;
-    const nx = dir > 0 ? face - 26 : face;
-    ctx.fillStyle = shade(warm, .44); ctx.fillRect(nx - (dir > 0 ? 4 : 0), it.y - 5, 30, it.h + 10);
-    const gl = ctx.createLinearGradient(nx, 0, nx + 26, 0);
-    gl.addColorStop(dir > 0 ? 0 : 1, o.glassLow || '#eab873');
-    gl.addColorStop(dir > 0 ? 1 : 0, '#fff7e2');
-    ctx.fillStyle = gl; ctx.fillRect(nx, it.y, 26, it.h);
-    ctx.save(); ctx.globalAlpha = .22;                       // двор за стеклом
-    ctx.fillStyle = o.leaf1 || '#a8412c';
-    ctx.beginPath(); ctx.arc(nx + 13, it.y + it.h * .34, 8, 0, 6.3); ctx.fill();
-    ctx.fillStyle = o.leaf2 || '#c9992f';
-    ctx.beginPath(); ctx.arc(nx + 13, it.y + it.h * .70, 6, 0, 6.3); ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = shade(warm, .40);                        // переплёт
-    ctx.fillRect(nx, it.y + Math.round(it.h / 2) - 1, 26, 2);
-    for (let i = 1; i < 3; i++) ctx.fillRect(nx + Math.round(i * 26 / 3) - 1, it.y, 2, it.h);
-    ctx.fillStyle = shade(warm, 1.24); ctx.fillRect(nx - (dir > 0 ? 4 : 0), it.y - 5, 30, 2);
-    /* свет на полу */
-    const len = (rx - wallW) * .62;
+    const depth = 26;
+    const nx = dir > 0 ? face - depth : face;
+    const wh = it.h;
+    uniWindow(ctx, nx, it.y, depth, wh, {
+      view: it.view || o.view || 'yard', wall:warm, reveal:4, dir:-dir,
+      cols:2, rows:Math.max(3, Math.round(wh / 14)), sill:false, arch:o.arch,
+    });
+    ctx.fillStyle = UNI.sill;                                       // подоконник в коридор
+    ctx.fillRect(dir > 0 ? face - 3 : face - 2, it.y - 3, 5, wh + 6);
+    ctx.fillStyle = UNI.sillHi;
+    ctx.fillRect(dir > 0 ? face - 3 : face + 1, it.y - 3, 2, wh + 6);
+    /* свет поперёк коридора, со сносом вниз по ходу */
+    const len = inner * .78;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     const g = dir > 0 ? ctx.createLinearGradient(wallW, 0, wallW + len, 0)
                       : ctx.createLinearGradient(rx, 0, rx - len, 0);
-    const a = o.lightA === undefined ? .34 : o.lightA;
-    g.addColorStop(0, `rgba(255,242,208,${a.toFixed(3)})`);
+    g.addColorStop(0, `rgba(255,242,208,${lightA.toFixed(3)})`);
+    g.addColorStop(.5, `rgba(255,232,186,${(lightA * .42).toFixed(3)})`);
     g.addColorStop(1, 'rgba(255,226,170,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    if (dir > 0) { ctx.moveTo(wallW, it.y); ctx.lineTo(wallW, it.y + it.h);
-                   ctx.lineTo(wallW + len, it.y + it.h + 30); ctx.lineTo(wallW + len, it.y + 30); }
-    else         { ctx.moveTo(rx, it.y); ctx.lineTo(rx, it.y + it.h);
-                   ctx.lineTo(rx - len, it.y + it.h + 30); ctx.lineTo(rx - len, it.y + 30); }
-    ctx.closePath(); ctx.fill(); ctx.restore();
+    if (dir > 0) { ctx.moveTo(wallW, it.y); ctx.lineTo(wallW, it.y + wh);
+                   ctx.lineTo(wallW + len, it.y + wh + 34); ctx.lineTo(wallW + len, it.y + 34); }
+    else         { ctx.moveTo(rx, it.y); ctx.lineTo(rx, it.y + wh);
+                   ctx.lineTo(rx - len, it.y + wh + 34); ctx.lineTo(rx - len, it.y + 34); }
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = .34;                                          // след переплёта
+    for (let i = 0; i < 3; i++) {
+      const py = it.y + Math.round(i * wh / 3);
+      ctx.beginPath();
+      if (dir > 0) { ctx.moveTo(wallW, py); ctx.lineTo(wallW, py + wh / 5);
+                     ctx.lineTo(wallW + len, py + wh / 5 + 34); ctx.lineTo(wallW + len, py + 34); }
+      else         { ctx.moveTo(rx, py); ctx.lineTo(rx, py + wh / 5);
+                     ctx.lineTo(rx - len, py + wh / 5 + 34); ctx.lineTo(rx - len, py + 34); }
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
   };
 
-  /* дверь: ниша в толще стены, створка и табличка на простенке */
+  /* ДВЕРЬ: ниша в толще, створка в глубине, табличка на простенке */
   const door = (it, dir) => {
-    const sk = DOOR_SKIN[it.style] || DOOR_SKIN.plain;
+    const sk = UNI_DOOR_SKIN[it.style] || UNI_DOOR_SKIN.plain;
     const face = dir > 0 ? wallW : rx;
-    const nx = dir > 0 ? face - 30 : face;
-    ctx.fillStyle = sk.frame; ctx.fillRect(nx - (dir > 0 ? 4 : 0), it.y - 4, 34, it.h + 8);
-    ctx.fillStyle = sk.leaf;  ctx.fillRect(nx + (dir > 0 ? 2 : 4), it.y, 26, it.h);
+    const depth = 30;
+    const nx = dir > 0 ? face - depth : face;
+    const h = it.h;
+    ctx.fillStyle = shade(warm, .40); ctx.fillRect(nx - (dir > 0 ? 4 : 0), it.y - 4, depth + 4, h + 8);
+    ctx.fillStyle = shade(warm, .92); ctx.fillRect(nx - (dir > 0 ? 4 : 0), it.y - 4, depth + 4, 3);
+    ctx.fillStyle = shade(warm, .30); ctx.fillRect(nx - (dir > 0 ? 4 : 0), it.y + h + 1, depth + 4, 3);
+    ctx.fillStyle = sk.frame; ctx.fillRect(nx + (dir > 0 ? 0 : 2), it.y - 2, depth - 2, h + 4);
+    ctx.fillStyle = sk.leaf;  ctx.fillRect(nx + (dir > 0 ? 2 : 4), it.y, depth - 6, h);
     ctx.fillStyle = sk.panel;
-    ctx.fillRect(nx + (dir > 0 ? 6 : 8), it.y + 4, 18, Math.round(it.h * .40));
-    ctx.fillRect(nx + (dir > 0 ? 6 : 8), it.y + Math.round(it.h * .54), 18, Math.round(it.h * .36));
-    ctx.fillStyle = '#c9a05a';                                        // ручка
-    ctx.fillRect(dir > 0 ? nx + 26 : nx + 5, it.y + Math.round(it.h / 2) - 2, 3, 4);
-    ctx.fillStyle = shade(warm, 1.30); ctx.fillRect(nx - (dir > 0 ? 4 : 0), it.y - 4, 34, 2);
+    ctx.fillRect(nx + (dir > 0 ? 6 : 8), it.y + 4, depth - 14, Math.round(h * .40));
+    ctx.fillRect(nx + (dir > 0 ? 6 : 8), it.y + Math.round(h * .54), depth - 14, Math.round(h * .36));
+    if (sk.panel === '#e8c489') {
+      ctx.fillStyle = 'rgba(255,255,255,.18)';
+      ctx.fillRect(nx + (dir > 0 ? 8 : 10), it.y + 6, Math.round((depth - 14) * .5), Math.round(h * .30));
+    }
+    if (sk.metal) {
+      ctx.fillStyle = shade(sk.leaf, .70);
+      for (let i = 0; i < 3; i++) ctx.fillRect(nx + (dir > 0 ? 4 : 6), it.y + 5 + i * Math.round(h / 3), 2, 2);
+    }
+    if (sk.worn) {
+      ctx.globalAlpha = .18; ctx.fillStyle = '#8a7a5e';
+      for (let i = 0; i < 4; i++) ctx.fillRect(nx + 5 + (i * 11) % Math.max(4, depth - 12), it.y + 5 + (i * 37) % Math.max(6, h - 12), 4, 3);
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = UNI.brass;
+    ctx.fillRect(dir > 0 ? nx + depth - 7 : nx + 5, it.y + Math.round(h / 2) - 2, 3, 4);
+    ctx.fillStyle = 'rgba(0,0,0,.28)';                                // порог
+    ctx.fillRect(dir > 0 ? face - 2 : face, it.y, 3, h);
     if (it.label) {                                                   // табличка на простенке
       const lw = Math.max(18, it.label.length * 4 + 6);
-      const lx = dir > 0 ? Math.max(2, face - lw - 2)
-                         : Math.min(W - lw - 2, face + 2);
-      ctx.fillStyle = '#d8cfae'; ctx.fillRect(lx, it.y - 14, lw, 9);
+      const lx = dir > 0 ? Math.max(2, face - lw - 2) : Math.min(W - lw - 2, face + 2);
+      ctx.fillStyle = '#d8cfae'; ctx.fillRect(lx, it.y - 15, lw, 9);
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(lx, it.y - 6, lw, 1);
       ctx.fillStyle = '#3a3026'; ctx.font = '5px Courier New';
-      ctx.fillText(it.label, lx + 3, it.y - 7);
+      ctx.fillText(it.label, lx + 3, it.y - 8);
     }
   };
 
@@ -4136,11 +4893,13 @@ function paintWing(ctx, W, H, o) {
     L.items.forEach(it => { if (it.k === 'door') door(it, dir); });
   });
 
-  if (o.uniAtmosphere) paintUniAtmosphere(ctx, W, H, { wallH:Math.min(150, Math.round(H*.25)) });
+  if (o.uniAtmosphere) paintUniAtmosphere(ctx, W, H, { wallH:Math.min(150, Math.round(H * .25)) });
 
-  /* торцы коридора: тёмный проём наверху, светлый выход вниз */
+  /* торец коридора уходит в темноту: крыло должно казаться длиннее кадра */
   if (o.capTop !== false) {
-    ctx.fillStyle = 'rgba(10,8,12,.34)'; ctx.fillRect(wallW, 0, rx - wallW, 16);
+    const cg = ctx.createLinearGradient(0, 0, 0, 26);
+    cg.addColorStop(0, 'rgba(8,6,10,.52)'); cg.addColorStop(1, 'rgba(8,6,10,0)');
+    ctx.fillStyle = cg; ctx.fillRect(wallW, 0, inner, 26);
   }
   const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .30,
                                       W / 2, H / 2, Math.max(W, H) * .62);
@@ -5257,38 +6016,43 @@ function paintPlayground(ctx, worn) {
 
 /* Западное (театральное) крыло, первый этаж. Слева — залы и мастерские,
    справа — стена во внутренний двор с окнами и преподавательской. */
-const UNI_W1_LEFT = wingLayout(560, [
+const UNI_W1_LEFT = wingLayout(620, [
   { k:'door', label:'РЕПЕТИЦИОННЫЙ', h:52, id:'rehearsal', style:'heavy' },
   { k:'door', label:'ГРИМЁРНАЯ',     h:46, id:'dressing' },
   { k:'door', label:'КОСТЮМЕРНАЯ',   h:44, id:'costume', style:'shut' },
   { k:'door', label:'СКЛАД',         h:40, id:'wstore', style:'shut' },
+  { k:'door', label:'108',           h:40, id:'w108', style:'shut' },
   { k:'door', label:'ТЕАТРАЛЬНЫЙ ЗАЛ', h:56, id:'theatre', style:'stage' },
 ]);
-const UNI_W1_RIGHT = wingLayout(560, [
-  { k:'win',  id:'w0', h:52 },
+const UNI_W1_RIGHT = wingLayout(620, [
+  { k:'win',  id:'w0', h:56 },
   { k:'door', label:'ПРЕПОДАВАТЕЛЬСКАЯ', h:46, id:'teachers', style:'office' },
-  { k:'win',  id:'w1', h:52 },
+  { k:'win',  id:'w1', h:56 },
   { k:'door', label:'ПОДСОБКА', h:40, id:'wutil', style:'shut' },
-  { k:'win',  id:'w2', h:52 },
+  { k:'win',  id:'w2', h:56 },
+  { k:'door', label:'110', h:40, id:'w110', style:'shut' },
+  { k:'win',  id:'w3', h:56 },
 ]);
 
 /* Восточное (аудиторное) крыло, первый этаж. Справа — библиотека, архив,
    кабинет Морель и три аудитории; слева — двор, деканат и туалет. */
-const UNI_E1_RIGHT = wingLayout(600, [
+const UNI_E1_RIGHT = wingLayout(680, [
   { k:'door', label:'БИБЛИОТЕКА',    h:54, id:'library', style:'heavy' },
   { k:'door', label:'АРХИВ',         h:42, id:'archive', style:'shut' },
   { k:'door', label:'МОРЕЛЬ Ж.',     h:44, id:'morel', style:'office' },
   { k:'door', label:'14',            h:44, id:'aud14', style:'glass' },
   { k:'door', label:'МУЗЫКАЛЬНАЯ',   h:44, id:'music' },
   { k:'door', label:'ХУДОЖЕСТВЕННАЯ', h:44, id:'art' },
+  { k:'door', label:'16',            h:40, id:'e16', style:'shut' },
 ]);
-const UNI_E1_LEFT = wingLayout(600, [
-  { k:'win',  id:'w0', h:52 },
+const UNI_E1_LEFT = wingLayout(680, [
+  { k:'win',  id:'w0', h:56 },
   { k:'door', label:'ДЕКАНАТ', h:46, id:'admin', style:'shut' },
-  { k:'win',  id:'w1', h:52 },
+  { k:'win',  id:'w1', h:56 },
   { k:'door', label:'WC', h:38, id:'wc1' },
-  { k:'win',  id:'w2', h:52 },
-  { k:'win',  id:'w3', h:52 },
+  { k:'win',  id:'w2', h:56 },
+  { k:'door', label:'15', h:40, id:'e15', style:'shut' },
+  { k:'win',  id:'w3', h:56 },
 ]);
 
 /* Центральный коридор второго этажа: аудитории и кабинеты по северной
@@ -8802,7 +9566,7 @@ uniFrontYard: {
   ],
   interactables:[
     {x:214,y:100,w:72,h:58,name:'mainEntrance',prompt:'Главный вход',action:async()=>{
-      await changeRoom('uniHall',220,336);
+      await changeRoom('uniHall', 280, 366);
     }},
     {x:198,y:174,w:104,h:38,name:'frontFountain',prompt:'Фонтан',action(){
       Dialogue.start([{who:'naya',expr:'normal',text:'Небольшой фонтан перед главным корпусом. Вода тёмная, но в ней отражаются окна.'},{who:'naya',expr:'talk',text:'(Сью говорила, что в этом дворе всё выглядит лучше после дождя.)'}]);
@@ -8828,94 +9592,155 @@ uniFrontYard: {
 },
 
 /* ---------------------------------------------------------------- */
-/* ГЛАВНЫЙ ХОЛЛ. Юг здания: главный вход снизу, проход во внутренний
-   двор наверху, парадная лестница на второй этаж, стойка информации и
-   стенды, с которых начинается расследование.                        */
+/* ГЛАВНЫЙ ХОЛЛ. Сердце корпуса и его самое просторное помещение.
+   Юг — парадный вход с улицы, север — сквозной проём во внутренний
+   двор: от дверей насквозь видно двор, и это первое, что говорит
+   игроку, что здание замкнуто в кольцо. Справа парадная лестница,
+   слева вахта. Потолок высокий: стена занимает треть кадра.          */
 uniHall: {
-  name:"Университет. Главный холл", music:'home', w:440, h:360,
+  name:"Университет. Главный холл", music:'home', w:560, h:430,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
-  light:{ tint:'#1a1a22', dark:.20 },
+  light:{ tint:'#1a1a22', dark:.18 },
   lights:[
-    {x:90,y:40,r:48,c:'#ffe6b0',i:.42},{x:352,y:40,r:48,c:'#ffe6b0',i:.42},
-    {x:222,y:60,r:56,c:'#ffe6b0',i:.46},{x:220,y:250,r:70,c:'#f2d8a8',i:.30},
+    {x:71,y:56,r:52,c:'#ffe6b0',i:.40},{x:159,y:56,r:52,c:'#ffe6b0',i:.40},
+    {x:353,y:56,r:46,c:'#ffe6b0',i:.38},{x:280,y:70,r:64,c:'#e8dcc0',i:.30},
+    {x:280,y:300,r:96,c:'#f2d8a8',i:.26},{x:430,y:170,r:60,c:'#ffdca0',i:.30},
+    {x:116,y:392,r:52,c:'#ffe6b0',i:.34},{x:444,y:392,r:52,c:'#ffe6b0',i:.34},
   ],
-  sun:{ x:222, y:100, w:60, len:200, tilt:0, a:.15 },
+  sun:{ x:159, y:120, w:62, len:210, tilt:.32, a:.13 },
   bgPaint(ctx) {
-    const W = 440, H = 360, wallH = 100;
-    paintInterior(ctx, W, H, { wall:'#6f6152', wall2:'#5c5044', floor:'#8a7454', floor2:'#77603f', wallH });
-    // окна главного фасада по краям северной стены
-    paintYardWindow(ctx, 34, 18, 62, 66);
-    paintYardWindow(ctx, 344, 18, 62, 66);
-    [34, 344].forEach(wx => {
-      const g = ctx.createLinearGradient(0, wallH, 0, H);
-      g.addColorStop(0, 'rgba(255,238,200,.18)'); g.addColorStop(1, 'rgba(255,232,190,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.moveTo(wx - 6, wallH); ctx.lineTo(wx + 68, wallH);
-      ctx.lineTo(wx + 96, H); ctx.lineTo(wx - 34, H); ctx.closePath(); ctx.fill();
+    const W = 560, H = 430, wallH = 120, nearY = 384;
+
+    /* --- северная стена: высокий парадный ярус --- */
+    paintWallFace(ctx, 0, 0, W, wallH, { warm:'#6f6152', wainH:30 });
+
+    /* --- пол: каменные плиты, дорожка по оси и мраморная розетка --- */
+    ctx.fillStyle = '#8a7f6c'; ctx.fillRect(0, wallH, W, nearY - wallH);
+    for (let y = wallH; y < nearY; y += 22)
+      for (let x = 0; x < W; x += 22) {
+        ctx.fillStyle = (((x / 22 + y / 22) | 0) % 2) ? '#7f7462' : '#8f8471';
+        ctx.fillRect(x, y, 22, 22);
+      }
+    ctx.fillStyle = 'rgba(60,48,36,.20)';
+    for (let y = wallH; y < nearY; y += 22) ctx.fillRect(0, y, W, 1);
+    for (let x = 0; x < W; x += 22) ctx.fillRect(x, wallH, 1, nearY - wallH);
+    ctx.fillStyle = 'rgba(0,0,0,.20)'; ctx.fillRect(0, wallH, W, 8);
+    /* парадная дорожка от дверей к проёму во двор */
+    ctx.fillStyle = 'rgba(120,52,52,.22)'; ctx.fillRect(246, wallH, 68, nearY - wallH);
+    ctx.fillStyle = 'rgba(150,70,70,.16)'; ctx.fillRect(252, wallH, 56, nearY - wallH);
+    /* розетка в центре: её кладут один раз и потом сто лет по ней ходят */
+    ctx.save(); ctx.translate(280, 300);
+    ctx.strokeStyle = 'rgba(201,160,90,.34)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(0, 0, 96, 42, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, 62, 27, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, 26, 11, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = 'rgba(201,160,90,.16)';
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 27, Math.sin(a) * 12);
+      ctx.lineTo(Math.cos(a + .13) * 60, Math.sin(a + .13) * 26);
+      ctx.lineTo(Math.cos(a - .13) * 60, Math.sin(a - .13) * 26); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+
+    /* --- окна северной стены: смотрят во внутренний двор --- */
+    [[40, 62], [128, 62], [330, 46]].forEach(([wx, ww]) => {
+      uniWindow(ctx, wx, 18, ww, 66, { view:'yard', wall:'#6f6152', reveal:6,
+                                       cols:Math.max(3, Math.round(ww / 15)), rows:5, arch:true, dir:1 });
+      uniBeam(ctx, wx, ww, wallH, nearY - wallH, { a:.17, tilt:.34, cols:3 });
     });
-    // Дополнительные высокие боковые окна с глубокими откосами.
-    paintYardWindow(ctx, 112, 10, 54, 70, {ornate:true,rays:true});
-    paintYardWindow(ctx, 274, 10, 54, 70, {ornate:true,rays:true});
-    // проход во внутренний двор — сквозной проём в северной стене
-    ctx.fillStyle = '#2a3020'; ctx.fillRect(196, 24, 60, 76);
-    ctx.fillStyle = 'rgba(150,190,120,.20)'; ctx.fillRect(200, 28, 52, 70);
-    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(192, 20, 68, 6); ctx.fillRect(192, 20, 6, 80);
-    ctx.fillRect(254, 20, 6, 80);
-    ctx.fillStyle = '#a0d0a0'; ctx.font = '6px Courier New'; ctx.fillText('ВНУТРЕННИЙ ДВОР', 190, 16);
-    // проходы в крылья: настоящие арки в боковых стенах
-    const arch = (x, label, lx) => {
-      ctx.fillStyle = '#3a2c1e'; ctx.fillRect(x, 176, 26, 68);
-      ctx.fillStyle = '#211a14'; ctx.fillRect(x + (x < 100 ? 0 : 4), 180, 22, 60);
-      ctx.fillStyle = 'rgba(255,238,200,.08)'; ctx.fillRect(x + 4, 180, 18, 60);
-      ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText(label, lx, 172);
+
+    /* --- сквозной проём во внутренний двор --- */
+    ctx.fillStyle = '#241a12'; ctx.fillRect(240, 12, 80, 108);
+    uniOutside(ctx, 250, 26, 60, 82, 'yard', { rain:false });
+    ctx.fillStyle = 'rgba(20,14,10,.55)'; ctx.fillRect(250, 26, 8, 82);
+    ctx.fillStyle = 'rgba(20,14,10,.40)'; ctx.fillRect(302, 26, 8, 82);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(240, 12, 80, 8);
+    ctx.fillStyle = '#5a4834'; ctx.fillRect(240, 12, 80, 3);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(240, 20, 10, 100); ctx.fillRect(310, 20, 10, 100);
+    ctx.fillStyle = shade('#6f6152', 1.18); ctx.fillRect(238, 8, 84, 3);
+    /* свет со двора ложится в холл широкой полосой */
+    uniBeam(ctx, 252, 56, wallH, nearY - wallH, { a:.20, tilt:.06, cols:2 });
+    ctx.fillStyle = '#a0d0a0'; ctx.font = '6px Courier New'; ctx.fillText('ВНУТРЕННИЙ ДВОР', 236, 8);
+
+    /* --- арки в крылья: настоящие проёмы в толще боковых стен --- */
+    const arch = (x0, dir, label, lx) => {
+      ctx.fillStyle = '#2a2018'; ctx.fillRect(x0, 236, 20, 68);
+      ctx.fillStyle = '#140f0a'; ctx.fillRect(x0 + (dir > 0 ? 0 : 6), 240, 14, 60);
+      const gl = ctx.createLinearGradient(x0, 0, x0 + 20, 0);
+      gl.addColorStop(dir > 0 ? 0 : 1, 'rgba(255,226,170,.16)');
+      gl.addColorStop(dir > 0 ? 1 : 0, 'rgba(255,226,170,0)');
+      ctx.fillStyle = gl; ctx.fillRect(x0, 240, 20, 60);
+      ctx.fillStyle = '#3a2c1e'; ctx.fillRect(x0, 230, 20, 8);
+      ctx.fillStyle = shade('#6f6152', 1.16); ctx.fillRect(x0, 228, 20, 2);
+      ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText(label, lx, 224);
     };
-    arch(0, '← ЗАПАДНОЕ', 4); arch(414, 'ВОСТОЧНОЕ →', 372);
-    // парадный вход снизу
-    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(178, 322, 84, 38);
-    ctx.fillStyle = '#5f4530'; ctx.fillRect(182, 326, 76, 34);
-    ctx.fillStyle = '#a8c0d8'; ctx.fillRect(188, 330, 30, 22); ctx.fillRect(224, 330, 30, 22);
-    ctx.fillStyle = '#c8dcec'; ctx.fillRect(188, 330, 30, 5); ctx.fillRect(224, 330, 30, 5);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '7px Courier New'; ctx.fillText('ГЛАВНЫЙ ВХОД', 182, 318);
-    // мраморная розетка и парадная лестница
-    ctx.fillStyle = 'rgba(0,0,0,.08)';
-    ctx.beginPath(); ctx.ellipse(222, 250, 82, 36, 0, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = 'rgba(201,160,90,.30)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.ellipse(222, 250, 78, 34, 0, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(222, 250, 50, 22, 0, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('НА ВТОРОЙ ЭТАЖ ↑', 306, 116);
+    arch(0, 1, '← ЗАПАДНОЕ КРЫЛО', 6); arch(540, -1, 'ВОСТОЧНОЕ →', 466);
+
+    /* --- южная стена: она поднимается к зрителю, поэтому пол у неё сверху.
+           Главный вход в середине, по сторонам окна на передний двор. --- */
+    paintWallFace(ctx, 0, nearY, W, H - nearY, { warm:'#675a4c', wainH:13, up:true });
+    [[86, 60], [414, 60]].forEach(([wx, ww]) => {
+      uniWindow(ctx, wx, nearY + 12, ww, 26, { view:'front', wall:'#675a4c', reveal:5,
+                                              cols:4, rows:3, sill:false, dir:-1 });
+      ctx.fillStyle = UNI.sill;   ctx.fillRect(wx - 6, nearY + 2, ww + 12, 4);
+      ctx.fillStyle = UNI.sillHi; ctx.fillRect(wx - 6, nearY + 2, ww + 12, 1);
+    });
+    /* парадные двери: двустворчатые, застеклённые, с фрамугой */
+    ctx.fillStyle = '#2a2018'; ctx.fillRect(232, nearY - 2, 96, H - nearY + 2);
+    ctx.fillStyle = '#4a3524'; ctx.fillRect(236, nearY + 2, 88, 40);
+    [240, 284].forEach(dx => {
+      ctx.fillStyle = '#5f4530'; ctx.fillRect(dx, nearY + 6, 36, 36);
+      const gl = ctx.createLinearGradient(0, nearY + 8, 0, nearY + 40);
+      gl.addColorStop(0, '#b8ccdc'); gl.addColorStop(1, '#6a7a88');
+      ctx.fillStyle = gl; ctx.fillRect(dx + 3, nearY + 9, 30, 30);
+      ctx.fillStyle = '#4a3524'; ctx.fillRect(dx + 17, nearY + 9, 2, 30);
+    });
+    ctx.fillStyle = UNI.brass; ctx.fillRect(274, nearY + 22, 3, 9); ctx.fillRect(283, nearY + 22, 3, 9);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(236, nearY - 1, 88, 4);      // фрамуга
+    ctx.fillStyle = '#8fa6bd'; ctx.fillRect(240, nearY, 80, 2);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '7px Courier New'; ctx.fillText('ГЛАВНЫЙ ВХОД', 238, nearY - 6);
+
+    /* --- надписи-указатели: по ним и ориентируются --- */
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('НА ВТОРОЙ ЭТАЖ ↑', 388, 200);
+    ctx.fillText('ВАХТА', 56, 178);
   },
   objects: [
-    { t:'stairs_main', x:352, y:158 },
-    { t:'desk', x:96, y:150 }, { t:'chair_wood', x:96, y:176 },
-    { t:'pillar_wood', x:130, y:196 }, { t:'pillar_wood', x:312, y:196 },
-    { t:'pillar_wood', x:104, y:296 }, { t:'pillar_wood', x:340, y:296 },
-    { t:'clock', x:222, y:14 },
-    { t:'notice_board', x:130, y:78 }, { t:'notice_board', x:314, y:78 },
-    { t:'painting', x:166, y:48 }, { t:'painting', x:278, y:48 },
-    { t:'info_stand', x:150, y:236 }, { t:'info_stand', x:296, y:236 },
-    { t:'bench_stone', x:74, y:300 }, { t:'bench_stone', x:372, y:300 },
-    { t:'plant_pot', x:44, y:320 }, { t:'plant_pot', x:400, y:320 },
-    { t:'plant_pot', x:164, y:150 }, { t:'plant_pot', x:284, y:150 },
-    { t:'bin', x:150, y:318 }, { t:'radiator', x:296, y:318 },
+    { t:'stairs_main', x:430, y:184 },
+    { t:'hall_counter', x:72, y:206 }, { t:'chair_wood', x:72, y:236 },
+    { t:'display_case', x:516, y:206 }, { t:'display_case', x:516, y:280 },
+    { t:'column_stone', x:190, y:306 }, { t:'column_stone', x:370, y:306 },
+    { t:'column_stone', x:190, y:384 }, { t:'column_stone', x:370, y:384 },
+    { t:'dir_sign', x:150, y:262 }, { t:'dir_sign', x:410, y:262 },
+    { t:'clock', x:212, y:16 },
+    { t:'notice_board', x:216, y:78 },
+    { t:'painting', x:114, y:60 }, { t:'photo_frame', x:322, y:60 },
+    { t:'fire_cabinet', x:502, y:66 },
+    { t:'info_stand', x:130, y:330 }, { t:'info_stand', x:432, y:330 },
+    { t:'bench_stone', x:78, y:344 }, { t:'bench_stone', x:482, y:344 },
+    { t:'plant_pot', x:40, y:372 }, { t:'plant_pot', x:520, y:372 },
+    { t:'plant_pot', x:236, y:150 }, { t:'plant_pot', x:326, y:150 },
+    { t:'bin', x:118, y:374 }, { t:'radiator', x:200, y:378 }, { t:'radiator', x:364, y:378 },
   ],
   walls: [
-    {x:0,y:0,w:196,h:100},{x:256,y:0,w:184,h:100},
-    {x:0,y:0,w:8,h:176},{x:0,y:244,w:8,h:116},
-    {x:432,y:0,w:8,h:176},{x:432,y:244,w:8,h:116},
-    {x:0,y:352,w:178,h:8},{x:262,y:352,w:178,h:8},
+    {x:0,y:0,w:240,h:120},{x:320,y:0,w:240,h:120},
+    {x:0,y:0,w:14,h:236},{x:0,y:304,w:14,h:126},
+    {x:546,y:0,w:14,h:236},{x:546,y:304,w:14,h:126},
+    {x:0,y:386,w:232,h:44},{x:328,y:386,w:232,h:44},
   ],
   interactables: [
-    { x:178,y:322,w:84,h:34, name:'toFrontYard', prompt:'В передний двор',
+    { x:232,y:372,w:96,h:34, name:'toFrontYard', prompt:'В передний двор',
       action: async ()=> await changeRoom('uniFrontYard', 250, 318) },
-    { x:0,y:180,w:40,h:60, name:'toWest', prompt:'Западное крыло (театральное)',
-      action: async ()=> await changeRoom('uniWestHall', 130, 584) },
-    { x:400,y:180,w:40,h:60, name:'toEast', prompt:'Восточное крыло (аудитории)',
-      action: async ()=> await changeRoom('uniEastHall', 130, 624) },
-    { x:192,y:40,w:68,h:60, name:'toCourtyard', prompt:'Во внутренний двор',
+    { x:0,y:238,w:44,h:64, name:'toWest', prompt:'Западное крыло (театральное)',
+      action: async ()=> await changeRoom('uniWestHall', 130, 664) },
+    { x:516,y:238,w:44,h:64, name:'toEast', prompt:'Восточное крыло (аудитории)',
+      action: async ()=> await changeRoom('uniEastHall', 130, 704) },
+    { x:240,y:60,w:80,h:62, name:'toCourtyard', prompt:'Во внутренний двор',
       action: async ()=> await changeRoom('uniCourtyard', 210, 286) },
-    { x:318,y:120,w:70,h:58, name:'toFloor2', prompt:'Наверх, на второй этаж',
-      action: async ()=> await changeRoom('uniCorr2', 312, 238) },
-    { x:76,y:126,w:44,h:34, name:'infoDesk', prompt:'Стойка информации', action(){
+    { x:386,y:184,w:88,h:38, name:'toFloor2', prompt:'Наверх, на второй этаж',
+      action: async ()=> await changeRoom('uniCorr2', 400, 232) },
+    { x:44,y:184,w:56,h:40, name:'infoDesk', prompt:'Стойка информации', action(){
         if (C('uniDay') >= 4 && F('universityBanned')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'(Вахтёр смотрит на меня и делает вид, что не смотрит.)'},
         ]);
@@ -8924,7 +9749,7 @@ uniHall: {
           {who:'naya',expr:'talk',text:'(Второй этаж закрашен так, будто его чертили позже и второпях.)'},
         ]);
       }},
-    { x:108,y:56,w:44,h:40, name:'boardShows', prompt:'Афиши', action(){
+    { x:196,y:60,w:44,h:66, name:'boardShows', prompt:'Афиши', action(){
         setFlag('uniHallStands');
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Афиши студенческих постановок за десять лет. Бумага выцвела до одинакового бежевого.'},
@@ -8932,7 +9757,7 @@ uniHall: {
           {who:'naya',expr:'talk',text:'(Совпадение. Это просто пьеса, её ставят все.)'},
         ]);
       }},
-    { x:146,y:60,w:44,h:40, name:'portraits', prompt:'Портреты и награды', action(){
+    { x:94,y:56,w:44,h:70, name:'portraits', prompt:'Портреты и награды', action(){
         setFlag('uniHallStands');
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Портреты ректоров. Самый левый — тысяча восемьсот какой-то, лицо в трещинах лака.'},
@@ -8940,14 +9765,14 @@ uniHall: {
           {who:'naya',expr:'talk',text:'(Здание старше города вокруг него.)'},
         ]);
       }},
-    { x:132,y:216,w:36,h:34, name:'graduates', prompt:'Фотографии выпускников', action(){
+    { x:494,y:186,w:48,h:44, name:'graduates', prompt:'Фотографии выпускников', action(){
         setFlag('uniHallStands');
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Стенд с выпусками. Ряды одинаковых лиц под стеклом, год под каждым рядом.'},
           {who:'naya',expr:'talk',text:'(Через двадцать лет их никто не узнает. Через сорок — снимут и уберут в архив.)'},
         ]);
       }},
-    { x:278,y:216,w:36,h:34, name:'teachers', prompt:'Список преподавателей', action(){
+    { x:108,y:308,w:44,h:40, name:'teachers', prompt:'Список преподавателей', action(){
         setFlag('uniHallStands');
         if (!F('uniTeacherList') && C('uniDay') >= 1) {
           setFlag('uniTeacherList');
@@ -8963,28 +9788,46 @@ uniHall: {
           {who:'naya',expr:'normal',text:'«ЖЕНЕВЬЕВА МОРЕЛЬ — преподаватель театрального направления». Кабинет в восточном крыле.'},
         ]);
       }},
-    { x:296,y:58,w:44,h:40, name:'boardMain', prompt:'Расписание', action(){
+    { x:410,y:308,w:44,h:40, name:'boardMain', prompt:'Расписание', action(){
         if (C('uniDay') >= 1) return Dialogue.start([
           {who:'naya',expr:'normal',text:'«История театра, ауд. 14, Морель Ж.» Каждый вторник и четверг.'},
           {who:'naya',expr:'talk',text:'(Сегодня четверг.)'},
         ]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Расписание на четыре курса. Половина листов подписана от руки поверх напечатанного.'}]);
       }},
+    { x:126,y:246,w:48,h:36, name:'hallSigns', prompt:'Указатель', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«ТЕАТРАЛЬНОЕ ОТДЕЛЕНИЕ — ЗАПАД. АУДИТОРИИ, БИБЛИОТЕКА — ВОСТОК. КАФЕДРЫ — 2 ЭТАЖ».'},
+          {who:'naya',expr:'talk',text:'(Стрелка на «север» кем-то подрисована карандашом и ведёт в стену.)'},
+        ]);
+      }},
+    { x:236,y:120,w:88,h:44, name:'yardArch', prompt:'Проём во двор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'От входных дверей насквозь видно двор: фонтан и стену напротив.'},
+          {who:'naya',expr:'talk',text:'(Здание сомкнуто в кольцо. Отсюда это наконец видно.)'},
+        ]);
+      }},
   ],
   npcs: [
-    { x:120, y:272, sprite:'acolyte', name:'Студентка', speed:0.42,
-      path:[[120,272],[330,270],[330,312],[120,312]],
+    { x:150, y:340, sprite:'acolyte', name:'Студентка', speed:0.42,
+      path:[[150,340],[420,338],[420,366],[150,368]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed(); return Dialogue.start([
         {who:'acolyte',expr:'normal',name:'Студентка',text:'Ты ведь не с нашего факультета?'},
         {who:'naya',expr:'normal',text:'Нет. Я жду Сью.'},
         {who:'acolyte',expr:'normal',name:'Студентка',text:'А, актёрские. Они всегда задерживаются. Всегда.'},
       ]); } },
-    { x:330, y:196, sprite:'customer', name:'Преподаватель', speed:0.55,
-      path:[[330,196],[330,300],[110,300],[110,196]],
+    { x:452, y:256, sprite:'customer', name:'Преподаватель', speed:0.55,
+      path:[[452,256],[452,358],[112,358],[112,256]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed(); return Dialogue.start([
         {who:'customer',expr:'normal',name:'Преподаватель',text:'Четырнадцатая — в восточном крыле, до конца и направо. Не заблудитесь.'},
+      ]); } },
+    { x:280, y:210, sprite:'student', name:'Студент', speed:0.34,
+      path:[[280,210],[212,214],[212,250],[286,248]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> { Campus.noticed(); return Dialogue.start([
+        {who:'student',expr:'normal',name:'Студент',text:'Через двор быстрее, чем по коридорам. Только под дождём.'},
       ]); } },
   ],
   /* Первый приход в корпус после смены открывает главу; на четвёртый
@@ -9002,44 +9845,52 @@ uniHall: {
 /* ---------------------------------------------------------------- */
 /* ЗАПАДНОЕ (ТЕАТРАЛЬНОЕ) КРЫЛО, первый этаж. Коридор идёт от холла на
    север. Слева — залы и мастерские, справа — стена во внутренний двор
-   с окнами и преподавательской. В торце лестница на второй этаж.     */
+   с окнами и преподавательской. В торце лестница на второй этаж.
+   Самое живое крыло корпуса: афиши, реквизит по стенам, вечно чем-то
+   заставленный проход.                                              */
 uniWestHall: {
-  name:"Университет. Западное крыло", music:'home', w:260, h:620,
+  name:"Университет. Западное крыло", music:'home', w:260, h:700,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1d150f', dark:.22 },
   lights:[
-    {x:130,y:60,r:46,c:'#ffe6b0',i:.34},{x:130,y:220,r:46,c:'#ffe6b0',i:.34},
-    {x:130,y:380,r:46,c:'#ffe6b0',i:.34},{x:130,y:540,r:46,c:'#ffe6b0',i:.36},
+    {x:130,y:60,r:46,c:'#ffe6b0',i:.34},{x:130,y:230,r:46,c:'#ffe6b0',i:.34},
+    {x:130,y:400,r:46,c:'#ffe6b0',i:.34},{x:130,y:560,r:46,c:'#ffe6b0',i:.34},
+    {x:130,y:672,r:44,c:'#ffe6b0',i:.32},
   ],
   bgPaint(ctx) {
-    paintWing(ctx, 260, 620, {
+    paintWing(ctx, 260, 700, {
       uniAtmosphere:true,
       wallW:62, warm:'#6b5a44', floor:'#8e7448', floor2:'#7a6038',
-      left:UNI_W1_LEFT, right:UNI_W1_RIGHT,
-      leaf1:'#a8412c', leaf2:'#c9992f', lightA:.36, vignette:.34,
+      left:UNI_W1_LEFT, right:UNI_W1_RIGHT, view:'yard',
+      lightA:.32, vignette:.34,
     });
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
     ctx.fillText('ЛЕСТНИЦА ↑', 82, 24);
-    ctx.fillText('ХОЛЛ ↓', 96, 610);
-    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(62, 0, 136, 12);
+    ctx.fillText('ХОЛЛ ↓', 96, 690);
+    ctx.fillText('ТЕАТРАЛЬНОЕ ОТДЕЛЕНИЕ', 74, 118);
   },
   objects: [
     { t:'stairs_main', x:130, y:56 },
-    { t:'bench_stone', x:96, y:250 }, { t:'bench_stone', x:164, y:452 },
-    { t:'plant_pot', x:76, y:340 }, { t:'plant_pot', x:184, y:150 },
-    { t:'bin', x:78, y:560 }, { t:'radiator', x:186, y:230 },
-    { t:'poster', x:42, y:110 }, { t:'poster', x:42, y:330 },
-    { t:'mask_pair', x:218, y:470 },
-    { t:'photo_frame', x:42, y:212 },
-    { t:'book_stack', x:104, y:238 },
+    { t:'poster', x:44, y:126 }, { t:'poster', x:44, y:352 }, { t:'poster', x:44, y:540 },
+    { t:'photo_frame', x:44, y:226 }, { t:'photo_frame', x:44, y:452 },
+    { t:'mask_pair', x:216, y:498 },
+    { t:'fire_cabinet', x:216, y:150 },
+    { t:'painting', x:216, y:334 },
+    { t:'costume_rail', x:96, y:284 },
+    { t:'crate_stack', x:172, y:596 },
+    { t:'bench_stone', x:96, y:430 }, { t:'bench_stone', x:166, y:640 },
+    { t:'plant_pot', x:78, y:360 }, { t:'plant_pot', x:182, y:166 },
+    { t:'bin', x:78, y:620 }, { t:'radiator', x:186, y:250 },
+    { t:'book_stack', x:104, y:472 },
+    { t:'stool', x:172, y:392 },
   ],
   walls: [
-    {x:0,y:0,w:62,h:620},{x:198,y:0,w:62,h:620},
-    {x:62,y:0,w:136,h:10},{x:62,y:612,w:136,h:8},
+    {x:0,y:0,w:62,h:700},{x:198,y:0,w:62,h:700},
+    {x:62,y:0,w:136,h:10},{x:62,y:692,w:136,h:8},
   ],
   interactables: [
-    { x:70,y:566,w:120,h:44, name:'toHall', prompt:'В главный холл',
-      action: async ()=> await changeRoom('uniHall', 44, 210) },
+    { x:70,y:644,w:120,h:44, name:'toHall', prompt:'В главный холл',
+      action: async ()=> await changeRoom('uniHall', 44, 268) },
     { x:76,y:62,w:110,h:44, name:'toFloor2', prompt:'Наверх, в западное крыло',
       action: async ()=> await changeRoom('uniWest2', 130, 280) },
 
@@ -9055,6 +9906,12 @@ uniWestHall: {
     { x:62,y:UNI_W1_LEFT.mid('wstore')-24,w:36,h:48, name:'storeDoor', prompt:'Склад', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Склад декораций. Замок висячий, дужка в засохшей краске.'}]);
       }},
+    { x:62,y:UNI_W1_LEFT.mid('w108')-22,w:36,h:44, name:'aud108', prompt:'Аудитория 108', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«108». Заперто. За матовым стеклом кто-то оставил свет — одна лампа из четырёх.'},
+          {who:'naya',expr:'talk',text:'(Крыло длиннее, чем мне нужно. Половину этих дверей я никогда не открою.)'},
+        ]);
+      }},
     { x:62,y:UNI_W1_LEFT.mid('theatre')-26,w:36,h:52, name:'toTheatre', prompt:'Театральный зал',
       action: async ()=> await changeRoom('uniTheatre', 274, 250) },
 
@@ -9063,15 +9920,24 @@ uniWestHall: {
     { x:162,y:UNI_W1_RIGHT.mid('wutil')-24,w:36,h:48, name:'utilDoor', prompt:'Подсобка', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Подсобка. Из-под двери пахнет мокрой тряпкой и хлоркой.'}]);
       }},
+    { x:162,y:UNI_W1_RIGHT.mid('w110')-22,w:36,h:44, name:'aud110', prompt:'Кабинет 110', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'«110». Заперто. Табличка новее двери — кабинет кому-то отдали недавно.'}]);
+      }},
     { x:162,y:UNI_W1_RIGHT.mid('w0')-26,w:36,h:52, name:'yardWinW', prompt:'Окно во двор', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Окно во внутренний двор. Фонтан не работает, но воду из него никто не сливал.'},
           {who:'naya',expr:'talk',text:'(С той стороны двора — восточное крыло. Одинаковые окна, одинаковый свет.)'},
         ]);
       }},
+    { x:162,y:UNI_W1_RIGHT.mid('w2')-26,w:36,h:52, name:'yardWinW2', prompt:'Окно во двор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Отсюда двор виден по диагонали: фонтан, скамьи и тёмная северная сторона.'},
+          {who:'naya',expr:'talk',text:'(Одно здание, замкнутое в кольцо. Я хожу по его западной стороне.)'},
+        ]);
+      }},
     /* Старая театральная фотография: на раме — знак, который Ная уже
        видела на срезе кристалла. Первая физическая улика главы. */
-    { x:66,y:194,w:40,h:36, name:'oldPhoto', prompt:'Старая фотография', action(){
+    { x:64,y:200,w:42,h:52, name:'oldPhoto', prompt:'Старая фотография', action(){
         if (!F('metGenevieveUni')) return Dialogue.start([
           {who:'naya',expr:'normal',text:'Групповая фотография в тяжёлой раме. Тридцать человек в костюмах, все смотрят чуть мимо объектива.'},
         ]);
@@ -9089,12 +9955,21 @@ uniWestHall: {
         }
         Dialogue.start([{who:'naya',expr:'normal',text:'Знак на раме никуда не делся. Круг, четыре луча, четыре точки.'}]);
       }},
-    { x:66,y:294,w:44,h:34, name:'postersW', prompt:'Афиши крыла', action(){
+    { x:64,y:326,w:44,h:52, name:'postersW', prompt:'Афиши крыла', action(){
         if (F('learnedMedea')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'«Медея», позапрошлый год. Я прохожу мимо этой афиши третий раз за неделю.'},
           {who:'naya',expr:'empty',text:'(И только теперь читаю имя.)'},
         ]);
         Dialogue.start([{who:'naya',expr:'normal',text:'Афиши постановок и список тех, кто занят в новой. Фамилия Сью — третья снизу.'}]);
+      }},
+    { x:70,y:262,w:56,h:44, name:'railW', prompt:'Рейл с костюмами', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Рейл выкатили в коридор и забыли. На плечиках бирки: «АКТ 2», «АКТ 2», «ЗАПАС».'},
+          {who:'naya',expr:'smile',text:'(В этом крыле вещи живут в коридоре дольше, чем в комнатах.)'},
+        ]);
+      }},
+    { x:150,y:572,w:52,h:44, name:'cratesW', prompt:'Ящики с декорациями', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Ящики из-под задников. На верхнем мелом: «НЕ КАНТОВАТЬ». Кантовали.'}]);
       }},
   ],
   npcs: [
@@ -9103,13 +9978,17 @@ uniWestHall: {
     { x:118, y:UNI_W1_LEFT.mid('rehearsal') + 26, sprite:'sue', name:'Сью',
       when:()=> F('sueWaitingCorridor') && !F('premiereDone'),
       dialogue:()=> Scene.play('sueWaitingCorridor') },
-    { x:110, y:300, sprite:'student', name:'Студент', speed:0.44,
-      path:[[110,300],[150,300],[150,470],[110,470]],
+    { x:110, y:330, sprite:'student', name:'Студент', speed:0.44,
+      path:[[110,330],[152,330],[152,520],[110,520]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed();
         if (F('investigatedUniversity')) return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
         return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Репетиционный — первая дверь слева. Только тихо, у них прогон.'}]);
       }},
+    { x:150, y:600, sprite:'friend', name:'Студентка', speed:0.32,
+      path:[[150,600],[112,604],[112,664],[152,660]],
+      when:()=> !F('sueDead') && !F('premiereDone'),
+      dialogue:()=> Dialogue.start([{who:'friend',expr:'normal',name:'Студентка',text:'Ты на премьеру придёшь? Зал маленький, места кончатся за час.'}]) },
   ],
   /* Обе встречи с Морель происходят здесь и сами: она идёт по коридору
      навстречу, а не ждёт, пока игрок ткнёт в неё. */
@@ -9124,45 +10003,51 @@ uniWestHall: {
 
 /* ---------------------------------------------------------------- */
 /* ВОСТОЧНОЕ (АУДИТОРНОЕ) КРЫЛО, первый этаж. Справа — библиотека,
-   запертый архив, кабинет Морель и три аудитории; слева — двор,
-   деканат и туалет. В торце лестница на второй этаж.                 */
+   запертый архив, кабинет Морель и аудитории; слева — стена во двор
+   с окнами, деканат и туалет. В торце лестница на второй этаж.
+   Академическая половина корпуса: ровные ряды шкафчиков, стенды,
+   расписания, и тихо так, как в театральном не бывает никогда.      */
 uniEastHall: {
-  name:"Университет. Восточное крыло", music:'home', w:260, h:660,
+  name:"Университет. Восточное крыло", music:'home', w:260, h:740,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1d150f', dark:.24 },
   lights:[
-    {x:130,y:60,r:46,c:'#ffdc9a',i:.34},{x:130,y:220,r:46,c:'#ffdc9a',i:.34},
-    {x:130,y:400,r:46,c:'#ffdc9a',i:.34},{x:130,y:580,r:46,c:'#ffdc9a',i:.36},
+    {x:130,y:60,r:46,c:'#ffdc9a',i:.34},{x:130,y:230,r:46,c:'#ffdc9a',i:.34},
+    {x:130,y:410,r:46,c:'#ffdc9a',i:.34},{x:130,y:580,r:46,c:'#ffdc9a',i:.34},
+    {x:130,y:706,r:44,c:'#ffdc9a',i:.32},
   ],
   bgPaint(ctx) {
-    paintWing(ctx, 260, 660, {
+    paintWing(ctx, 260, 740, {
       uniAtmosphere:true,
       wallW:62, warm:'#6b5a44', floor:'#8e7448', floor2:'#7a6038',
-      left:UNI_E1_LEFT, right:UNI_E1_RIGHT,
-      leaf1:'#c2702c', leaf2:'#a8412c', lightA:.36, vignette:.36,
+      left:UNI_E1_LEFT, right:UNI_E1_RIGHT, view:'yard',
+      lightA:.32, vignette:.36,
     });
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
     ctx.fillText('ЛЕСТНИЦА ↑', 82, 24);
-    ctx.fillText('ХОЛЛ ↓', 96, 650);
-    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(62, 0, 136, 12);
+    ctx.fillText('ХОЛЛ ↓', 96, 730);
+    ctx.fillText('АУДИТОРИИ 14 — 16', 82, 118);
   },
   objects: [
     { t:'stairs_main', x:130, y:56 },
-    { t:'lockers', x:88, y:300 }, { t:'lockers', x:88, y:344 },
-    { t:'bench_stone', x:164, y:200 }, { t:'bench_stone', x:96, y:500 },
-    { t:'plant_pot', x:184, y:120 }, { t:'plant_pot', x:76, y:600 },
-    { t:'bin', x:180, y:420 }, { t:'radiator', x:186, y:296 },
-    { t:'painting', x:218, y:388 }, { t:'photo_frame', x:42, y:452 },
-    { t:'notice_board', x:218, y:560 },
-    { t:'book_stack', x:104, y:486 }, { t:'stool', x:170, y:640 },
+    { t:'lockers', x:88, y:320 }, { t:'lockers', x:88, y:364 }, { t:'lockers', x:88, y:408 },
+    { t:'notice_board', x:216, y:206 }, { t:'notice_board', x:216, y:620 },
+    { t:'painting', x:216, y:430 }, { t:'photo_frame', x:44, y:500 },
+    { t:'fire_cabinet', x:44, y:158 },
+    { t:'dir_sign', x:170, y:684 },
+    { t:'bench_stone', x:166, y:236 }, { t:'bench_stone', x:96, y:560 },
+    { t:'plant_pot', x:182, y:136 }, { t:'plant_pot', x:78, y:660 },
+    { t:'bin', x:180, y:470 }, { t:'radiator', x:186, y:316 },
+    { t:'book_stack', x:104, y:546 }, { t:'stool', x:170, y:530 },
+    { t:'crate_stack', x:172, y:132 },
   ],
   walls: [
-    {x:0,y:0,w:62,h:660},{x:198,y:0,w:62,h:660},
-    {x:62,y:0,w:136,h:10},{x:62,y:652,w:136,h:8},
+    {x:0,y:0,w:62,h:740},{x:198,y:0,w:62,h:740},
+    {x:62,y:0,w:136,h:10},{x:62,y:732,w:136,h:8},
   ],
   interactables: [
-    { x:70,y:606,w:120,h:44, name:'toHall', prompt:'В главный холл',
-      action: async ()=> await changeRoom('uniHall', 396, 210) },
+    { x:70,y:684,w:120,h:44, name:'toHall', prompt:'В главный холл',
+      action: async ()=> await changeRoom('uniHall', 516, 268) },
     { x:76,y:62,w:110,h:44, name:'toFloor2', prompt:'Наверх, в восточное крыло',
       action: async ()=> await changeRoom('uniEast2', 130, 280) },
 
@@ -9199,6 +10084,11 @@ uniEastHall: {
       action: async ()=> await changeRoom('uniMusicRoom', 28, 130) },
     { x:162,y:UNI_E1_RIGHT.mid('art')-24,w:36,h:48, name:'toArt', prompt:'Художественная аудитория',
       action: async ()=> await changeRoom('uniArtRoom', 28, 140) },
+    { x:162,y:UNI_E1_RIGHT.mid('e16')-22,w:36,h:44, name:'aud16', prompt:'Аудитория 16', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«16». Заперто. На двери график занятий, из которого следует, что тут не бывает никого до полудня.'},
+        ]);
+      }},
 
     { x:62,y:UNI_E1_LEFT.mid('admin')-24,w:36,h:48, name:'adminDoor', prompt:'Деканат', action(){
         Dialogue.start([
@@ -9208,13 +10098,25 @@ uniEastHall: {
     { x:62,y:UNI_E1_LEFT.mid('wc1')-20,w:36,h:40, name:'wcDoor', prompt:'Туалет', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Туалет. Одна кабинка подпёрта шваброй, и это, кажется, надолго.'}]);
       }},
+    { x:62,y:UNI_E1_LEFT.mid('e15')-22,w:36,h:44, name:'aud15', prompt:'Аудитория 15', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«15». Идёт пара: слышно один голос и ни одного ответа.'},
+          {who:'naya',expr:'talk',text:'(В этом крыле всё пронумеровано. В театральном половина дверей вообще без табличек.)'},
+        ]);
+      }},
     { x:62,y:UNI_E1_LEFT.mid('w1')-26,w:36,h:52, name:'yardWinE', prompt:'Окно во двор', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Окно во двор. Отсюда видно северную сторону — тёмный этаж без единого горящего окна.'},
           {who:'naya',expr:'talk',text:'(Старое крыло. Днём его тоже не включают.)'},
         ]);
       }},
-    { x:72,y:276,w:52,h:40, name:'lockersE', prompt:'Шкафчики', action(){
+    { x:62,y:UNI_E1_LEFT.mid('w3')-26,w:36,h:52, name:'yardWinE2', prompt:'Окно во двор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Напротив, через двор, — окна театрального крыла. В одном горит свет и кто-то ходит.'},
+          {who:'naya',expr:'smile',text:'(Сью. Или кто-то ростом со Сью.)'},
+        ]);
+      }},
+    { x:72,y:296,w:52,h:44, name:'lockersE', prompt:'Шкафчики', action(){
         if (F('sueDead') && !F('sueRevived')) return Dialogue.start([
           {who:'naya',expr:'empty',text:'Её шкафчик — четвёртый слева. Наклейка с кошкой.'},
           {who:'naya',expr:'empty',text:'Его ещё не вскрыли. Значит, тут пока никто не знает.'},
@@ -9224,21 +10126,32 @@ uniEastHall: {
           {who:'naya',expr:'smile',text:'У Сью — четвёртый слева. Она наклеила кошку, чтобы «было видно издалека».'},
         ]);
       }},
-    { x:150,y:538,w:44,h:34, name:'boardStudy', prompt:'Стенд', action(){
+    { x:150,y:596,w:52,h:44, name:'boardStudy', prompt:'Стенд', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Списки групп, объявление о пересдаче и расписание библиотеки: до восьми, по субботам до трёх.'}]);
+      }},
+    { x:150,y:186,w:52,h:44, name:'boardEast', prompt:'Доска объявлений', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'«Просьба не оставлять вещи в коридоре». Под объявлением стоят три коробки.'},
+        ]);
       }},
   ],
   npcs: [
-    { x:112, y:380, sprite:'student', name:'Студент', speed:0.46,
-      path:[[112,380],[150,380],[150,540],[112,540]],
+    { x:112, y:430, sprite:'student', name:'Студент', speed:0.46,
+      path:[[112,430],[152,430],[152,600],[112,600]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed();
         if (F('learnedMedea')) return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Ты вчера в архиве сидела? Морель потом туда заходила. Спрашивала, кто брал папки.'}]);
         return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Морель сегодня добрая. Значит, зачёт будет злой.'}]);
       }},
-    { x:150, y:150, sprite:'acolyte', name:'Студентка', speed:0.38,
-      path:[[150,150],[110,150],[110,260],[150,260]],
+    { x:150, y:170, sprite:'acolyte', name:'Студентка', speed:0.38,
+      path:[[150,170],[110,170],[110,280],[150,280]],
       when:()=> !F('sueDead') },
+    { x:120, y:660, sprite:'customer', name:'Преподаватель', speed:0.36,
+      path:[[120,660],[168,656],[168,700],[120,704]],
+      when:()=> !F('sueDead'),
+      dialogue:()=> { Campus.noticed(); return Dialogue.start([
+        {who:'customer',expr:'normal',name:'Преподаватель',text:'Библиотека до восьми. После восьми там только пыль и я.'},
+      ]); } },
   ],
 },
 
@@ -10002,7 +10915,7 @@ uniCourtyard: {
   ],
   interactables: [
     { x:186,y:284,w:60,h:34, name:'toHall', prompt:'В главный холл',
-      action: async ()=> await changeRoom('uniHall', 222, 116) },
+      action: async ()=> await changeRoom('uniHall', 280, 150) },
     { x:180,y:194,w:60,h:44, name:'fountain', prompt:'Фонтан', action(){
         if (F('learnedWitches')) return Dialogue.start([
           {who:'naya',expr:'talk',text:'Вода стоит и не двигается. Я смотрю на своё отражение и думаю, что оно теперь значит.'},
@@ -10095,7 +11008,7 @@ uniCorr2: {
   ],
   interactables: [
     { x:366,y:216,w:88,h:30, name:'toFloor1', prompt:'Вниз, в главный холл',
-      action: async ()=> await changeRoom('uniHall', 352, 194) },
+      action: async ()=> await changeRoom('uniHall', 430, 236) },
     { x:8,y:154,w:44,h:60, name:'toWest2', prompt:'Западное крыло',
       action: async ()=> await changeRoom('uniWest2', 130, 44) },
     { x:628,y:154,w:44,h:60, name:'toEast2', prompt:'Восточное крыло',
