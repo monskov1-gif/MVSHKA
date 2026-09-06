@@ -1376,7 +1376,7 @@ function freshState() {
       universityWindowRouteUnlocked:false,
       // глава «Женевьева Морель»: четыре дня расследования
       uniArrived:false, uniDayDone:false, uniHallStands:false, uniTeacherList:false,
-      complaintFiled:false,
+      complaintFiled:false, sawOldWing:false, sawBasement:false, sawFloor2:false,
       symbolPhoto:false, libAsked:false, sueDay1Done:false, sawRehearsal:false,
       morelCorridor2:false,
       libPeriods:false, propsSymbol:false, propsMorel:false, morelKnowsName:false,
@@ -4625,46 +4625,70 @@ const Quests = {
     { w:()=> F('portalOpened'),      t:'Шагнуть в портал.' },
     { w:()=> F('learnedWitches'),    t:'Поговорить со Сью дома.',
       s:()=> F('communeInvite') ? 'Морель зовёт в коммуну после заката.' : '' },
-    /* Глава «Женевьева Морель»: цель ведёт по дням, от свежего к старому. */
+    /* Глава «Женевьева Морель»: цель ведёт по дням и по шагам, от
+       свежего к старому. Каждый физический ход — своя цель с указанием
+       места: без этого игрок не догадывался, что старое крыло на втором
+       этаже, и упирался в запертую подсобку. */
     { w:()=> C('uniDay') === 4 && F('morelTruth'),   t:'Отправиться в коммуну ведьм после заката.' },
-    { w:()=> C('uniDay') === 4 && F('premiereDone'), t:'Встретиться с Морель на крыше.' },
+    { w:()=> C('uniDay') === 4 && F('premiereDone'),
+      t:'Встретиться с Морель на крыше.', s:'Старое крыло, служебная лестница, вверх.' },
     { w:()=> C('uniDay') === 4 && F('archiveFolderFound'),
       t:'Попасть на премьеру Сью.', s:'Театральный зал — в западном крыле.' },
+    { w:()=> C('uniDay') === 4 && F('sawBasement'),
+      t:'Найти в цокольном архиве пропавшую папку.', s:'Коробки без описи.' },
     { w:()=> C('uniDay') === 4 && F('backWindowUsed'),
-      t:'Найти в цокольном архиве пропавшую папку.' },
+      t:'Спуститься по служебной лестнице в цоколь.' },
     { w:()=> C('uniDay') === 4 && F('universityBanned'),
-      t:'Вернуться в корпус обходным путём.', s:'Задний двор, низкое окно, служебная лестница.' },
+      t:'Вернуться в корпус обходным путём.', s:'Задний двор: низкое окно служебной лестницы.' },
     { w:()=> C('uniDay') === 4 && F('morelPhotoSeen'),
       t:'Вернуться в холл.', s:'Здесь больше нечего искать.' },
-    { w:()=> C('uniDay') === 4 && F('libMissing'),   t:'Проверить кабинет Морель.' },
+    { w:()=> C('uniDay') === 4 && F('libMissing'),
+      t:'Проверить кабинет Морель.', s:'Восточное крыло, третья дверь справа.' },
     { w:()=> C('uniDay') === 4,
-      t:'Узнать, что связывает Морель и Медею.', s:'Сегодня за тебя работает Крис.' },
-    { w:()=> C('uniDay') === 3 && F('roofPromise'),  t:'Посмотреть генеральную репетицию Сью.' },
+      t:'Проверить пропавшие материалы в библиотеке.', s:'Сегодня за тебя работает Крис.' },
+
+    { w:()=> C('uniDay') === 3 && F('roofPromise'),
+      t:'Дождаться Сью после генеральной.', s:'Западное крыло: она выйдет в коридор.' },
     { w:()=> C('uniDay') === 3 && F('archiveMorelFound'),
-      t:'Проследить за Морель.', s:'Она поднялась наверх.' },
+      t:'Проследить за Морель.', s:'Она поднялась по служебной лестнице на крышу.' },
     { w:()=> C('uniDay') === 3 && F('archiveMedeaFound'),
       t:'Досмотреть остальные папки архива.' },
+    { w:()=> C('uniDay') === 3 && F('sawBasement'),
+      t:'Найти цокольный архив.', s:'Дальняя дверь цоколя.' },
+    { w:()=> C('uniDay') === 3 && F('sawOldWing'),
+      t:'Спуститься по служебной лестнице.', s:'Единственная незапертая дверь старого крыла.' },
+    { w:()=> C('uniDay') === 3 && F('sawFloor2'),
+      t:'Найти проход в старое крыло.', s:'Середина коридора второго этажа.' },
     { w:()=> C('uniDay') === 3 && F('basementFound'),
-      t:'Найти в цокольном архиве упоминания Медеи.' },
+      t:'Подняться на второй этаж.', s:'Парадная лестница справа в холле.' },
+    { w:()=> C('uniDay') === 3 && F('cafeShiftFinished'),
+      t:'Проверить дверь архива в учебном крыле.', s:'Восточное крыло, вторая дверь справа.' },
     { w:()=> C('uniDay') === 3,
-      t:'Найти настоящий архив.', s:'Обе двери с табличкой «АРХИВ» заперты.' },
-    { w:()=> C('uniDay') === 2 && F('morelKnowsName'), t:'Вернуться к Сью на репетицию.' },
-    { w:()=> C('uniDay') === 2 && F('propsMorel'),   t:'Выйти в коридор западного крыла.' },
+      t:'Отработать смену в кафе.', s:'Кафе на Мейпл-стрит. Сначала работа.' },
+
+    { w:()=> C('uniDay') === 2 && F('morelKnowsName'),
+      t:'Дождаться Сью после репетиции.', s:'Западное крыло: она выйдет в коридор.' },
+    { w:()=> C('uniDay') === 2 && F('propsMorel'),
+      t:'Выйти в коридор западного крыла.' },
     { w:()=> C('uniDay') === 2 && F('propsSymbol'),
       t:'Осмотреть коробки театрального общества.', s:'Костюмерная — через гримёрную.' },
     { w:()=> C('uniDay') === 2 && F('libPeriods'),
-      t:'Найти источник символа в театральном зале.' },
-    { w:()=> C('uniDay') === 2,
+      t:'Найти источник символа в театральном зале.', s:'Западное крыло, дальняя дверь слева.' },
+    { w:()=> C('uniDay') === 2 && F('cafeShiftFinished'),
       t:'Сравнить материалы за 30, 25, 15 и 5 лет назад.', s:'Альбомы по годам в библиотеке.' },
-    { w:()=> C('uniDay') === 1 && F('libAsked'),     t:'Дождаться Сью после репетиции.' },
+    { w:()=> C('uniDay') === 2,
+      t:'Отработать смену в кафе.', s:'Кафе на Мейпл-стрит. Сначала работа.' },
+
+    { w:()=> C('uniDay') === 1 && F('libAsked'),
+      t:'Дождаться Сью после репетиции.', s:'Западное крыло: она выйдет в коридор.' },
     { w:()=> C('uniDay') === 1 && F('symbolPhoto'),
-      t:'Спросить библиотекаря о старых материалах.' },
+      t:'Спросить библиотекаря о старых материалах.', s:'Библиотека — восточное крыло.' },
     { w:()=> C('uniDay') === 1 && F('metGenevieveUni'),
-      t:'Осмотреть старую фотографию и символ.' },
+      t:'Осмотреть старую фотографию в коридоре.', s:'Западное крыло, рама у скамьи.' },
     { w:()=> C('uniDay') === 1 && F('sawRehearsal'),
       t:'Выйти в коридор западного крыла.' },
     { w:()=> C('uniDay') === 1 && F('uniTeacherList'),
-      t:'Найти Сью в репетиционном зале.' },
+      t:'Найти Сью в репетиционном зале.', s:'Западное крыло, первая дверь слева.' },
     { w:()=> C('uniDay') === 1,
       t:'Осмотреть стенды в холле.', s:'Афиши, награды, выпускники, преподаватели.' },
     { w:()=> F('cafeSceneComplete'), t:'Зайти за Сью в университет.' },
@@ -5562,6 +5586,14 @@ street: {
         if (!F('mainStoryStarted')) {
           return Dialogue.start([{who:'naya',expr:'normal',text:'Автобус до университета. Мне туда сегодня незачем.'}]);
         }
+        /* Первые три дня Ная сначала работает. Бросить смену и уехать
+           расследовать нельзя: это её единственный заработок. */
+        if (C('uniDay') >= 1 && C('uniDay') <= 3 && !F('cafeShiftFinished')) {
+          return Dialogue.start([
+            {who:'naya',expr:'talk',text:'(У меня смена. Крис один не вытянет вечер.)'},
+            {who:'naya',expr:'normal',text:'(Сначала кафе. Университет никуда не денется — Сью репетирует до восьми.)'},
+          ]);
+        }
         if (F('universityBanned') || (F('universityAccessRestricted') && !F('oldWingOpen'))) {
           return Dialogue.start([
             {who:'naya',expr:'talk',text:'(Через главный вход меня больше не пустят. Охранник запомнил лицо.)'},
@@ -5785,7 +5817,13 @@ cafe: {
         {who:'neighbor',expr:'normal',name:'Мардж',text:'Ная, ты сегодня опять как в воду опущенная. Возьми выходной, я подменю.'},
       ]) },
   ],
-  onEnter() { if (F('mainStoryStarted') && !F('cafeSceneComplete')) setTimeout(()=> Scene.play('cafeScene'), 520); }
+  onEnter() {
+    if (F('mainStoryStarted') && !F('cafeSceneComplete')) return setTimeout(()=> Scene.play('cafeScene'), 520);
+    /* Смена второго и третьего дня начинается сама, как только Ная
+       переступает порог: она сюда именно за этим и пришла. */
+    if (C('uniDay') >= 2 && C('uniDay') <= 3 && !F('cafeShiftFinished'))
+      setTimeout(()=> Scene.play('cafeWorkDay'), 520);
+  }
 },
 
 /* ---------------------------------------------------------------- */
@@ -8702,6 +8740,10 @@ uniWestHall: {
       }},
   ],
   npcs: [
+    /* Репетиция кончилась — Сью вышла и ждёт тут, а не сидит в зале. */
+    { x:130, y:420, sprite:'sue', name:'Сью',
+      when:()=> F('uniArrived') && C('uniDay') <= 3 && UniDay.ready(C('uniDay')),
+      dialogue:()=> Scene.play('sueRehearsalTalk') },
     { x:110, y:300, sprite:'student', name:'Студент', speed:0.44,
       path:[[110,300],[150,300],[150,470],[110,470]],
       when:()=> !F('sueDead'),
@@ -8944,7 +8986,7 @@ uniRehearsal: {
         return Dialogue.start([{who:'acolyte',expr:'normal',name:'Режиссёр',text:'Все по местам. Зал уже собирается.'}]);
       }},
     { x:132, y:236, sprite:'acolyte', name:'Режиссёр',
-      when:()=> F('uniArrived') && !F('premiereDone') && UniDay.ready(C('uniDay')),
+      when:()=> F('uniArrived') && C('uniDay') <= 3 && UniDay.ready(C('uniDay')),
       dialogue:()=> Dialogue.start([
         {who:'acolyte',expr:'normal',name:'Режиссёр',text:'На сегодня всё, я дожимаю одну сцену. Вашу подругу я отпустил.'},
         {who:'acolyte',expr:'smile',name:'Режиссёр',text:'Она ждёт в коридоре. Идите, не стойте тут.'},
@@ -8963,11 +9005,11 @@ uniRehearsal: {
         return Dialogue.start([{who:'student',expr:'normal',name:'Актёр',text:'Мы репетируем «Последний свет». Про девушку, которая возвращается в дом перед продажей.'}]);
       } },
     { x:150, y:192, sprite:'sue', name:'Сью',
-      when:()=> F('uniArrived') && !F('premiereDone') && !UniDay.ready(C('uniDay')),
+      when:()=> F('uniArrived') && C('uniDay') <= 3 && !UniDay.ready(C('uniDay')),
       dialogue:()=> Scene.play('sueRehearsalTalk') },
     { x:120, y:296, sprite:'acolyte', name:'Актриса', speed:0.30,
       path:[[120,296],[200,294],[204,268],[116,270]],
-      when:()=> F('uniArrived') && !F('premiereDone') && !UniDay.ready(C('uniDay')),
+      when:()=> F('uniArrived') && C('uniDay') <= 3 && !UniDay.ready(C('uniDay')),
       dialogue:()=> { const d = Math.max(1, C('uniDay'));
         if (d >= 3) return Dialogue.start([{who:'acolyte',expr:'worried',name:'Актриса',text:'У меня во втором акте четыре реплики, и я все четыре забываю. Каждый раз одни и те же.'}]);
         return Dialogue.start([{who:'acolyte',expr:'normal',name:'Актриса',text:'Ты подруга Сью? Она нас всех держит. Без неё бы третью сцену до сих пор читали с листа.'}]);
@@ -9752,6 +9794,8 @@ uniCorr2: {
       path:[[540,236],[300,236],[300,206],[540,206]],
       when:()=> !F('sueDead') },
   ],
+  /* Отметка «я тут была»: по ней цель ведёт игрока дальше по зданию. */
+  onEnter() { setFlag('sawFloor2'); },
 },
 
 /* ---------------------------------------------------------------- */
@@ -9937,6 +9981,7 @@ uniOldWing: {
       }},
   ],
   npcs: [],
+  onEnter() { setFlag('sawOldWing'); },
 },
 
 /* ---------------------------------------------------------------- */
@@ -10109,6 +10154,7 @@ uniBasement: {
         {who:'customer',expr:'normal',name:'Техник',text:'Только за трубы не хватайся, они горячие.'},
       ]) },
   ],
+  onEnter() { setFlag('sawBasement'); },
 },
 
 /* ---------------------------------------------------------------- */
@@ -10718,7 +10764,7 @@ const Scene = {
     'pastCheck','rehearsalWatch','sueRehearsalTalk','sueDayWait','libraryFolk',
     'librarianTalk','archiveFolder15','archiveFolder5','chrisShiftDay',
     'persuadeSue','persuadeResolve','sueHint','distractWitch2','dorothy',
-    'dorothyHall','postRevival','lonerDoor','lonerCaughtScene',
+    'dorothyHall','postRevival','lonerDoor','lonerCaughtScene','cafeWorkDay',
   ]),
   seen(name) { return !!(gameState && gameState.scenesSeen && gameState.scenesSeen.includes(name)); },
   mark(name) {
@@ -12515,7 +12561,11 @@ suePremiereDay: [
 /* Общий переход между днями: вечер, дорога домой, утро. */
 uniDayEnd: [
   { fadeOut:800 },
-  ()=>{ UniDay.advance(); },
+  ()=>{
+    UniDay.advance();
+    /* Новый день — новая смена. На четвёртый её берёт на себя Крис. */
+    if (C('uniDay') <= 3) setFlag('cafeShiftFinished', false);
+  },
   { room:'nayaRoom', x:120, y:250 },
   { music:'home' },
   { fadeIn:800 },
@@ -13227,6 +13277,36 @@ roofTruth: [
 
 /* Конец смены на второй, третий и четвёртый день главы. Крис не
    расспрашивает — он просто отмечает, что Ная зачастила. */
+/* Смена второго и третьего дня: короткий заход, работа, короткий выход.
+   Диспетчер — реплики Криса зависят от дня, а сама сцена повторяется. */
+cafeWorkDay: [
+  { music:'warm' },
+  ()=>{
+    const d = C('uniDay');
+    return new Promise(res => Dialogue.start(d >= 3 ? [
+      {who:'chris',expr:'normal',text:'Пришла. Я уж думал, ты сегодня в университете ночуешь.'},
+      {who:'naya',expr:'smile',text:'Ещё не всё выяснила. Дай фартук.'},
+    ] : [
+      {who:'chris',expr:'normal',text:'О, явилась. Вечер обещает быть бодрым.'},
+      {who:'naya',expr:'normal',text:'Как всегда. Давай.'},
+    ], res));
+  },
+  { shift:true },
+  ()=>{
+    const d = C('uniDay');
+    return new Promise(res => Dialogue.start(d >= 3 ? [
+      {who:'chris',expr:'normal',text:'Всё, иди. Я закрою.'},
+      {who:'naya',expr:'smile',text:'Спасибо.'},
+      {who:'chris',expr:'smile',text:'И удачи там. С чем бы ты ни возилась.'},
+    ] : [
+      {who:'chris',expr:'smile',text:'Свободна. Беги к своей актрисе.'},
+      {who:'naya',expr:'smile',text:'Она не моя актриса.'},
+      {who:'chris',expr:'smile',text:'Ага.'},
+    ], res));
+  },
+  { dlg:[{who:'naya',expr:'talk',text:'(Теперь — автобус.)'}] },
+],
+
 chrisShiftDay: [
   ()=>{
     const d = C('uniDay');

@@ -174,8 +174,7 @@ async function university(page, picks, tag) {
   await step(page, 'obj', 'exit', [], tag);
   await step(page, 'obj', 'toHall', [], tag);
   await step(page, 'obj', 'toWest', [], tag);
-  await step(page, 'obj', 'toRehearsal', [], tag);
-  await step(page, 'npc', 'Сью', [], tag);                         // конец первого дня -> дом
+  await step(page, 'npc', 'Сью', [], tag);                         // ждёт в коридоре -> дом
   await need(2, 'конец первого дня');
 
   // --- день второй: периоды, щит на сцене, коробки, «До свидания, Ная.» ---
@@ -194,9 +193,7 @@ async function university(page, picks, tag) {
   await step(page, 'obj', 'costumeBoxes', [], tag);                // МОРЕЛЬ в коробках
   await step(page, 'obj', 'exit', [], tag);                        // -> гримёрная
   await step(page, 'obj', 'exit', [], tag);                        // -> коридор: «Я не называла имени»
-  await step(page, 'obj', 'toRehearsal', [], tag);
-  await step(page, 'obj', 'watch', [], tag);
-  await step(page, 'npc', 'Сью', [], tag);
+  await step(page, 'npc', 'Сью', [], tag);                         // ждёт в коридоре
   await need(3, 'конец второго дня');
 
   // --- день третий: старое крыло, служебная лестница, архив, крыша ---
@@ -220,9 +217,7 @@ async function university(page, picks, tag) {
   await step(page, 'obj', 'toCorr2', [], tag);
   await step(page, 'obj', 'toFloor1', [], tag);
   await step(page, 'obj', 'toWest', [], tag);
-  await step(page, 'obj', 'toRehearsal', [], tag);
-  await step(page, 'obj', 'watch', [], tag);                       // генеральная
-  await step(page, 'npc', 'Сью', [], tag);
+  await step(page, 'npc', 'Сью', [], tag);                         // ждёт в коридоре
   await need(4, 'конец третьего дня');
 
   // --- день четвёртый: запрет, обходной путь, премьера, правда ---
@@ -255,11 +250,18 @@ async function university(page, picks, tag) {
   await step(page, 'npc', 'Морель', [picks.reveal], tag);          // правда -> дом
 }
 
-/* Дорога из комнаты Наи до университета — она повторяется каждый день. */
+/* Дорога из комнаты Наи до университета. Первые три дня автобус не
+   поедет, пока не отработана смена, поэтому по пути — кафе. */
 async function toUni(page, tag) {
   await step(page, 'obj', 'door', [], tag);
   await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
+  const needShift = await page.evaluate(() =>
+    C('uniDay') >= 1 && C('uniDay') <= 3 && !gameState.flags.cafeShiftFinished);
+  if (needShift) {
+    await step(page, 'obj', 'toCafe', [], tag);     // смена запускается сама
+    await step(page, 'obj', 'exit', [], tag);
+  }
   await step(page, 'obj', 'toUni', [], tag);
 }
 
