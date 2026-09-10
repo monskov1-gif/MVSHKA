@@ -18,9 +18,14 @@ const TURN = `(() => {
   if (S.menuOpen) {
     const g = S.guests.find(x => x.state === 'ordered');
     if (!g) { S.menuOpen = false; return 'close'; }
-    const i = S.MENU.findIndex(m => m.id === g.dish);
+    /* Сетка меню — две колонки на три ряда, и считать ячейку надо ровно
+       так же, как это делает pickDish. Старая раскладка 3×2 промахивалась
+       мимо нужного блюда и всегда выбирала первое из доступных. */
+    const menu = S.availableMenu();
+    const i = menu.findIndex(m => m.id === g.dish);
+    if (i < 0) { S.menuOpen = false; return 'nodish'; }
     const b = S.MENU_BOX;
-    S.pickDish(b.x + 6 + (i % 3) * 66 + 30, b.y + 18 + ((i / 3) | 0) * 42 + 20);
+    S.pickDish(b.x + 6 + (i % 2) * 130 + 60, b.y + 28 + ((i / 2) | 0) * 62 + 30);
     return 'cook';
   }
   if (S.carry) {

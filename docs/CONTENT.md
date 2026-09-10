@@ -24,10 +24,17 @@
 | **Мадлен, Роза** | ведьмы коммуны — носительницы амулетов |
 | **Агата, Беатрис, Руби** | ведьмы **из сказа**; в коммуне не появляются |
 
-Спрайты (31): `naya, nayaDark, sue, sueGhost, nayaHell, chris, drizella, stacy,
+Спрайты (42): `naya, nayaDark, sue, sueGhost, nayaHell, chris, drizella, stacy,
 frank, nayaTeen, genevieve, witch1..witch6, acolyte, customer, neighbor, friend,
 student, imp, mother, motherWitch, sueChild, nayaChild, dorothy, dorothySit,
-charlotte, lilith`.
+charlotte, lilith` — плюс население университета и театра: `librarian,
+professor, studentB, studentC, studentD, director, actorM, actressF, costumer,
+techie, keeper`.
+
+**Модель подруги Сью (`friend`) в университете не используется** — она
+принадлежит другой линии. Библиотекарь, преподаватели, костюмер, техник,
+режиссёр и труппа имеют собственные модели и портреты; безымянные студенты
+разведены на четыре разных.
 
 ## Структура истории
 
@@ -156,6 +163,10 @@ uniBackYard   toStreet→street  window→uniServiceStair
 * **кафе** — `cafeShiftStarted`, `cafeShiftFinished`, `chrisCovering`;
 * **амулеты и коммуна** — `firstAmulet`, `secondAmulet`, `thirdAmulet`,
   `firstWitchDead`, `communePanic`, `communeWarded`, `thirdHouseOpen`;
+* **второе имя без убийства** — `claraHint` (Женевьева рассказала про Клару),
+  `hiddenAmulet` (амулет найден в её заколоченном доме, Роза жива). Второй
+  флаг разводит сцены паники и собрания, реплики Сью, шкаф и фотографии в
+  доме Розы и её присутствие в мире;
 * **развилка** — `sueDead`, `reviveChoiceMade`, `sueRevived`, `sueLeftDead`,
   `pathChosen`, `chosenWitchPath`, `chosenEarthPath`, `gaveCrystalAway`;
 * **ветка «злая Ная»** — 12 флагов с префиксом `evil`;
@@ -233,6 +244,7 @@ tests/evil.js           быстрый прогон ветки «Ная выбр
 tests/chapter.js        четыре дня главы подряд: дни, журнал, запрет, обход
 tests/goals.js          цель меняется на каждом шаге и называет место
 tests/archive.js        четвёртый день: цель про папку и коробки говорят об одном
+tests/amulet.js         второе имя без убийства: дом Клары, живая Роза, собрание
 tests/campus.js         внимание охраны, высылка, обходной путь
 tests/shift.js          смена в кафе доигрывается до конца
 tests/dev.js            меню разработчика: точки, все 55 комнат, кадр не чёрный
