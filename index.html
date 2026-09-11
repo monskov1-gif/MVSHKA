@@ -373,7 +373,10 @@
 /* ===== THEATRE STAGING ===== */
 #theaterOverlay{position:fixed;inset:0;z-index:20;display:none;background:#08070a;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
 #theaterOverlay.show{display:flex}
-#theaterCanvas{width:min(96vw,860px);height:min(78vh,560px);image-rendering:pixelated;box-shadow:0 20px 80px rgba(0,0,0,.55)}
+/* Ширина и высота, заданные независимо, растягивали сцену 640x420 под
+   форму экрана: на телефоне она вытягивалась почти вдвое. Размер
+   считается по одному масштабу — как у игрового холста. */
+#theaterCanvas{width:min(96vw,calc(78vh * 640 / 420),860px);height:auto;aspect-ratio:640 / 420;image-rendering:pixelated;box-shadow:0 20px 80px rgba(0,0,0,.55)}
 </style>
 </head>
 <body>
@@ -12805,8 +12808,25 @@ const Theater = {
   prop(name,v=true){this.props[name]=v;},
   wide(){this.mode='audience';this.lightTarget=.28;},
   stage(){this.mode='stage';this.lightTarget=this._style>=3?.78:.42;},
+  /* Холст рисуется в системе координат 640x420, но хранилище пикселей
+     подгоняется под реальный размер на экране с учётом плотности точек.
+     Иначе на телефоне сцена сначала рисуется в 640 пикселей, а потом
+     сжимается до четырёхсот — и всё мылится. */
+  fit(){
+    const c=document.getElementById('theaterCanvas');
+    const r=c.getBoundingClientRect();
+    if(!r.width||!r.height)return c.getContext('2d');
+    const dpr=Math.min(3,window.devicePixelRatio||1);
+    const w=Math.max(1,Math.round(r.width*dpr)), h=Math.max(1,Math.round(r.height*dpr));
+    if(c.width!==w||c.height!==h){c.width=w;c.height=h;}
+    const g=c.getContext('2d');
+    g.setTransform(w/this.W,0,0,h/this.H,0,0);
+    g.imageSmoothingEnabled=false;
+    return g;
+  },
+
   draw(){
-    const c=document.getElementById('theaterCanvas'),g=c.getContext('2d'),W=this.W,H=this.H;
+    const g=this.fit(),W=this.W,H=this.H;
     g.clearRect(0,0,W,H);g.fillStyle='#0b080b';g.fillRect(0,0,W,H);
     if(this.mode==='audience'){this.drawAudience(g);return;}
     this.drawStage(g);
