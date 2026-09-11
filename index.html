@@ -19025,13 +19025,17 @@ const DevTools = {
     this.updateReadout();
   },
 
+  /* Метка сборки. Без неё вопрос «а точно ли это новая версия?» решается
+     только на глаз по картинке, и разные копии файла путаются между собой. */
+  BUILD: 'сборка 2026-09-11 · театр, модельки университета, имя Клары',
   updateReadout() {
     const el = document.getElementById('devStateReadout');
     if (!el) return;
-    if (!gameState) { el.textContent = 'Состояние: нет игры'; return; }
+    if (!gameState) { el.textContent = this.BUILD + '\nСостояние: нет игры'; return; }
     const g = Quests.goal();
     el.textContent =
-      'Комната: ' + gameState.currentRoom +
+      this.BUILD +
+      '\nКомната: ' + gameState.currentRoom +
       '\nДень университета: ' + C('uniDay') +
       '\nЦель: ' + (g ? g.t : '—') +
       '\nСмена кафе: ' + (F('cafeShiftFinished') ? 'пройдена' : 'не пройдена') +
