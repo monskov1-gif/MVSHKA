@@ -100,13 +100,16 @@ async function endingI() {
     await H.step(page,'obj','toStairs',[],'I');
     await H.step(page,'obj','toStreet',[],'I');
     await H.step(page,'obj','toRightHouse',[],'I');
+    await H.step(page,'obj','toLiving',[],'I');
     await H.step(page,'npc','Женевьева',[],'I');   // lonerGenevieve
+    await H.step(page,'obj','toHallway',[],'I');
     await H.step(page,'obj','exit',[],'I');
     await H.step(page,'obj','toLeftHouse',[],'I'); // lonerDoor
     await H.step(page,'obj','toAlley',[],'I');
     await H.step(page,'obj','window',[],'I');      // break-in
     await H.step(page,'obj','exit',[],'I');
     await H.step(page,'obj','toRightHouse',[],'I');
+    await H.step(page,'obj','toLiving',[],'I');
     await H.step(page,'obj','toCommune',[],'I');   // discovered -> chase
     const chase = await page.evaluate(()=>({active: !!(Game.chase&&Game.chase.active), room:gameState.currentRoom}));
     console.log('  I: chase =', JSON.stringify(chase));

@@ -245,6 +245,21 @@
     touch-action:none; cursor:pointer;
   }
   #shiftSay { color:#c09880; font-size:11px; min-height:28px; max-width:min(94vw, 340px); line-height:1.4; }
+  /* Инструкция: один раз перед первой сменой и дальше по кнопке. */
+  #shiftHelpBtn { margin-top:6px; background:#241820; color:#c8a070; border:1px solid #5a3040;
+                  border-radius:8px; padding:6px 14px; font-size:11px; letter-spacing:1px; cursor:pointer; }
+  #shiftHelpBtn:hover,#shiftHelpBtn:active { background:#3a2030; }
+  #shiftHelp { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+               background:rgba(8,6,10,.86); z-index:6; padding:16px; }
+  #shiftHelp.show { display:flex; }
+  .shiftHelpBox { background:#1a1218; border:2px solid #7a3a52; border-radius:12px;
+                  padding:16px 18px; max-width:min(92vw,360px); color:#e8dcd0; }
+  .shiftHelpBox h3 { margin:0 0 10px; color:#f0c0a0; font-size:13px; letter-spacing:2px; }
+  .shiftHelpBox ol { margin:0; padding-left:20px; font-size:12px; line-height:1.65; }
+  .shiftHelpBox li { margin-bottom:3px; }
+  .shiftHelpNote { color:#c8a070; font-size:11px; margin:10px 0 12px; }
+  #shiftHelpOk { width:100%; background:#3a2030; color:#f0e4c0; border:1px solid #7a3a52;
+                 border-radius:8px; padding:9px; font-size:12px; letter-spacing:1px; cursor:pointer; }
 
   /* ==================== OVERLAYS ==================== */
   #fade { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:40; transition:opacity .5s; }
@@ -441,7 +456,7 @@
   <!-- ===== Settings ===== -->
   <div class="screen" id="settingsPanel">
     <h2>НАСТРОЙКИ</h2>
-    <label>Громкость: <span id="volVal">50</span>%</label>
+    <label>Звуки: <span id="volVal">50</span>%</label>
     <input type="range" id="volSlider" min="0" max="100" value="50">
     <label>Музыка: <span id="musVal">40</span>%</label>
     <input type="range" id="musSlider" min="0" max="100" value="40">
@@ -489,6 +504,22 @@
     <div id="shiftPhase">ДНЕВНАЯ СМЕНА</div>
     <canvas id="shiftCanvas" width="300" height="420"></canvas>
     <div id="shiftSay"></div>
+    <button id="shiftHelpBtn">КАК ИГРАТЬ</button>
+    <div id="shiftHelp">
+      <div class="shiftHelpBox">
+        <h3>СМЕНА В КАФЕ</h3>
+        <ol>
+          <li>Нажми на зал — Ная пойдёт в это место.</li>
+          <li>Подойди к гостю: над столом появится заказ.</li>
+          <li>Иди к Крису за стойку слева и выбери блюдо из меню.</li>
+          <li>Крис готовит несколько секунд.</li>
+          <li>Забери готовое справа, на выдаче.</li>
+          <li>Отнеси тому, кто это заказывал.</li>
+        </ol>
+        <p class="shiftHelpNote">Главное — не перепутать, кому что.</p>
+        <button id="shiftHelpOk">ПОНЯТНО</button>
+      </div>
+    </div>
   </div>
 
   <!-- ===== Pause ===== -->
@@ -586,9 +617,14 @@ const Audio = {
      шумы с событиями (ambientVolume). Раньше эмбиент ехал на громкости
      музыки, и убавить одно, не убавив другое, было нельзя. */
   ctx:null, volume:0.5, musicVolume:0.4, ambientVolume:0.55,
+  /* Повторный вызов создавал второй контекст, а шина музыки оставалась
+     подключённой к первому: узлы с разных контекстов не соединяются, и
+     звук пропадал молча. Контекст создаётся один раз. */
   init() {
+    if (this.ctx) return this.ctx;
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch(e) { this.ctx = null; }
+    return this.ctx;
   },
   resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
   beep(freq=440, dur=0.08, type='square', vol=0.15) {
@@ -1336,6 +1372,8 @@ const Ambience = {
     uniCostume:['theatre'], uniLibrary:['library'],
     uniOldWing:['oldWing'], uniServiceStair:['oldWing',['basement']],
     uniBasement:['basement'], uniArchive:['basement'], uniRoof:['roof'],
+    genLiving:['indoor'], genKitchen:['indoor'], genStudy:['indoor'],
+    genBed:['indoor'], genBath:['indoor'],
     forestEdge:['forest'], communeRoad:['forest'], communeYard:['forest'],
     nightSpot:['forest'], oldHouse:['indoor'], oldHouseAttic:['indoor'],
     hell:['hell'], lilithHall:['hell'], hellStreet:['hell'], hellFinal:['hell'],
@@ -2193,6 +2231,7 @@ function freshState() {
       metSue:false, cafeSceneComplete:false,
       cafeShiftStarted:false, cafeShiftFinished:false,
       sueWaitingCorridor:false,
+      shiftHelpSeen:false,
       // площадка в настоящем
       presentPlaygroundVisited:false, playgroundMemoryTriggered:false,
       metGenevieveUni:false, crystalReacted:false, oldWingOpen:false,
@@ -6066,6 +6105,9 @@ const Shift = {
       this.ctx=this.cv.getContext('2d');
       this.bind();
       document.getElementById('shiftScreen').classList.add('show');
+      /* Перед первой сменой правила показываются сами, дальше — только по
+         кнопке: навязчивое обучение на каждой смене раздражает. */
+      if (!F('shiftHelpSeen')) { this.help(true); setFlag('shiftHelpSeen'); }
       Game.mode='shift'; UI.dimControls(true);
       this.phase();
       this.say('Подойди к гостю, чтобы принять заказ.');
@@ -6113,10 +6155,17 @@ const Shift = {
     if(k!==this._k){this._k=k;this.say(this.CHRIS[k]);}
   },
   say(t){document.getElementById('shiftSay').textContent=t;},
+  help(on) {
+    const el = document.getElementById('shiftHelp');
+    if (!el) return;
+    el.classList.toggle('show', !!on);
+    this.paused = !!on;
+  },
   dish(id){return this.MENU.find(m=>m.id===id);},
 
   update(dt){
     if(!this.resolve)return;          // смена уже закрыта — этот кадр лишний
+    if(this.paused)return;            // открыта инструкция — часы стоят
     this.left-=dt;
     if(this.left<=0)return this.finish();
     this.phase();
@@ -7424,7 +7473,7 @@ street: {
       prompt:()=> F('foundGenevieve') ? 'Дом Женевьевы' : 'Заколоченный дом',
       action: async ()=> {
         if (!F('returnedFromHell1')) { UI.toast('Заколочено. Тут давно никто не живёт.'); return; }
-        await changeRoom('genevieveHouse', 120, 258);
+        await changeRoom('genevieveHouse', 100, 180);
       }},
     { x:186,y:126,w:64,h:34, name:'toUni', prompt:'Остановка: университет', action: async ()=> {
         if (Game.chase && Game.chase.active) { UI.toast('Не сейчас!'); return; }
@@ -7880,80 +7929,147 @@ lilithHall: {
 },
 
 /* ---------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   ДОМ ЖЕНЕВЬЕВЫ МОРЕЛЬ
+
+   Снаружи — обычный дом преподавателя, и внутри поначалу тоже: прихожая
+   с ботинками, гостиная с пледом, кухня, где пахнет супом. Ведьминское
+   проступает не сразу и не в лоб — в кабинете, в театральных коробках, в
+   фотографиях, к которым Ная возвращается уже зная, кого на них искать.
+   Комнаты маленькие и соединены так, как соединяются комнаты в жилом
+   доме: прихожая → гостиная → кухня, кабинет и спальня, из спальни —
+   ванная.                                                           */
 genevieveHouse: {
-  name:"Дом Женевьевы", music:'warm', w:240, h:300,
-  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
-  light:{ tint:'#241a14', dark:.18 },
-  lights:[{x:200,y:104,r:40,c:'#8ad04a',i:.35},{x:44,y:60,r:44,c:'#7ba0c8',i:.24}],
+  name:"Дом Женевьевы. Прихожая", music:'warm', w:200, h:210,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 },
+  light:{ tint:'#241a14', dark:.22 },
+  lights:[{x:100,y:60,r:46,c:'#e8c070',i:.30}],
   bgPaint(ctx) {
-    paintInterior(ctx, 240, 300, { wall:'#4e5442', wall2:'#414736', floor:'#7d6446', floor2:'#6c5439', wallH:56 });
-    // проём в коммуну — косяк, наличник и темнота за ним
-    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(54, 58, 54, 60);
-    ctx.fillStyle = '#5f4530'; ctx.fillRect(57, 61, 48, 55);
-    ctx.fillStyle = '#171a14'; ctx.fillRect(62, 64, 38, 52);
-    ctx.fillStyle = 'rgba(140,200,90,.10)'; ctx.fillRect(62, 64, 38, 52);
-    ctx.fillStyle = '#2a3020'; ctx.fillRect(62, 64, 38, 6);
-    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('КОММУНА', 60, 126);
-    ctx.fillStyle = 'rgba(140,200,90,.05)'; ctx.fillRect(150, 56, 88, 100);
-    // домотканая дорожка от двери вглубь
-    ctx.fillStyle = 'rgba(0,0,0,.06)';
-    ctx.beginPath(); ctx.moveTo(104,292); ctx.lineTo(140,292); ctx.lineTo(126,130); ctx.lineTo(106,130); ctx.closePath(); ctx.fill();
-    paintDoor(ctx, 105, 285);
+    paintInterior(ctx, 200, 210, { wall:'#4e5442', wall2:'#414736', floor:'#7d6446', floor2:'#6c5439', wallH:52 });
+    ctx.fillStyle = 'rgba(0,0,0,.07)';
+    ctx.beginPath(); ctx.moveTo(80,204); ctx.lineTo(118,204); ctx.lineTo(112,70); ctx.lineTo(88,70); ctx.closePath(); ctx.fill();
+    // проём в гостиную
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(140, 54, 46, 58);
+    ctx.fillStyle = '#241a12'; ctx.fillRect(144, 58, 38, 54);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('ГОСТИНАЯ', 139, 120);
+    paintDoor(ctx, 99, 200);
   },
   objects: [
-    { t:'window_in', x:30, y:36 },
-    { t:'herb_shelf', x:24, y:122 },
-    { t:'jar_shelf', x:26, y:176 },
-    { t:'bookshelf', x:214, y:104 },
-    { t:'cauldron', x:198, y:150 },
-    { t:'dresser', x:170, y:120 },
-    { t:'table_wood', x:126, y:176 },
-    { t:'chair_wood', x:100, y:182 }, { t:'chair_wood', x:152, y:182 },
-    { t:'rug_warm', x:122, y:232 },
-    { t:'armchair', x:44, y:232 },
-    { t:'rocking_chair', x:212, y:206 },
-    { t:'sewing_basket', x:190, y:214 },
-    { t:'lamp_floor', x:76, y:218 },
-    { t:'book_stack', x:100, y:212 },
-    { t:'vase_flowers', x:126, y:166 },
-    { t:'plant_pot', x:22, y:262 }, { t:'plant_pot', x:214, y:250 },
-    { t:'plant_pot', x:196, y:274 },
-    { t:'candle', x:104, y:158 },
-    { t:'painting', x:150, y:28 }, { t:'photo_frame', x:196, y:30 },
-    { t:'cat_bed', x:64, y:270 },
+    { t:'coat_rack', x:34, y:96 }, { t:'boots', x:30, y:150 },
+    { t:'mirror_tall', x:172, y:150 },
+    { t:'cabinet', x:60, y:120 },
+    { t:'plant_pot', x:170, y:196 },
+    { t:'photo_frame', x:96, y:26 },
   ],
-  ambient() { if (!F('communePanic') && Math.random()<0.05) FX.spawn(198,144,1,{color:'#80c040',rise:-0.35,life:60}); },
   walls: [
-    {x:0,y:0,w:240,h:56},{x:0,y:0,w:8,h:300},{x:232,y:0,w:8,h:300},{x:0,y:295,w:240,h:5},
-    {x:58,y:56,w:46,h:60},
+    {x:0,y:0,w:200,h:52},{x:0,y:0,w:8,h:210},{x:192,y:0,w:8,h:210},{x:0,y:205,w:200,h:5},
   ],
   interactables: [
-    { x:100,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 370, 160) },
-    { x:60,y:96,w:42,h:34, name:'toCommune', prompt:'В коммуну',
+    { x:80,y:170,w:40,h:36, name:'exit', prompt:'Выйти', action: async ()=> await changeRoom('street', 370, 160) },
+    { x:140,y:86,w:46,h:32, name:'toLiving', prompt:'В гостиную',
+      action: async ()=> await changeRoom('genLiving', 40, 150) },
+    { x:152,y:118,w:40,h:34, name:'genMirror', prompt:'Зеркало', action(){
+        if (F('firstAmulet')) return Dialogue.start([
+          {who:'naya',expr:'sad',text:'(В чужом зеркале я всегда выгляжу честнее, чем хотелось бы.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Высокое зеркало в раме. Внизу приклеен список покупок.'}]);
+      }},
+    { x:14,y:130,w:40,h:34, name:'genBoots', prompt:'Обувь', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Две пары ботинок и резиновые сапоги, все разношенные.'},
+          {who:'naya',expr:'normal',text:'(Человек, который много ходит пешком. И в дождь тоже.)'},
+        ]);
+      }},
+  ],
+  npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+genLiving: {
+  name:"Дом Женевьевы. Гостиная", music:'warm', w:260, h:280,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#241a14', dark:.18 },
+  lights:[{x:214,y:104,r:40,c:'#8ad04a',i:.30},{x:60,y:60,r:44,c:'#7ba0c8',i:.24}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 260, 280, { wall:'#4e5442', wall2:'#414736', floor:'#7d6446', floor2:'#6c5439', wallH:56 });
+    // проём в коммуну — косяк, наличник и темнота за ним
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(96, 58, 54, 60);
+    ctx.fillStyle = '#5f4530'; ctx.fillRect(99, 61, 48, 55);
+    ctx.fillStyle = '#171a14'; ctx.fillRect(104, 64, 38, 52);
+    ctx.fillStyle = 'rgba(140,200,90,.10)'; ctx.fillRect(104, 64, 38, 52);
+    ctx.fillStyle = '#2a3020'; ctx.fillRect(104, 64, 38, 6);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('КОММУНА', 102, 126);
+    ctx.fillStyle = 'rgba(140,200,90,.05)'; ctx.fillRect(170, 56, 82, 96);
+    // боковые проёмы: прихожая слева, кухня и кабинет справа и снизу
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(8, 120, 20, 56); ctx.fillRect(232, 120, 20, 56);
+    ctx.fillStyle = '#241a12'; ctx.fillRect(10, 124, 16, 48); ctx.fillRect(234, 124, 16, 48);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New';
+    ctx.fillText('ПРИХОЖАЯ', 10, 118); ctx.fillText('КУХНЯ', 226, 118);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(186, 268, 52, 12);
+    ctx.fillStyle = '#c9a05a'; ctx.fillText('КАБИНЕТ', 186, 266);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(30, 268, 52, 12);
+    ctx.fillStyle = '#c9a05a'; ctx.fillText('СПАЛЬНЯ', 30, 266);
+  },
+  objects: [
+    { t:'window_in', x:60, y:34 },
+    { t:'bookshelf', x:222, y:108 },
+    { t:'dresser', x:180, y:116 },
+    { t:'rug_warm', x:130, y:206 },
+    { t:'armchair', x:70, y:206 },
+    { t:'rocking_chair', x:224, y:196 },
+    { t:'sewing_basket', x:200, y:206 },
+    { t:'lamp_floor', x:100, y:192 },
+    { t:'book_stack', x:124, y:186 },
+    { t:'table_round', x:150, y:196 },
+    { t:'vase_flowers', x:150, y:186 },
+    { t:'plant_pot', x:34, y:250 }, { t:'plant_pot', x:226, y:246 },
+    { t:'cat_bed', x:96, y:252 },
+    { t:'painting', x:176, y:28 }, { t:'photo_frame', x:214, y:30 },
+    { t:'clock', x:130, y:26 },
+  ],
+  ambient() { if (!F('communePanic') && Math.random()<0.04) FX.spawn(224,100,1,{color:'#80c040',rise:-0.35,life:60}); },
+  walls: [
+    {x:0,y:0,w:260,h:56},{x:0,y:0,w:8,h:280},{x:252,y:0,w:8,h:280},{x:0,y:275,w:260,h:5},
+    {x:100,y:56,w:46,h:60},
+  ],
+  interactables: [
+    { x:8,y:126,w:26,h:44, name:'toHallway', prompt:'В прихожую',
+      action: async ()=> await changeRoom('genevieveHouse', 160, 120) },
+    { x:226,y:126,w:26,h:44, name:'toKitchen', prompt:'На кухню',
+      action: async ()=> await changeRoom('genKitchen', 36, 130) },
+    { x:186,y:244,w:52,h:32, name:'toStudy', prompt:'В кабинет',
+      action: async ()=> await changeRoom('genStudy', 110, 200) },
+    { x:30,y:244,w:52,h:32, name:'toBed', prompt:'В спальню',
+      action: async ()=> await changeRoom('genBed', 110, 190) },
+    { x:102,y:96,w:42,h:34, name:'toCommune', prompt:'В коммуну',
       when:()=> F('foundGenevieve'),
       action: async ()=> {
         if (F('sueRefused') && !F('lonerBreakIn')) { UI.toast('Женевьева не пустит тебя туда одну. Пока — нет.'); return; }
         await changeRoom('communeHall', 120, 268);
       }},
-    { x:6,y:100,w:40,h:34, name:'herbs', prompt:'Травы', action(){
-        Dialogue.start([{who:'naya',expr:'normal',text:'Полынь, зверобой, ещё что-то остро пахнущее. Всё подписано аккуратным почерком.'}]);
-      }},
-    { x:180,y:130,w:38,h:32, name:'cauldron', prompt:'Котёл', action(){
-        if (F('communePanic')) return Dialogue.start([{who:'naya',expr:'sad',text:'Котёл остыл. Женевьева больше ничего не варит.'}]);
-        Dialogue.start([{who:'naya',expr:'normal',text:'Пахнет супом. Обычным овощным супом. Я почему-то ждала другого.'}]);
-      }},
-    { x:196,y:82,w:40,h:32, name:'genBooks', prompt:'Книги', action(){
+    { x:204,y:86,w:40,h:32, name:'genBooks', prompt:'Книги', action(){
+        if (F('claraHint')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Травники, справочники, детектив в мягкой обложке.'},
+          {who:'naya',expr:'sad',text:'(И тонкая тетрадь, подписанная «К.». Я не буду её открывать.)'},
+        ]);
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Травники, справочники, две книги по акушерству и детектив в мягкой обложке.'},
           {who:'naya',expr:'sad',text:'Ничего страшного. Вообще ничего страшного.'},
         ]);
       }},
-    { x:26,y:210,w:38,h:32, name:'chairLook', prompt:'Кресло', action(){
+    { x:50,y:184,w:40,h:34, name:'chairLook', prompt:'Кресло', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Продавленное кресло с пледом. В нём кто-то сидит каждый вечер сорок лет подряд.'}]);
+      }},
+    { x:196,y:20,w:40,h:32, name:'genPhotos', prompt:'Фотографии', action(){
+        if (F('symbolPhoto')) return Dialogue.start([
+          {who:'naya',expr:'shocked',text:'Театральная труппа, много лет назад. Женевьева во втором ряду.'},
+          {who:'naya',expr:'shocked',text:'(И та же рама, что в университете. Тот же символ в углу.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Групповые снимки. Кто-то в костюмах, кто-то просто на крыльце.'}]);
       }},
   ],
   npcs: [
-    { x:126,y:210, sprite:'genevieve', name:'Женевьева',
+    { x:140,y:222, sprite:'genevieve', name:'Женевьева',
       dialogue:()=> {
         if (!F('foundGenevieve')) return Dialogue.start([{who:'genevieve',expr:'normal',text:'Мы ещё не знакомы как следует. Найди меня в университете.'}]);
         if (F('sueRefused') && !F('lonerGenevieve')) return Scene.play('lonerGenevieve');
@@ -7972,6 +8088,220 @@ genevieveHouse: {
         ]);
       }},
   ],
+},
+
+/* ---------------------------------------------------------------- */
+genKitchen: {
+  name:"Дом Женевьевы. Кухня", music:'warm', w:210, h:230,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#241a14', dark:.18 },
+  lights:[{x:150,y:74,r:40,c:'#e8c070',i:.32},{x:56,y:150,r:34,c:'#8ad04a',i:.22}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 210, 230, { wall:'#4a5040', wall2:'#3e4434', floor:'#7a6244', floor2:'#695238', wallH:52 });
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(8, 118, 20, 54);
+    ctx.fillStyle = '#241a12'; ctx.fillRect(10, 122, 16, 46);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('ГОСТИНАЯ', 10, 116);
+  },
+  objects: [
+    { t:'window_in', x:150, y:30 },
+    { t:'counter', x:92, y:78 }, { t:'counter', x:138, y:78 },
+    { t:'stove', x:174, y:78 },
+    { t:'herb_shelf', x:48, y:104 },
+    { t:'jar_shelf', x:48, y:158 },
+    { t:'cauldron', x:170, y:150 },
+    { t:'table_wood', x:120, y:172 },
+    { t:'chair_wood', x:94, y:178 }, { t:'chair_wood', x:146, y:178 },
+    { t:'candle', x:120, y:160 },
+    { t:'plant_pot', x:190, y:206 },
+  ],
+  ambient() { if (!F('communePanic') && Math.random()<0.05) FX.spawn(170,144,1,{color:'#80c040',rise:-0.35,life:60}); },
+  walls: [
+    {x:0,y:0,w:210,h:52},{x:0,y:0,w:8,h:230},{x:202,y:0,w:8,h:230},{x:0,y:225,w:210,h:5},
+  ],
+  interactables: [
+    { x:8,y:124,w:26,h:42, name:'toLiving', prompt:'В гостиную',
+      action: async ()=> await changeRoom('genLiving', 226, 148) },
+    { x:30,y:90,w:40,h:34, name:'herbs', prompt:'Травы', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Полынь, зверобой, ещё что-то остро пахнущее. Всё подписано аккуратным почерком.'}]);
+      }},
+    { x:30,y:144,w:40,h:34, name:'jars', prompt:'Банки', action(){
+        if (F('learnedWitches')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Соленья, варенье, сушёные ягоды. И три банки без подписи, с чем-то тёмным.'},
+          {who:'naya',expr:'talk',text:'(Раньше я бы решила, что это компот.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Соленья и варенье, ряд за рядом. Половина с прошлого года.'}]);
+      }},
+    { x:152,y:130,w:40,h:34, name:'cauldron', prompt:'Котёл', action(){
+        if (F('communePanic')) return Dialogue.start([{who:'naya',expr:'sad',text:'Котёл остыл. Женевьева больше ничего не варит.'}]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Пахнет супом. Обычным овощным супом. Я почему-то ждала другого.'}]);
+      }},
+    { x:100,y:56,w:44,h:32, name:'genStove', prompt:'Плита', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'На плите чайник и кастрюля. Конфорка подпалена с одного бока — как у нас.'}]);
+      }},
+  ],
+  npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+genStudy: {
+  name:"Дом Женевьевы. Кабинет", music:'warm', w:220, h:230,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
+  light:{ tint:'#201810', dark:.24 },
+  lights:[{x:110,y:96,r:42,c:'#e8c070',i:.30}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 220, 230, { wall:'#464a3c', wall2:'#3a3e30', floor:'#6f5a3e', floor2:'#5e4b32', wallH:52 });
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(84, 218, 52, 12);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('ГОСТИНАЯ', 84, 216);
+  },
+  objects: [
+    { t:'window_in', x:170, y:30 },
+    { t:'desk', x:74, y:112 },
+    { t:'chair_wood', x:74, y:146 },
+    { t:'bookshelf', x:184, y:110 },
+    { t:'archive_box', x:30, y:160 }, { t:'archive_box', x:30, y:186 },
+    { t:'old_shield', x:150, y:154 },
+    { t:'mask_pair', x:44, y:28 },
+    { t:'photo_frame', x:100, y:28 },
+    { t:'lamp_floor', x:150, y:188 },
+    { t:'book_stack', x:96, y:106 },
+  ],
+  walls: [
+    {x:0,y:0,w:220,h:52},{x:0,y:0,w:8,h:230},{x:212,y:0,w:8,h:230},{x:0,y:225,w:220,h:5},
+  ],
+  interactables: [
+    { x:84,y:196,w:52,h:30, name:'toLiving', prompt:'В гостиную',
+      action: async ()=> await changeRoom('genLiving', 212, 246) },
+    { x:52,y:90,w:48,h:34, name:'genDesk', prompt:'Письменный стол', action(){
+        if (F('morelTruth')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Тетради с планами занятий. И между ними — листы, исписанные не по-русски.'},
+          {who:'naya',expr:'talk',text:'(Теперь я знаю, что это не латынь и не учебный материал.)'},
+        ]);
+        if (F('symbolPhoto')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Планы занятий, стопка непроверенных работ, счета за свет.'},
+          {who:'naya',expr:'shocked',text:'(И на полях одной тетради — тот самый круг с четырьмя лучами. Машинально, как рисуют, задумавшись.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Планы занятий, стопка непроверенных работ, счета за свет. Рабочий стол преподавателя.'}]);
+      }},
+    { x:12,y:140,w:44,h:36, name:'genBoxes', prompt:'Коробки', action(){
+        if (F('propsMorel')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Театральные архивы: программки, эскизы, списки занятых в спектаклях.'},
+          {who:'naya',expr:'shocked',text:'(Те же коробки, что в реквизиторской. Только эти она унесла домой.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Картонные коробки с театральными бумагами. Пахнут пылью и клеем.'}]);
+      }},
+    { x:132,y:134,w:40,h:34, name:'genShield', prompt:'Старый щит', action(){
+        if (F('propsSymbol')) return Dialogue.start([
+          {who:'naya',expr:'shocked',text:'Декоративный щит. Такой же, как в реквизиторской, и символ на нём тот же.'},
+          {who:'naya',expr:'talk',text:'(Кристалл под кофтой отзывается. Тихо, но отзывается.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Бутафорский щит из какого-то спектакля. Краска облупилась по краю.'}]);
+      }},
+    { x:164,y:88,w:44,h:34, name:'genOldBooks', prompt:'Верхняя полка', action(){
+        if (F('learnedMedea')) return Dialogue.start([
+          {who:'naya',expr:'shocked',text:'Старые книги без названий на корешках. Одна раскрыта на середине.'},
+          {who:'naya',expr:'shocked',text:'(«...из четверых одна отказалась исполнять третье повеление...» Тот же текст, что в архиве.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Верхняя полка, до которой надо тянуться. Книги старые, корешки без названий.'}]);
+      }},
+  ],
+  npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+genBed: {
+  name:"Дом Женевьевы. Спальня", music:'warm', w:220, h:220,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
+  light:{ tint:'#241a14', dark:.22 },
+  lights:[{x:110,y:80,r:40,c:'#e8c070',i:.26}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 220, 220, { wall:'#4a4a44', wall2:'#3e3e38', floor:'#786042', floor2:'#665036', wallH:50 });
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(84, 208, 52, 12);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('ГОСТИНАЯ', 84, 206);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(190, 96, 22, 50);
+    ctx.fillStyle = '#241a12'; ctx.fillRect(192, 100, 18, 42);
+    ctx.fillStyle = '#c9a05a'; ctx.fillText('ВАННАЯ', 176, 94);
+  },
+  objects: [
+    { t:'window_in', x:56, y:28 },
+    { t:'bed_single', x:70, y:106 },
+    { t:'wardrobe', x:160, y:82 },
+    { t:'chest', x:38, y:170 },
+    { t:'rug_red', x:120, y:168 },
+    { t:'photo_frame', x:120, y:26 },
+    { t:'candle', x:110, y:96 },
+    { t:'plant_pot', x:196, y:188 },
+  ],
+  walls: [
+    {x:0,y:0,w:220,h:50},{x:0,y:0,w:8,h:220},{x:212,y:0,w:8,h:220},{x:0,y:215,w:220,h:5},
+  ],
+  interactables: [
+    { x:84,y:186,w:52,h:30, name:'toLiving', prompt:'В гостиную',
+      action: async ()=> await changeRoom('genLiving', 56, 246) },
+    { x:186,y:102,w:28,h:42, name:'toBath', prompt:'В ванную',
+      action: async ()=> await changeRoom('genBath', 40, 130) },
+    { x:44,y:84,w:50,h:36, name:'genBed', prompt:'Кровать', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Узкая кровать, заправленная по-солдатски ровно.'},
+          {who:'naya',expr:'sad',text:'(Одна подушка. Всю жизнь одна подушка.)'},
+        ]);
+      }},
+    { x:138,y:60,w:46,h:36, name:'genWardrobe', prompt:'Шкаф', action(){
+        if (F('learnedWitches')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'Пальто, кардиганы, две пары одинаковых туфель.'},
+          {who:'naya',expr:'talk',text:'(И в глубине — тёмная накидка, которую не носят на лекции.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Пальто, кардиганы, две пары одинаковых туфель. Гардероб человека, которому некогда выбирать.'}]);
+      }},
+    { x:18,y:148,w:44,h:34, name:'genChest', prompt:'Сундук', action(){
+        if (F('morelPhotoSeen')) return Dialogue.start([
+          {who:'naya',expr:'sad',text:'Старый сундук. Внутри — письма, перевязанные бечёвкой, и один конверт без марки.'},
+          {who:'naya',expr:'sad',text:'(На нём одно слово. Имя. Я уже знаю какое.)'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Старый сундук под окном. Закрыт, но не заперт. Я не стала открывать.'}]);
+      }},
+  ],
+  npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
+genBath: {
+  name:"Дом Женевьевы. Ванная", music:'warm', w:170, h:190,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
+  light:{ tint:'#1e2026', dark:.20 },
+  lights:[{x:85,y:70,r:36,c:'#cfe0e8',i:.28}],
+  bgPaint(ctx) {
+    paintInterior(ctx, 170, 190, { wall:'#4a5258', wall2:'#3e464c', floor:'#8a8c86', floor2:'#767872', wallH:48 });
+    ctx.fillStyle = 'rgba(255,255,255,.05)';
+    for (let x = 10; x < 162; x += 14) for (let y = 50; y < 186; y += 14) ctx.fillRect(x, y, 12, 12);
+    ctx.fillStyle = '#3a2c1e'; ctx.fillRect(8, 100, 20, 46);
+    ctx.fillStyle = '#241a12'; ctx.fillRect(10, 104, 16, 38);
+    ctx.fillStyle = '#c9a05a'; ctx.font = '6px Courier New'; ctx.fillText('СПАЛЬНЯ', 10, 98);
+  },
+  objects: [
+    { t:'bathtub', x:104, y:110 },
+    { t:'sink', x:44, y:90 },
+    { t:'mirror_tall', x:44, y:64 },
+    { t:'plant_pot', x:146, y:166 },
+  ],
+  walls: [
+    {x:0,y:0,w:170,h:48},{x:0,y:0,w:8,h:190},{x:162,y:0,w:8,h:190},{x:0,y:185,w:170,h:5},
+  ],
+  interactables: [
+    { x:8,y:106,w:26,h:38, name:'toBed', prompt:'В спальню',
+      action: async ()=> await changeRoom('genBed', 176, 126) },
+    { x:82,y:92,w:48,h:36, name:'genTub', prompt:'Ванна', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Чугунная ванна на ножках. По краю — следы от воды, которые уже не отмываются.'},
+        ]);
+      }},
+    { x:24,y:66,w:44,h:34, name:'genSink', prompt:'Раковина', action(){
+        if (F('communePanic')) return Dialogue.start([
+          {who:'naya',expr:'sad',text:'На полке — упаковка успокоительного, вскрытая.'},
+        ]);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Мыло, щётка, стакан. Ничего, чего не было бы у нас со Сью.'}]);
+      }},
+  ],
+  npcs: [],
 },
 
 /* ---------------------------------------------------------------- */
@@ -8044,7 +8374,7 @@ communeHall: {
     { x:130,y:252,w:40,h:38, name:'exit', prompt:'Выйти', action: async ()=> {
         if (F('lonerSuspected') && !F('lonerChase')) { Scene.play('lonerCaughtScene'); return; }
         if (F('sueLeftDead')) { await changeRoom('communeYard', 96, 196); return; }
-        await changeRoom('genevieveHouse', 120, 244);
+        await changeRoom('genLiving', 122, 150);   // из коммуны выходишь в гостиную
       }},
     { x:242,y:100,w:42,h:32, name:'toTrial', prompt:'Вниз, в комнату испытания',
       when:()=> F('evilTrialOffered'),
@@ -19825,6 +20155,15 @@ const DevTools = {
   musWire() {
     const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
     on('devMusPlay', 'click', () => {
+      Audio.resume();
+      /* После паузы тема продолжается с того же такта, а не начинается
+         заново: секвенсор хранит step, надо лишь снова завести таймер. */
+      if (this.musCur && Music.cur === Music.resolve(this.musCur) && !Music.timer && Audio.ctx) {
+        Music.nextTime = Audio.ctx.currentTime + 0.06;
+        try { Music.bus.gain.cancelScheduledValues(Audio.ctx.currentTime);
+              Music.bus.gain.linearRampToValueAtTime(1, Audio.ctx.currentTime + 0.25); } catch(e){}
+        Music.startTimer(); this.musMark(); return;
+      }
       if (this.musCur) this.musPlay(this.musCur);
       else this.musPlay(Object.keys(Music.TRACKS)[0]);
     });
@@ -20091,6 +20430,8 @@ window.addEventListener('load', () => {
   wire('btnSettings', () => UI.showScreen('settingsPanel', true));
   wire('btnDevMain', () => DevTools.open(true));
   DevTools.musWire();
+  wireOpt('shiftHelpBtn', 'click', () => Shift.help(true));
+  wireOpt('shiftHelpOk',  'click', () => Shift.help(false));
   wire('btnBackSettings', () => { UI.showScreen('settingsPanel', false); });
   wire('btnMemories', () => { Memories.renderList(); UI.showScreen('memoriesScreen', true); });
   wire('btnBackMemories', () => UI.showScreen('memoriesScreen', false));

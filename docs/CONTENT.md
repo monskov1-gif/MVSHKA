@@ -90,7 +90,11 @@ techie, keeper`.
                playgroundNow 300x300 Площадка на окраине
 ПРЕДЫСТОРИЯ    oldHouse 320x300 Дом отца · oldHouseAttic 240x280 Чердак
                playground 300x300 · prologueHell 240x320 Ад, семнадцать лет назад
-ВЕДЬМЫ         genevieveHouse 240x300 · witch1House 320x340 Дом Мадлен
+ВЕДЬМЫ         genevieveHouse 200x210 Дом Женевьевы: прихожая
+               genLiving 260x280 гостиная · genKitchen 210x230 кухня
+               genStudy 220x230 кабинет · genBed 220x220 спальня
+               genBath 170x190 ванная
+               witch1House 320x340 Дом Мадлен
                witch2House 320x340 Дом Розы · witch3House 320x340 Дом за городом
                nightSpot 320x320 За городом, ночь
 КОММУНА        communeRoad 380x280 · communeYard 340x300 · communeHall 300x300
@@ -245,6 +249,7 @@ tests/chapter.js        четыре дня главы подряд: дни, ж�
 tests/goals.js          цель меняется на каждом шаге и называет место
 tests/archive.js        четвёртый день: цель про папку и коробки говорят об одном
 tests/amulet.js         второе имя без убийства: дом Клары, живая Роза, собрание
+tests/audio.js          партитуры, секвенсор, плеер, фоновые события, время суток
 tests/campus.js         внимание охраны, высылка, обходной путь
 tests/shift.js          смена в кафе доигрывается до конца
 tests/dev.js            меню разработчика: точки, все 55 комнат, кадр не чёрный

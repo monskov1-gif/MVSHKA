@@ -68,7 +68,7 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
       secondAmulet:false, claraHint:false, hiddenAmulet:false,
     });
     DevTools.ensureRunning();
-    await DevTools.teleport('genevieveHouse');
+    await DevTools.teleport('genLiving');    // Женевьева теперь в гостиной
   });
   await p.waitForTimeout(700);
 

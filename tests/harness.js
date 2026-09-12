@@ -29,13 +29,22 @@ async function pump(page, picks, tag) {
       const acted = await page.evaluate(() => {
         const S = Shift;
         if (!S.resolve) return 'done';
+        // перед первой сменой игра показывает правила и останавливает
+        // часы: игрок закрывает их кнопкой, харнесс делает то же
+        const help = document.getElementById('shiftHelp');
+        if (help && help.classList.contains('show')) { S.help(false); return 'help'; }
         const go = (x, y) => { S.naya.tx = x; S.naya.ty = y; };
         if (S.menuOpen) {                             // назвать Крису блюдо
           const g = S.guests.find(x => x.state === 'ordered');
           if (!g) { S.menuOpen = false; return 'close'; }
-          const i = S.MENU.findIndex(m => m.id === g.dish);
+          /* Сетка меню — две колонки на три ряда; считать ячейку надо так
+             же, как это делает pickDish, иначе всегда выбирается первое
+             доступное блюдо. */
+          const menu = S.availableMenu();
+          const i = menu.findIndex(m => m.id === g.dish);
+          if (i < 0) { S.menuOpen = false; return 'nodish'; }
           const b = S.MENU_BOX;
-          S.pickDish(b.x + 6 + (i % 3) * 66 + 30, b.y + 18 + ((i / 3) | 0) * 42 + 20);
+          S.pickDish(b.x + 6 + (i % 2) * 130 + 60, b.y + 28 + ((i / 2) | 0) * 62 + 30);
           return 'cook';
         }
         if (S.carry) {                                // отнести тому, кто заказал
@@ -138,8 +147,10 @@ async function opening(page, picks, tag) {
   await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
   await step(page, 'obj', 'toRightHouse', [], tag);                // Genevieve at home
+  await step(page, 'obj', 'toLiving', [], tag);                // прихожая -> гостиная
   await step(page, 'obj', 'toCommune', [], tag);                   // commune intro
-  await step(page, 'obj', 'exit', [], tag);
+  await step(page, 'obj', 'exit', [], tag);                        // -> гостиная
+  await step(page, 'obj', 'toHallway', [], tag);                   // -> прихожая
   await step(page, 'obj', 'exit', [], tag);                        // -> street
   await step(page, 'obj', 'toHome', [], tag);                      // -> entry hall
   await step(page, 'obj', 'toFlat', [], tag);                      // -> hallway
@@ -286,8 +297,10 @@ async function amuletArc(page, picks, tag) {
   await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
   await step(page, 'obj', 'toRightHouse', [], tag);               // genevieve
+  await step(page, 'obj', 'toLiving', [], tag);               // прихожая -> гостиная
   await step(page, 'obj', 'toCommune', [], tag);                  // panic scene
-  await step(page, 'obj', 'exit', [], tag);
+  await step(page, 'obj', 'exit', [], tag);                       // -> гостиная
+  await step(page, 'obj', 'toHallway', [], tag);                  // -> прихожая
   await step(page, 'obj', 'exit', [], tag);                       // -> street
   await step(page, 'obj', 'toOldTown', [], tag);                  // old quarter
   await step(page, 'obj', 'toRose', [], tag);                     // Rose's own house
@@ -297,8 +310,10 @@ async function amuletArc(page, picks, tag) {
   await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
   await step(page, 'obj', 'toRightHouse', [], tag);               // genevieve
+  await step(page, 'obj', 'toLiving', [], tag);               // прихожая -> гостиная
   await step(page, 'obj', 'toCommune', [], tag);                  // ward scene
-  await step(page, 'obj', 'exit', [], tag);
+  await step(page, 'obj', 'exit', [], tag);                       // -> гостиная
+  await step(page, 'obj', 'toHallway', [], tag);                  // -> прихожая
   await step(page, 'obj', 'exit', [], tag);                       // -> street
   await step(page, 'obj', 'toOldTown', [], tag);
   await step(page, 'obj', 'toNightRoad', [], tag);                // out of town

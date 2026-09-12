@@ -58,8 +58,18 @@ const TURN = `(() => {
         shown: document.getElementById('shiftScreen').classList.contains('show'),
       }; });
     }, ms);
+    /* Перед первой сменой игра показывает правила и останавливает часы.
+       Игрок закрывает их кнопкой — бот делает то же самое. */
+    const dismissHelp = async () => {
+      const shown = await page.evaluate(() =>
+        document.getElementById('shiftHelp').classList.contains('show'));
+      if (shown) { await page.click('#shiftHelpOk'); await page.waitForTimeout(200); }
+    };
     const wait = async (play) => {
       for (let i = 0; i < 400; i++) {
+        /* Окно правил появляется вместе со сменой, а не мгновенно, поэтому
+           проверяем его на каждом круге, а не один раз до начала. */
+        await dismissHelp();
         const r = await page.evaluate(() => window.__res);
         if (r) return r;
         if (play) await page.evaluate(TURN);

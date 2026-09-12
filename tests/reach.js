@@ -1,8 +1,9 @@
 const H = require('./harness.js');
 const ENTRY = {
   nayaRoom:[120,255], corridor1:[120,210], street:[120,210], cafe:[120,268],
-  hell:[160,240], lilithHall:[180,340], genevieveHouse:[120,258], communeHall:[150,268],
+  hell:[160,240], lilithHall:[180,340], genevieveHouse:[100,180], communeHall:[150,268],
   witch1House:[120,258], witch2House:[120,258], nightSpot:[120,268], witch3House:[120,262],
+  genLiving:[130,240], genKitchen:[110,200], genStudy:[110,196], genBed:[110,186], genBath:[85,160],
   backAlley:[120,280], hellFinal:[150,300], parkWalk:[120,290],
   kitchen:[120,258], bathroom:[120,240], balcony:[120,192], stairwell:[120,108], oldTown:[30,280],
   prologueHell:[120,200], playground:[150,236], playgroundNow:[150,268],
