@@ -352,6 +352,13 @@
   }
   .devBtn .devTitle { color:#f0e4c0; display:block; }
   .devBtn .devDesc { color:#927f88; display:block; margin-top:3px; font-size:10px; }
+  .devNow { color:#e0c8a0; font-size:11px; margin:4px 0 6px; min-height:14px; }
+  .devRow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .devRow input[type=range] { flex:1 1 90px; min-width:70px; }
+  .devMini { background:#241820; color:#f0e4c0; border:1px solid #5a3040;
+             border-radius:6px; padding:5px 11px; font-size:13px; cursor:pointer; }
+  .devMini:hover,.devMini:active { background:#3a2030; }
+  .devBtn.playing { border-color:#c07a90; background:#3a2030; }
   .devDanger { border-color:rgba(180,70,80,.45); }
   #devStateReadout {
     margin-top:12px; padding:10px;
@@ -438,6 +445,8 @@
     <input type="range" id="volSlider" min="0" max="100" value="50">
     <label>Музыка: <span id="musVal">40</span>%</label>
     <input type="range" id="musSlider" min="0" max="100" value="40">
+    <label>Фон и шумы: <span id="ambVal">55</span>%</label>
+    <input type="range" id="ambSlider" min="0" max="100" value="55">
     <label>Скорость текста: <span id="spdVal">30</span></label>
     <input type="range" id="spdSlider" min="5" max="90" value="30">
     <label>Эффекты экрана: <span id="fxVal">вкл</span></label>
@@ -512,6 +521,19 @@
       <div class="devSection">БЫСТРЫЙ ПЕРЕХОД — ОСТАЛЬНЫЕ ЛОКАЦИИ</div>
       <div class="devGrid" id="devWorldGrid"></div>
 
+      <div class="devSection">МУЗЫКА / SOUNDTRACK</div>
+      <div class="devNow" id="devMusNow">— ничего не играет —</div>
+      <div class="devRow">
+        <button class="devMini" id="devMusPlay">▶</button>
+        <button class="devMini" id="devMusPause">⏸</button>
+        <button class="devMini" id="devMusStop">■</button>
+        <span class="devDesc" id="devMusLayerLbl">слой 0</span>
+        <input type="range" id="devMusLayer" min="0" max="3" value="0">
+        <span class="devDesc" id="devMusVolLbl">60%</span>
+        <input type="range" id="devMusVol" min="0" max="100" value="60">
+      </div>
+      <div class="devGrid" id="devMusGrid"></div>
+
       <div class="devSection">ОБЩИЕ ТЕСТЫ</div>
       <div class="devGrid">
         <button class="devBtn devDanger" id="devFresh">
@@ -560,7 +582,10 @@ const CONFIG = {
    AUDIO — SFX (Web Audio) + simple procedural ambient music
 ===================================================================== */
 const Audio = {
-  ctx:null, volume:0.5, musicVolume:0.4,
+  /* Три независимых шины: SFX (volume), музыка (Music.vol) и фоновые
+     шумы с событиями (ambientVolume). Раньше эмбиент ехал на громкости
+     музыки, и убавить одно, не убавив другое, было нельзя. */
+  ctx:null, volume:0.5, musicVolume:0.4, ambientVolume:0.55,
   init() {
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch(e) { this.ctx = null; }
@@ -608,20 +633,380 @@ const Audio = {
   rune()  { this.beep(330,0.25,'triangle',.12); setTimeout(()=>this.beep(247,0.3,'triangle',.10),120); },
 };
 
-/* --- Ambient music: 3 detuned oscillators through a lowpass, chord per theme --- */
+/* =====================================================================
+   МУЗЫКА — процедурный секвенсор на Web Audio.
+
+   Игра остаётся одним файлом без единого сетевого запроса, поэтому
+   саундтрек не лежит в mp3, а играется: у каждой темы есть темп, размер,
+   последовательность аккордов, мелодия и набор голосов. Ноты ставятся в
+   очередь заранее (lookahead), а не по таймеру кадра — иначе ритм плывёт.
+
+   Референсы задавали настроение, а не материал: осенняя меланхолия
+   гитарных тем, вальсовая лёгкость начала, фортепианная сдержанность
+   университета, оркестровый размах пролога. Мелодии здесь свои.
+
+   Файлы всё ещё можно подсунуть вместо синтеза — см. useFiles().        */
 const Music = {
-  nodes:null, gain:null, filter:null, lfo:null, current:null,
-  /* Real loops can replace the synth pad without touching anything else:
-     put the files next to index.html and call
-        Music.useFiles();            // uses the default names below
-        Music.useFiles({hell:'my/track.ogg'});
-     Left empty by default so the single-file build makes no network requests. */
-  DEFAULT_FILES: { home:'assets/audio/home.mp3', street:'assets/audio/town.mp3',
-                   warm:'assets/audio/cafe.mp3', tense:'assets/audio/witch.mp3',
-                   hell:'assets/audio/hell.mp3', sad:'assets/audio/sad.mp3' },
-  FILES: {},
-  useFiles(map) { this.FILES = Object.assign({}, this.DEFAULT_FILES, map || {}); this.els = {}; this.current = null; },
-  els:{}, elCur:null,
+  /* ---------- шина и состояние ---------- */
+  master:null, bus:null, timer:null, started:false,
+  cur:null, layer:0, step:0, nextTime:0, duckAmt:1, vol:0.4,
+  LOOKAHEAD:0.18, TICK:35,
+
+  /* ---------- ноты ---------- */
+  SEMI:{C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11},
+  hz(name) {
+    if (typeof name === 'number') return name;
+    const m = /^([A-G][b#]?)(-?\d)$/.exec(name);
+    if (!m) return 440;
+    return 440 * Math.pow(2, (this.SEMI[m[1]] + (+m[2] + 1) * 12 - 69) / 12);
+  },
+  /* Аккорд по имени: Am, F, G7, Cmaj7, Ddim. Возвращает ступени в полутонах. */
+  CHORD:{ '':[0,4,7], m:[0,3,7], 7:[0,4,7,10], m7:[0,3,7,10], maj7:[0,4,7,11],
+          dim:[0,3,6], sus2:[0,2,7], sus4:[0,5,7], m6:[0,3,7,9], add9:[0,4,7,14] },
+  chordNotes(name, oct) {
+    const m = /^([A-G][b#]?)(.*)$/.exec(name || 'C');
+    if (!m) return [this.hz('C' + oct)];
+    const root = this.SEMI[m[1]] || 0;
+    const steps = this.CHORD[m[2]] || this.CHORD[''];
+    return steps.map(s => 440 * Math.pow(2, (root + s + (oct + 1) * 12 - 69) / 12));
+  },
+
+  /* ---------- голоса ---------- */
+  /* Каждый инструмент собирает свою цепочку и сам её гасит: узлы живут
+     ровно столько, сколько звучит нота, иначе на длинной сессии их
+     набираются тысячи. */
+  voice(type, t, freq, dur, vel) {
+    const c = Audio.ctx; if (!c || !this.bus) return;
+    const amp = vel * this.vol * this.duckAmt;
+    if (amp <= 0.0004 || !isFinite(freq)) return;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    const kill = end => {
+      const stopAt = end + 0.05;
+      g.gain.setTargetAtTime(0.0001, end, 0.04);
+      return stopAt;
+    };
+    let stopAt = t + dur + 0.1;
+
+    if (type === 'piano') {
+      const o1 = c.createOscillator(), o2 = c.createOscillator();
+      o1.type = 'triangle'; o2.type = 'sine';
+      o1.frequency.value = freq; o2.frequency.value = freq * 2;
+      const g2 = c.createGain(); g2.gain.value = 0.16;
+      const f = c.createBiquadFilter(); f.type = 'lowpass';
+      f.frequency.setValueAtTime(Math.min(9000, freq * 9), t);
+      f.frequency.exponentialRampToValueAtTime(Math.max(400, freq * 2.2), t + dur * 0.9);
+      o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(f); f.connect(this.bus);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o1.start(t); o2.start(t); stopAt = t + dur + 0.05;
+      o1.stop(stopAt); o2.stop(stopAt);
+      o1.onended = () => { try { g.disconnect(); g2.disconnect(); f.disconnect(); } catch(e){} };
+      return;
+    }
+    if (type === 'guitar' || type === 'pluck') {
+      const o = c.createOscillator();
+      o.type = 'sawtooth'; o.frequency.value = freq;
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 4;
+      f.frequency.setValueAtTime(Math.min(6000, freq * 7), t);
+      f.frequency.exponentialRampToValueAtTime(Math.max(240, freq * 1.6), t + Math.min(0.5, dur));
+      o.connect(g); g.connect(f); f.connect(this.bus);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); stopAt = t + dur + 0.05; o.stop(stopAt);
+      o.onended = () => { try { g.disconnect(); f.disconnect(); } catch(e){} };
+      return;
+    }
+    if (type === 'bass') {
+      const o = c.createOscillator(), o2 = c.createOscillator();
+      o.type = 'triangle'; o2.type = 'sine';
+      o.frequency.value = freq; o2.frequency.value = freq / 2;
+      const g2 = c.createGain(); g2.gain.value = 0.5;
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(f); f.connect(this.bus);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o2.start(t); stopAt = t + dur + 0.05; o.stop(stopAt); o2.stop(stopAt);
+      o.onended = () => { try { g.disconnect(); g2.disconnect(); f.disconnect(); } catch(e){} };
+      return;
+    }
+    if (type === 'pad' || type === 'strings') {
+      const o1 = c.createOscillator(), o2 = c.createOscillator();
+      o1.type = 'sawtooth'; o2.type = 'sawtooth';
+      o1.frequency.value = freq; o2.frequency.value = freq * 1.005;
+      const f = c.createBiquadFilter(); f.type = 'lowpass';
+      f.frequency.value = type === 'strings' ? 1800 : 900; f.Q.value = 0.7;
+      o1.connect(g); o2.connect(g); g.connect(f); f.connect(this.bus);
+      const atk = type === 'strings' ? 0.35 : 0.7;
+      g.gain.linearRampToValueAtTime(amp, t + Math.min(atk, dur * 0.5));
+      g.gain.setValueAtTime(amp, t + dur * 0.8);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o1.start(t); o2.start(t); stopAt = t + dur + 0.08; o1.stop(stopAt); o2.stop(stopAt);
+      o1.onended = () => { try { g.disconnect(); f.disconnect(); } catch(e){} };
+      return;
+    }
+    if (type === 'bell') {
+      const o1 = c.createOscillator(), o2 = c.createOscillator();
+      o1.type = 'sine'; o2.type = 'sine';
+      o1.frequency.value = freq; o2.frequency.value = freq * 2.76;   // негармоничный обертон
+      const g2 = c.createGain(); g2.gain.value = 0.3;
+      o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(this.bus);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o1.start(t); o2.start(t); stopAt = t + dur + 0.05; o1.stop(stopAt); o2.stop(stopAt);
+      o1.onended = () => { try { g.disconnect(); g2.disconnect(); } catch(e){} };
+      return;
+    }
+    kill(t + dur);
+  },
+  /* Ударные: три коротких шумовых/синусных удара, без сэмплов. */
+  drum(kind, t, vel) {
+    const c = Audio.ctx; if (!c || !this.bus) return;
+    const amp = vel * this.vol * this.duckAmt;
+    if (amp <= 0.0004) return;
+    if (kind === 'k') {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(120, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+      g.gain.setValueAtTime(amp, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      o.connect(g); g.connect(this.bus);
+      o.start(t); o.stop(t + 0.22);
+      o.onended = () => { try { g.disconnect(); } catch(e){} };
+      return;
+    }
+    const dur = kind === 's' ? 0.16 : 0.05;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter();
+    if (kind === 's') { f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.8; }
+    else { f.type = 'highpass'; f.frequency.value = 7000; }
+    const g = c.createGain(); g.gain.value = amp * (kind === 's' ? 0.9 : 0.5);
+    src.connect(f); f.connect(g); g.connect(this.bus);
+    src.start(t);
+    src.onended = () => { try { f.disconnect(); g.disconnect(); } catch(e){} };
+  },
+
+  /* ---------- партитуры ----------
+     meter — долей в такте, сетка шаблонов — восьмые (meter*2 знака на такт).
+     В pat: цифра — ступень аккорда (с переносом на октаву выше при выходе
+     за пределы), 'r' — основной тон, '.' — пауза.
+     melody: [доля от начала петли, нота, длительность в долях].
+     layer — с какого «уровня» темы голос вступает: так одна и та же тема
+     обрастает слоями по мере расследования, а не подменяется другой.      */
+  TRACKS: {
+    intro: { title:'Начало игры', bpm:116, meter:3, oct:3,
+      chords:['F','Dm','Bb','C'],
+      voices:[
+        {i:'bass',  kind:'root', gain:.20, pat:'x.....'},
+        {i:'piano', kind:'arp',  gain:.10, pat:'..0.1.', oct:4},
+        {i:'piano', kind:'melody', gain:.26, notes:[
+          [0,'A4',1],[1,'C5',1],[2,'D5',1],[3,'C5',1.6],[5,'A4',.8],
+          [6,'Bb4',1],[7,'D5',1],[8,'C5',1.6],[10,'A4',.8],[11,'G4',.9]]},
+      ]},
+
+    prologue: { title:'Пролог', bpm:74, meter:4, oct:2,
+      chords:['Dm','Bb','F','C','Dm','Bb','Gm','A'],
+      voices:[
+        {i:'pad',   kind:'hold', gain:.13, oct:3},
+        {i:'bass',  kind:'root', gain:.22, pat:'x.......'},
+        {i:'bell',  kind:'melody', gain:.20, layer:1, notes:[
+          [0,'D5',2],[2,'F5',1],[3,'E5',1],[4,'D5',2],[6,'C5',2],
+          [8,'F5',1],[9,'E5',1],[10,'D5',2],[12,'A4',3],
+          [16,'D5',2],[18,'F5',1],[19,'G5',1],[20,'A5',3],[23,'F5',1],
+          [24,'G5',2],[26,'F5',1],[27,'E5',1],[28,'D5',4]]},
+        {i:'strings', kind:'hold', gain:.11, layer:2, oct:4},
+        {i:'piano', kind:'arp', gain:.09, layer:2, pat:'0.2.1.2.', oct:4},
+        {i:'drum',  kind:'drums', gain:.16, layer:3, pat:'k...k...'},
+      ]},
+
+    street: { title:'Улица', bpm:94, meter:4, oct:2,
+      chords:['Em','C','G','D'],
+      voices:[
+        {i:'bass',   kind:'root', gain:.19, pat:'x...x...'},
+        {i:'guitar', kind:'arp',  gain:.15, pat:'0.1.2.1.', oct:3},
+        {i:'guitar', kind:'melody', gain:.17, notes:[
+          [0,'B4',1],[1,'G4',.8],[2,'A4',1.4],[4,'E4',1.6],
+          [6,'G4',.8],[7,'A4',.8],[8,'B4',1.6],[10,'D5',1.4],
+          [12,'B4',1],[13,'A4',1],[14,'G4',2]]},
+        {i:'drum',   kind:'drums', gain:.10, layer:1, pat:'..h...h.'},
+      ]},
+
+    cafe: { title:'Кафе', bpm:84, meter:4, oct:2,
+      chords:['C','Am','F','G'],
+      voices:[
+        {i:'bass',   kind:'root', gain:.17, pat:'x.......'},
+        {i:'guitar', kind:'arp',  gain:.14, pat:'0.1.2.1.', oct:3},
+        {i:'piano',  kind:'melody', gain:.16, layer:1, notes:[
+          [0,'E4',1.4],[2,'G4',1],[3,'A4',1],[4,'G4',2],
+          [7,'E4',1],[8,'F4',1.4],[10,'A4',1],[11,'C5',1],[12,'B4',2],[14,'G4',2]]},
+      ]},
+
+    shift: { title:'Кафе — смена', bpm:118, meter:4, oct:2,
+      chords:['C','Am','F','G'],
+      voices:[
+        {i:'bass',   kind:'root', gain:.20, pat:'x..x..x.'},
+        {i:'guitar', kind:'arp',  gain:.16, pat:'0.1.2.1.', oct:3},
+        {i:'guitar', kind:'arp',  gain:.10, pat:'..2...1.', oct:4},
+        {i:'drum',   kind:'drums', gain:.15, pat:'k.hshk.h'},
+        {i:'piano',  kind:'melody', gain:.15, notes:[
+          [0,'G4',.5],[.5,'A4',.5],[1,'C5',1],[2,'B4',.5],[2.5,'G4',1],
+          [4,'E4',.5],[4.5,'G4',.5],[5,'A4',1],[6,'G4',1.4],
+          [8,'F4',.5],[8.5,'A4',.5],[9,'C5',1],[10,'A4',1.4],
+          [12,'D5',.5],[12.5,'B4',.5],[13,'G4',1.6]]},
+      ]},
+
+    home: { title:'Дом', bpm:76, meter:4, oct:2,
+      chords:['C','Em','Am','F'],
+      voices:[
+        {i:'bass',  kind:'root', gain:.14, pat:'x.......'},
+        {i:'piano', kind:'arp',  gain:.11, pat:'0...2...', oct:4},
+        {i:'piano', kind:'melody', gain:.20, notes:[
+          [0,'G4',2],[2,'E4',1.6],[4,'B4',2],[6,'G4',1.6],
+          [8,'A4',2],[10,'C5',1.6],[12,'F4',2],[14,'A4',1.6]]},
+      ]},
+
+    uni: { title:'Университет', bpm:72, meter:4, oct:2,
+      chords:['Am','Dm','E','Am','F','C','Dm','E'],
+      voices:[
+        {i:'piano', kind:'arp', gain:.12, pat:'0.1.2.1.', oct:4},
+        {i:'piano', kind:'melody', gain:.21, notes:[
+          [0,'A4',1.6],[2,'C5',1],[3,'B4',1],[4,'A4',2],[6,'F4',1.6],
+          [8,'E4',2],[10,'A4',1.6],[12,'C5',2],[14,'B4',1.6],
+          [16,'A4',1],[17,'C5',1],[18,'E5',2],[20,'D5',1.6],
+          [22,'C5',1.6],[24,'D5',2],[26,'F4',1.6],[28,'E4',3]]},
+        {i:'bass',  kind:'root', gain:.17, layer:1, pat:'x.......'},
+        {i:'strings', kind:'hold', gain:.10, layer:2, oct:3},
+        {i:'bell',  kind:'melody', gain:.13, layer:3, notes:[
+          [0,'A5',2],[4,'E5',2],[8,'C5',2],[12,'E5',2],
+          [16,'A5',2],[20,'G5',2],[24,'F5',2],[28,'E5',3]]},
+        {i:'drum',  kind:'drums', gain:.09, layer:3, pat:'k.......'},
+      ]},
+
+    oldWing: { title:'Старое крыло', bpm:60, meter:4, oct:2,
+      chords:['Am','F','E','Am'],
+      voices:[
+        {i:'pad',   kind:'hold', gain:.14, oct:2},
+        {i:'bass',  kind:'root', gain:.16, pat:'x.......'},
+        {i:'piano', kind:'melody', gain:.16, notes:[
+          [0,'A4',2],[3,'G#4',1.4],[6,'E4',2],
+          [8,'F4',2],[11,'E4',1.4],[14,'C4',2]]},
+      ]},
+
+    basement: { title:'Цоколь', bpm:52, meter:4, oct:1,
+      chords:['Dm','Dm','Bb','A'],
+      voices:[
+        {i:'pad',  kind:'hold', gain:.16, oct:2},
+        {i:'bass', kind:'root', gain:.18, pat:'x.......'},
+        {i:'bell', kind:'melody', gain:.11, notes:[[2,'D4',2],[9,'F4',2],[14,'A3',3]]},
+      ]},
+
+    archive: { title:'Архив', bpm:58, meter:4, oct:2,
+      chords:['Dm','Gm','Bb','A'],
+      voices:[
+        {i:'pad',  kind:'hold', gain:.12, oct:3},
+        {i:'bell', kind:'melody', gain:.16, notes:[
+          [0,'D5',2],[3,'F5',1.4],[6,'A4',2],
+          [8,'Bb4',2],[11,'D5',1.4],[14,'C#5',2]]},
+        {i:'bass', kind:'root', gain:.13, layer:1, pat:'x.......'},
+      ]},
+
+    roof: { title:'Крыша', bpm:68, meter:4, oct:2,
+      chords:['D','Bm','G','A','D','Bm','Em','A'],
+      voices:[
+        {i:'strings', kind:'hold', gain:.13, oct:3},
+        {i:'bass',    kind:'root', gain:.18, pat:'x.......'},
+        {i:'piano',   kind:'melody', gain:.22, notes:[
+          [0,'D5',2],[2,'F#5',1.6],[4,'E5',2],[6,'D5',1.6],
+          [8,'B4',2],[10,'D5',1.6],[12,'A4',3],
+          [16,'D5',1],[17,'E5',1],[18,'F#5',2],[20,'A5',3],
+          [24,'G5',2],[26,'F#5',1.6],[28,'E5',3]]},
+        {i:'bell',    kind:'melody', gain:.12, layer:1, notes:[[0,'D6',3],[16,'A5',3]]},
+      ]},
+
+    tense: { title:'Тревога', bpm:96, meter:4, oct:2,
+      chords:['Am','Am','F','E'],
+      voices:[
+        {i:'bass',    kind:'root', gain:.20, pat:'x.x.x.x.'},
+        {i:'strings', kind:'hold', gain:.10, oct:3},
+        {i:'piano',   kind:'arp', gain:.11, pat:'0.0.2.1.', oct:4},
+        {i:'bell',    kind:'melody', gain:.11, layer:1, notes:[[0,'E5',1],[8,'F5',1],[12,'E5',2]]},
+      ]},
+
+    sad: { title:'Печаль', bpm:64, meter:4, oct:2,
+      chords:['Am','F','C','G'],
+      voices:[
+        {i:'piano', kind:'arp', gain:.10, pat:'0...2...', oct:4},
+        {i:'piano', kind:'melody', gain:.20, notes:[
+          [0,'C5',2],[2,'B4',1.6],[4,'A4',3],
+          [8,'G4',2],[10,'E4',1.6],[12,'F4',3]]},
+        {i:'bass',  kind:'root', gain:.13, layer:1, pat:'x.......'},
+      ]},
+
+    hell: { title:'Ад', bpm:54, meter:4, oct:1,
+      chords:['Cm','Cm','Ab','G'],
+      voices:[
+        {i:'pad',  kind:'hold', gain:.18, oct:2},
+        {i:'bass', kind:'root', gain:.20, pat:'x.......'},
+        {i:'bell', kind:'melody', gain:.12, notes:[[4,'C4',2],[12,'Eb4',3]]},
+        {i:'drum', kind:'drums', gain:.12, layer:1, pat:'k.......'},
+      ]},
+
+    endLoner: { title:'Концовка I — Одиночка', bpm:62, meter:4, oct:2,
+      chords:['Cm','Ab','Eb','Bb'],
+      voices:[
+        {i:'piano', kind:'melody', gain:.20, notes:[
+          [0,'Eb4',2],[3,'C4',2],[8,'Ab4',2],[11,'G4',3]]},
+        {i:'piano', kind:'arp', gain:.08, pat:'0.......', oct:4},
+      ]},
+
+    endWitch: { title:'Концовка II — Злая ведьма', bpm:86, meter:4, oct:1,
+      chords:['Em','C','Am','B'],
+      voices:[
+        {i:'bass',    kind:'root', gain:.22, pat:'x.x.x.x.'},
+        {i:'pad',     kind:'hold', gain:.15, oct:2},
+        {i:'strings', kind:'hold', gain:.12, layer:1, oct:3},
+        {i:'drum',    kind:'drums', gain:.16, pat:'k..k..s.'},
+        {i:'bell',    kind:'melody', gain:.14, notes:[
+          [0,'B4',2],[4,'E5',2],[8,'C5',2],[12,'B4',3]]},
+      ]},
+
+    endRevenge: { title:'Концовка III — Месть', bpm:70, meter:4, oct:2,
+      chords:['Bm','G','D','F#'],
+      voices:[
+        {i:'strings', kind:'hold', gain:.12, oct:3},
+        {i:'bass',    kind:'root', gain:.18, pat:'x.......'},
+        {i:'piano',   kind:'melody', gain:.22, notes:[
+          [0,'F#5',2],[2,'D5',1.6],[4,'B4',3],
+          [8,'A4',1],[9,'B4',1],[10,'D5',2],[12,'A#4',3]]},
+      ]},
+
+    endStay: { title:'Концовка IV — Остаться', bpm:80, meter:4, oct:2,
+      chords:['G','Em','C','D'],
+      voices:[
+        {i:'bass',  kind:'root', gain:.15, pat:'x.......'},
+        {i:'piano', kind:'arp', gain:.11, pat:'0.1.2.1.', oct:4},
+        {i:'piano', kind:'melody', gain:.22, notes:[
+          [0,'D5',1.6],[2,'B4',1],[3,'G4',1],[4,'A4',2],[6,'B4',1.6],
+          [8,'C5',1.6],[10,'E5',1],[11,'D5',1],[12,'G4',3]]},
+      ]},
+  },
+  /* Старые имена тем остаются рабочими: по ним в сценарии сорок с лишним
+     вызовов, и переименовывать их значило бы трогать сюжет. */
+  ALIAS:{ warm:'cafe', none:null },
+
+  /* ---------- запись вместо синтеза ----------
+     Файлы можно положить рядом с игрой и подменить ими синтез, не трогая
+     ничего больше. По умолчанию выключено: одиночный файл не должен
+     ходить в сеть.                                                      */
+  DEFAULT_FILES:{ home:'assets/audio/home.mp3', street:'assets/audio/town.mp3',
+                  cafe:'assets/audio/cafe.mp3', tense:'assets/audio/witch.mp3',
+                  hell:'assets/audio/hell.mp3', sad:'assets/audio/sad.mp3' },
+  FILES:{}, els:{}, elCur:null,
+  useFiles(map) { this.FILES = Object.assign({}, this.DEFAULT_FILES, map || {}); this.els = {}; this.cur = null; },
   tryFile(theme) {
     const src = this.FILES[theme];
     if (!src) return false;
@@ -635,69 +1020,148 @@ const Music = {
     if (!el || !el.readyState) return false;
     if (this.elCur && this.elCur !== el) this.elCur.pause();
     this.elCur = el;
-    el.volume = Math.min(1, Audio.musicVolume);
+    el.volume = Math.min(1, this.vol);
     el.play().catch(()=>{});
     return true;
   },
-  THEMES: {
-    home:   [110, 164.81, 196.00],
-    street: [98,  146.83, 174.61],
-    tense:  [103.83, 138.59, 155.56],
-    hell:   [65.41, 92.50, 98.00],
-    sad:    [87.31, 130.81, 155.56],
-    warm:   [130.81, 164.81, 196.00],
-    none:   null,
-  },
-  play(theme) {
-    if (!Audio.ctx) return;
-    if (this.current === theme) return;
-    this.current = theme;
-    const chord = this.THEMES[theme];
-    if (!chord) { this.stop(); return; }
-    if (this.tryFile(theme)) { if (this.gain && Audio.ctx) { try { this.gain.gain.setTargetAtTime(0, Audio.ctx.currentTime, .6); } catch(e){} } return; }
-    if (this.elCur) { this.elCur.pause(); this.elCur = null; }
-    if (!this.nodes) this._build();
-    const t = Audio.ctx.currentTime;
-    this.nodes.forEach((o,i)=>{ try { o.frequency.setTargetAtTime(chord[i], t, 0.8); } catch(e){} });
-    const target = 0.055 * this.musicScale();
-    try { this.gain.gain.setTargetAtTime(target, t, 1.2); } catch(e){}
-  },
-  musicScale() { return Audio.musicVolume; },
-  _build() {
+
+  /* ---------- проигрыватель ---------- */
+  build() {
+    if (this.bus || !Audio.ctx) return;
     const c = Audio.ctx;
-    this.gain = c.createGain(); this.gain.gain.value = 0;
-    this.filter = c.createBiquadFilter();
-    this.filter.type = 'lowpass'; this.filter.frequency.value = 620; this.filter.Q.value = 3;
-    this.filter.connect(this.gain); this.gain.connect(c.destination);
-    this.nodes = [];
-    [0, 0.4, -0.35].forEach((det, i) => {
-      const o = c.createOscillator();
-      o.type = i === 0 ? 'sine' : 'triangle';
-      o.frequency.value = 110; o.detune.value = det * 14;
-      o.connect(this.filter); o.start();
-      this.nodes.push(o);
-    });
-    // slow breathing LFO on the filter
-    this.lfo = c.createOscillator(); this.lfo.frequency.value = 0.07;
-    const lg = c.createGain(); lg.gain.value = 190;
-    this.lfo.connect(lg); lg.connect(this.filter.frequency); this.lfo.start();
+    this.bus = c.createGain(); this.bus.gain.value = 1;
+    this.master = c.createGain(); this.master.gain.value = 1;
+    this.bus.connect(this.master); this.master.connect(c.destination);
   },
-  setVolume(v) {
-    Audio.musicVolume = v;
-    if (typeof Ambience !== 'undefined') Ambience.refresh();
-    if (this.gain && Audio.ctx && this.current && this.THEMES[this.current]) {
-      try { this.gain.gain.setTargetAtTime(0.055 * v, Audio.ctx.currentTime, 0.3); } catch(e){}
+  resolve(name) {
+    if (name in this.ALIAS) name = this.ALIAS[name];
+    return name && this.TRACKS[name] ? name : null;
+  },
+  /* «Уровень» темы по состоянию сюжета. Университет — одно и то же место
+     все четыре дня, и музыка у него одна; меняется её плотность. */
+  layerFor(name) {
+    if (typeof gameState === 'undefined' || !gameState) return 0;
+    if (name === 'uni')      return Math.max(0, Math.min(3, (C('uniDay') || 1) - 1));
+    if (name === 'prologue') return 3;
+    if (name === 'archive' || name === 'sad') return F('sueDead') ? 1 : 0;
+    if (name === 'street' || name === 'cafe') return F('firstAmulet') ? 1 : 0;
+    if (name === 'tense')    return F('secondAmulet') ? 1 : 0;
+    if (name === 'hell')     return F('metLilith') ? 1 : 0;
+    if (name === 'roof')     return C('uniDay') >= 4 ? 1 : 0;
+    return 0;
+  },
+  /* Точка входа для комнат: тема берётся из комнаты, уровень — из сюжета. */
+  forRoom(theme) { this.play(theme, this.layerFor(theme)); },
+  /* layer — «уровень» темы: те же аккорды, но больше голосов. Так
+     университет на четвёртый день звучит как тот же университет. */
+  play(name, layer) {
+    if (!Audio.ctx) return;
+    const key = this.resolve(name);
+    const lay = layer === undefined ? 0 : layer;
+    if (!key) { this.stop(); return; }
+    if (this.cur === key) {                    // та же зона — не перезапускаем
+      if (lay !== this.layer) this.layer = lay;
+      return;
     }
+    this.build();
+    if (this.tryFile(key)) { this.silence(); this.cur = key; this.layer = lay; return; }
+    if (this.elCur) { this.elCur.pause(); this.elCur = null; }
+    const swap = () => {
+      this.cur = key; this.layer = lay; this.step = 0;
+      this.nextTime = Audio.ctx.currentTime + 0.06;
+      this.startTimer();
+      try { this.bus.gain.cancelScheduledValues(Audio.ctx.currentTime);
+            this.bus.gain.setValueAtTime(0.0001, Audio.ctx.currentTime);
+            this.bus.gain.linearRampToValueAtTime(1, Audio.ctx.currentTime + 0.7); } catch(e){}
+    };
+    if (this.cur && this.timer) {              // плавная смена, а не обрыв
+      try { this.bus.gain.cancelScheduledValues(Audio.ctx.currentTime);
+            this.bus.gain.linearRampToValueAtTime(0.0001, Audio.ctx.currentTime + 0.5); } catch(e){}
+      clearTimeout(this._swapT);
+      this._swapT = setTimeout(swap, 520);
+    } else swap();
+  },
+  silence() {
+    if (this.bus && Audio.ctx) { try {
+      this.bus.gain.cancelScheduledValues(Audio.ctx.currentTime);
+      this.bus.gain.linearRampToValueAtTime(0.0001, Audio.ctx.currentTime + 0.4);
+    } catch(e){} }
+    this.stopTimer();
   },
   stop() {
-    this.current = 'none';
-    if (this.gain && Audio.ctx) { try { this.gain.gain.setTargetAtTime(0, Audio.ctx.currentTime, 0.5); } catch(e){} }
+    clearTimeout(this._swapT);
+    this.silence();
+    if (this.elCur) { this.elCur.pause(); this.elCur = null; }
+    this.cur = null;
   },
-  duck(on) {
-    if (!this.gain || !Audio.ctx) return;
-    const base = (this.current && this.THEMES[this.current]) ? 0.055 * Audio.musicVolume : 0;
-    try { this.gain.gain.setTargetAtTime(on ? 0 : base, Audio.ctx.currentTime, on ? 0.05 : 1.0); } catch(e){}
-  }
+  setVolume(v) { this.vol = Math.max(0, Math.min(1, v)); if (this.elCur) this.elCur.volume = this.vol; },
+  /* Приглушение под реплику: громкость возвращается сама. */
+  duck(v) {
+    this.duckAmt = (v === undefined || v === false) ? 1 : Math.max(0, Math.min(1, v));
+    clearTimeout(this._duckT);
+    if (this.duckAmt < 1) this._duckT = setTimeout(()=>{ this.duckAmt = 1; }, 2600);
+  },
+  startTimer() {
+    if (this.timer) return;
+    this.timer = setInterval(()=>{ try { this.tick(); } catch(e) { console.warn('music', e); } }, this.TICK);
+  },
+  stopTimer() { if (this.timer) { clearInterval(this.timer); this.timer = null; } },
+
+  /* Ноты ставятся в очередь заранее: планировщик на кадрах даёт слышимую
+     неровность, а setTimeout — тем более. */
+  tick() {
+    const c = Audio.ctx, tr = this.TRACKS[this.cur];
+    if (!c || !tr) { this.stopTimer(); return; }
+    if (c.state === 'suspended') return;
+    const stepDur = 60 / tr.bpm / 2;
+    const perBar = tr.meter * 2;
+    const total = tr.chords.length * perBar;
+    let guard = 0;
+    while (this.nextTime < c.currentTime + this.LOOKAHEAD && guard++ < 64) {
+      this.emit(tr, this.step % total, this.nextTime, stepDur, perBar);
+      this.step = (this.step + 1) % total;
+      this.nextTime += stepDur;
+    }
+  },
+  emit(tr, pos, t, stepDur, perBar) {
+    const bar = Math.floor(pos / perBar) % tr.chords.length;
+    const inBar = pos % perBar;
+    const beat = pos / 2;
+    for (const v of tr.voices) {
+      if ((v.layer || 0) > this.layer) continue;
+      const oct = v.oct === undefined ? tr.oct : v.oct;
+      const ch = this.chordNotes(tr.chords[bar], oct);
+      if (v.kind === 'hold') {
+        if (inBar !== 0) continue;
+        ch.forEach(f => this.voice(v.i, t, f, stepDur * perBar * 0.98, v.gain / ch.length * 1.6));
+        continue;
+      }
+      if (v.kind === 'drums') {
+        const k = v.pat[inBar % v.pat.length];
+        if (k && k !== '.') this.drum(k, t, v.gain);
+        continue;
+      }
+      if (v.kind === 'root') {
+        if (v.pat[inBar % v.pat.length] !== 'x') continue;
+        this.voice(v.i, t, ch[0], stepDur * 3.2, v.gain);
+        continue;
+      }
+      if (v.kind === 'arp') {
+        const k = v.pat[inBar % v.pat.length];
+        if (!k || k === '.') continue;
+        const idx = k === 'r' ? 0 : (+k || 0);
+        const f = ch[idx % ch.length] * (idx >= ch.length ? 2 : 1);
+        this.voice(v.i, t, f, stepDur * 1.8, v.gain);
+        continue;
+      }
+      if (v.kind === 'melody') {
+        for (const n of v.notes) {
+          if (Math.abs(n[0] - beat) > 0.001) continue;
+          this.voice(v.i, t, this.hz(n[1]), n[2] * (60 / tr.bpm) * 0.95, v.gain);
+        }
+      }
+    }
+  },
 };
 
 /* =====================================================================
@@ -739,7 +1203,7 @@ const Ambience = {
     this.cur = zone;
     const t = Audio.ctx.currentTime;
     const rain = (typeof Weather !== 'undefined') ? Weather.cur.rain : 0;
-    const vol = Audio.musicVolume;
+    const vol = Audio.ambientVolume;
     try {
       this.filter.frequency.setTargetAtTime(z.cut + rain*700, t, 1.2);
       this.gain.gain.setTargetAtTime((z.base + rain*.12) * vol, t, 1.4);
@@ -747,6 +1211,186 @@ const Ambience = {
     } catch(e) {}
   },
   refresh() { if (this.cur) this.set(this.cur); },
+
+  /* ---------- звуковые события ----------
+     Ровный шумовой ковёр делает мир плоским: он одинаков и в парке, и в
+     цоколе. Поэтому поверх него изредка происходят короткие события —
+     птица, чашка, дверь, капля. Играет не больше одного за раз и только
+     если окно игры активно: иначе на длинной сессии набегают сотни узлов.  */
+  busy:false, evTimer:null, prof:null, near:null,
+  E: {
+    bird()   { const f = 1800 + Math.random()*900;
+               Ambience.tone(f, .06, 'sine', .05);
+               setTimeout(()=>Ambience.tone(f*1.25, .05, 'sine', .04), 90);
+               setTimeout(()=>Ambience.tone(f*0.9, .07, 'sine', .035), 180); },
+    gust()   { Ambience.wind(1.1 + Math.random()*0.9, .07); },
+    car()    { Ambience.wind(1.6, .05, 260); },
+    steps()  { for (let i=0;i<4;i++) setTimeout(()=>Ambience.thud(90+Math.random()*20, .03), i*270); },
+    door()   { Ambience.tone(160, .10, 'sawtooth', .04);
+               setTimeout(()=>Ambience.thud(70, .05), 150); },
+    cup()    { Ambience.tone(2400 + Math.random()*500, .05, 'sine', .045);
+               setTimeout(()=>Ambience.tone(3100, .04, 'sine', .025), 60); },
+    coffee() { Ambience.hissBurst(.9, .05, 2600); },
+    murmur() { for (let i=0;i<5;i++) setTimeout(()=>Ambience.tone(220+Math.random()*160, .05, 'triangle', .018), i*130); },
+    page()   { Ambience.hissBurst(.12, .05, 5200); },
+    chair()  { Ambience.tone(120, .18, 'sawtooth', .028); },
+    bell()   { Ambience.tone(880, .5, 'sine', .05); setTimeout(()=>Ambience.tone(660,.6,'sine',.04), 220); },
+    creak()  { const f = 300 + Math.random()*200;
+               Ambience.tone(f, .35, 'sawtooth', .022); },
+    drip()   { Ambience.tone(1400, .05, 'sine', .05);
+               setTimeout(()=>Ambience.tone(900, .08, 'sine', .03), 40); },
+    pipe()   { Ambience.thud(120, .12); setTimeout(()=>Ambience.tone(420,.2,'triangle',.02), 90); },
+    hum()    { Ambience.tone(100, .8, 'sawtooth', .018); },
+    prop()   { Ambience.thud(80, .08); setTimeout(()=>Ambience.tone(240,.12,'sawtooth',.02), 120); },
+    lines()  { for (let i=0;i<7;i++) setTimeout(()=>Ambience.tone(260+Math.random()*200, .06, 'triangle', .022), i*150); },
+  },
+  /* профиль -> список событий с весами и пауза между ними в миллисекундах */
+  PROFILES: {
+    street:   { gap:[2600,7000], ev:[['bird',3],['gust',3],['car',2],['steps',1]] },
+    town:     { gap:[3200,8000], ev:[['gust',3],['car',1],['bird',1],['steps',1]] },
+    cafe:     { gap:[2200,5200], ev:[['cup',3],['murmur',3],['coffee',2],['door',1],['chair',1]] },
+    indoor:   { gap:[5000,12000], ev:[['creak',2],['steps',1]] },
+    uni:      { gap:[2600,6500], ev:[['murmur',3],['steps',3],['door',2],['page',1],['bell',1]] },
+    theatre:  { gap:[2400,5600], ev:[['lines',3],['prop',2],['steps',2],['creak',1]] },
+    library:  { gap:[3400,9000], ev:[['page',3],['chair',2],['murmur',1],['steps',1]] },
+    oldWing:  { gap:[5200,13000], ev:[['creak',3],['gust',2],['hum',2],['steps',1]] },
+    basement: { gap:[3000,8000], ev:[['drip',3],['pipe',2],['hum',3]] },
+    roof:     { gap:[2400,6000], ev:[['gust',4],['car',1],['bird',1]] },
+    forest:   { gap:[3000,8000], ev:[['gust',3],['bird',2],['creak',1]] },
+    hell:     { gap:[4000,11000], ev:[['hum',3],['pipe',1]] },
+    none:     { gap:[9000,9000], ev:[] },
+  },
+  /* короткие голоса для событий — на собственной шине громкости */
+  tone(f, dur, type, vol) {
+    const c = Audio.ctx; if (!c) return;
+    const amp = vol * Audio.ambientVolume;
+    if (amp <= 0.0004) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(amp, c.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + dur + 0.03);
+    o.onended = () => { try { g.disconnect(); } catch(e){} };
+  },
+  thud(f, vol) {
+    const c = Audio.ctx; if (!c) return;
+    const amp = vol * Audio.ambientVolume;
+    if (amp <= 0.0004) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, c.currentTime);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30, f*0.5), c.currentTime + 0.09);
+    g.gain.setValueAtTime(amp, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.14);
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + 0.18);
+    o.onended = () => { try { g.disconnect(); } catch(e){} };
+  },
+  hissBurst(dur, vol, hz) {
+    const c = Audio.ctx; if (!c) return;
+    const amp = vol * Audio.ambientVolume;
+    if (amp <= 0.0004) return;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = hz || 3000; f.Q.value = .8;
+    const g = c.createGain(); g.gain.value = amp;
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start();
+    src.onended = () => { try { f.disconnect(); g.disconnect(); } catch(e){} };
+  },
+  wind(dur, vol, hz) {
+    const c = Audio.ctx; if (!c) return;
+    const amp = vol * Audio.ambientVolume;
+    if (amp <= 0.0004) return;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    let last = 0;
+    for (let i=0;i<n;i++) { const w = Math.random()*2-1; last = (last + .03*w)/1.03; d[i] = last*3; }
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = hz || 700;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, c.currentTime);
+    g.gain.linearRampToValueAtTime(amp, c.currentTime + dur*0.4);
+    g.gain.linearRampToValueAtTime(0.0001, c.currentTime + dur);
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start();
+    src.onended = () => { try { f.disconnect(); g.disconnect(); } catch(e){} };
+  },
+  /* Профиль по ключу комнаты. Вынесено в одно место, чтобы не вписывать
+     звуковое поле в каждую из пятидесяти пяти комнат. */
+  ROOM_PROFILE: {
+    street:['street',['cafe']], oldTown:['street'], parkWalk:['street'],
+    backAlley:['street'], departureStation:['street'], playgroundNow:['street'],
+    playground:['street'], stairwell:['indoor',['street']],
+    cafe:['cafe',['street']],
+    uniFrontYard:['street',['uni']], uniCourtyard:['street',['uni']], uniBackYard:['street'],
+    uniHall:['uni'], uniCorr2:['uni'], uniEastHall:['uni',['library']],
+    uniWestHall:['uni',['theatre']], uniWest2:['uni'], uniEast2:['uni'],
+    uniAud14:['uni'], uniMusicRoom:['uni'], uniArtRoom:['uni'],
+    uniTeachersRoom:['uni'], uniMorelOffice:['indoor',['uni']],
+    uniRehearsal:['theatre'], uniTheatre:['theatre'], uniDressing:['theatre'],
+    uniCostume:['theatre'], uniLibrary:['library'],
+    uniOldWing:['oldWing'], uniServiceStair:['oldWing',['basement']],
+    uniBasement:['basement'], uniArchive:['basement'], uniRoof:['roof'],
+    forestEdge:['forest'], communeRoad:['forest'], communeYard:['forest'],
+    nightSpot:['forest'], oldHouse:['indoor'], oldHouseAttic:['indoor'],
+    hell:['hell'], lilithHall:['hell'], hellStreet:['hell'], hellFinal:['hell'],
+    prologueHell:['hell'],
+  },
+  profileFor(key, room) {
+    const p = this.ROOM_PROFILE[key];
+    if (p) return p;
+    const z = (room && room.zone) || 'indoor';
+    if (z === 'town') return ['town'];
+    if (z === 'street') return ['street'];
+    if (z === 'hell') return ['hell'];
+    return ['indoor'];
+  },
+
+  /* Профиль комнаты плюс «соседи»: у двери репетиционного зала слышно
+     репетицию, в кафе — город с улицы. Это не акустическая симуляция, а
+     подмешивание чужих событий на пониженной громкости. */
+  setProfile(prof, near) {
+    this.prof = this.PROFILES[prof] ? prof : null;
+    this.near = (near || []).filter(k => this.PROFILES[k]);
+    this.scheduleEvent();
+  },
+  scheduleEvent() {
+    clearTimeout(this.evTimer);
+    const P = this.PROFILES[this.prof];
+    if (!P || !P.ev.length) return;
+    const gap = P.gap[0] + Math.random() * (P.gap[1] - P.gap[0]);
+    this.evTimer = setTimeout(() => this.fireEvent(), gap);
+  },
+  fireEvent() {
+    const P = this.PROFILES[this.prof];
+    if (!P) return;
+    const quiet = !Audio.ctx || Audio.ctx.state === 'suspended' ||
+                  document.hidden || Audio.ambientVolume <= 0.01 ||
+                  (typeof Game !== 'undefined' && Game.mode === 'menu');
+    if (!quiet && !this.busy) {
+      // иногда вместо своего события звучит приглушённый сосед за стеной
+      const useNear = this.near.length && Math.random() < 0.28;
+      const src = useNear ? this.PROFILES[this.near[(Math.random()*this.near.length)|0]] : P;
+      const total = src.ev.reduce((a,e)=>a+e[1],0);
+      let r = Math.random()*total, pick = src.ev[0][0];
+      for (const e of src.ev) { r -= e[1]; if (r <= 0) { pick = e[0]; break; } }
+      const fn = this.E[pick];
+      if (fn) {
+        this.busy = true;
+        const keepVol = Audio.ambientVolume;
+        if (useNear) Audio.ambientVolume = keepVol * 0.34;   // за стеной тише
+        try { fn(); } catch(e) { console.warn('ambient', e); }
+        Audio.ambientVolume = keepVol;
+        setTimeout(()=>{ this.busy = false; }, 900);
+      }
+    }
+    this.scheduleEvent();
+  },
   stop() {
     if (this.gain && Audio.ctx) { try {
       this.gain.gain.setTargetAtTime(0, Audio.ctx.currentTime, .5);
@@ -1593,7 +2237,7 @@ function freshState() {
     memories: [],
     journal: [],
     scenesSeen: [],
-    settings: { volume:0.5, music:0.4, textSpeed:30, effects:1 },
+    settings: { volume:0.5, music:0.4, ambient:0.55, textSpeed:30, effects:1 },
   };
 }
 
@@ -3609,7 +4253,15 @@ const World = {
 
   /* Light sources = the room's own list plus any prop that declares one. */
   lightsOf(room) {
-    const out = (room.lights || []).map(L => Object.assign({ r:50, c:'#ffcf7a', i:.8 }, L));
+    /* Фонари и окна разгораются к вечеру: днём источник почти не виден,
+       ночью светит в полную силу. В помещении лампы горят всегда. */
+    const indoor = !!(room.weather && room.weather.indoor);
+    const k = indoor ? 1 : (0.25 + 0.75 * Daylight.lamp());
+    const out = (room.lights || []).map(L => {
+      const o = Object.assign({ r:50, c:'#ffcf7a', i:.8 }, L);
+      o.i *= k;
+      return o;
+    });
     (room.objects || []).forEach(o => {
       if (o.when && !o.when()) return;
       const d = Art.meta(o.t);
@@ -3649,15 +4301,17 @@ const Weather = {
     if (F('sueRevived'))      { r -= .10; f += .05; }
     if (F('chosenEarthPath')) { r -= .45; f -= .40; }
     if (F('sueRefused'))      { f += .16; }
-    return { rain:r, fog:f };
+    const d = Daylight.weather();          // вечер приносит морось и туман
+    return { rain:r + d.rain, fog:f + d.fog };
   },
   apply(room) {
     const base = room.weather || {};
     const m = this.storyMod();
     // indoors the story shows up as a haze in the air, not as weather
     const k = base.indoor ? .3 : 1;
+    const calm = Daylight.weather().calm;
     this.cur = {
-      rain:   clamp((base.rain||0)   + (base.indoor ? 0 : m.rain), 0, 1),
+      rain:   clamp((base.rain||0) * calm + (base.indoor ? 0 : m.rain), 0, 1),
       fog:    clamp((base.fog||0)    + m.fog * k, 0, base.indoor ? .34 : 1),
       wind:   base.wind === undefined ? .25 : base.wind,
       leaves: base.leaves || 0,
@@ -3733,6 +4387,70 @@ const Weather = {
    LIGHTING — a darkness sheet with holes punched out by light sources.
    Cheap, and it does most of the atmospheric work.
 ===================================================================== */
+/* =====================================================================
+   ВРЕМЯ СУТОК
+
+   Часов в игре нет — стрелки двигает сюжет. Пролог играется вечером,
+   переезд и первые дни — при свете, расследование уводит в сумерки, а
+   ночь наступает там, где история и так темнее некуда. Значение одно:
+   0 — день, 1 — ночь; всё остальное (темнота, оттенок, фонари, дождь)
+   считается из него, поэтому «резкого переключения дня в ночь» не бывает
+   даже при прыжке через меню разработчика: величина доезжает плавно.
+===================================================================== */
+const Daylight = {
+  cur:0.3, target:0.3, _last:0,
+  /* Целевое время суток по состоянию истории. Порядок важен: сначала
+     поздние вехи, иначе ранняя проверка перехватит поздний момент. */
+  stageFor() {
+    if (typeof gameState === 'undefined' || !gameState) return 0.32;
+    if (F('chosenEarthPath'))    return 0.34;   // отказ от силы — светлеет
+    if (F('ending'))             return 0.90;
+    if (F('sueDead'))            return 0.94;
+    if (F('secondAmulet'))       return 0.82;
+    if (F('firstAmulet'))        return 0.74;
+    if (F('communeIntro'))       return 0.68;
+    if (F('learnedWitches'))     return 0.64;
+    const d = C('uniDay');
+    if (d >= 1)                  return Math.min(0.62, 0.30 + d * 0.08);
+    if (F('mainStoryStarted'))   return 0.30;
+    if (F('prologBackstoryStarted')) return 0.46;
+    if (!F('prologueComplete'))  return 0.58;
+    return 0.34;
+  },
+  update(dt) {
+    this.target = this.stageFor();
+    const k = Math.min(1, (dt || 16) / 2400);          // около двух секунд на переход
+    this.cur += (this.target - this.cur) * k;
+  },
+  /* Резкая установка — при загрузке сохранения и прыжке из dev-меню. */
+  snap() { this.target = this.stageFor(); this.cur = this.target; },
+  t() { return clamp(this.cur, 0, 1); },
+  /* Насколько темнее становится картинка. В помещении время суток видно
+     слабее: там свои лампы. */
+  dark(indoor) { return this.t() * (indoor ? 0.10 : 0.30); },
+  /* Ночной оттенок: к вечеру внешний свет холоднее и синее. */
+  tintMix() { return clamp((this.t() - 0.30) / 0.55, 0, 1); },
+  /* Фонари и окна: днём не горят, к вечеру разгораются. */
+  lamp() { const x = clamp((this.t() - 0.40) / 0.30, 0, 1); return x * x * (3 - 2 * x); },
+  /* Осень сгущается вместе с вечером — немного дождя и тумана от времени. */
+  weather() {
+    const t = this.t();
+    return { rain: Math.max(0, t - 0.45) * 0.34,
+             fog:  Math.max(0, t - 0.35) * 0.30,
+             /* В начале истории погода спокойная: собственный дождь комнат
+                приглушён, и осень только начинается. */
+             calm: t < 0.36 ? 0.40 : (t < 0.50 ? 0.75 : 1) };
+  },
+  label() {
+    const t = this.t();
+    if (t < 0.28) return 'день';
+    if (t < 0.45) return 'ближе к вечеру';
+    if (t < 0.62) return 'вечер';
+    if (t < 0.80) return 'поздний вечер';
+    return 'ночь';
+  },
+};
+
 const Lighting = {
   buf:null, bctx:null,
   ensure() {
@@ -3790,7 +4508,12 @@ const Lighting = {
     const p = room.light || {};
     let tint = p.tint || '#101828';
     let a = p.dark === undefined ? .28 : p.dark;
+    const indoor = !!(room.weather && room.weather.indoor);
     if (gameState) {
+      // время суток: к вечеру темнее и холоднее, и это видно на улице сильнее
+      a += Daylight.dark(indoor);
+      const mix = Daylight.tintMix() * (indoor ? 0.4 : 1);
+      if (mix > 0.02) tint = shade(tint, 1 - mix * 0.35);
       if (F('sueDead') && !F('sueRevived')) a += .12;
       if (F('chosenWitchPath')) { tint = '#2a0410'; a += .10; }
       if (F('chosenEarthPath')) a = Math.max(0, a - .18);
@@ -5333,6 +6056,7 @@ const Shift = {
       }
       const d=this.difficulty();
       this.resolve=res; this.cfg=d.cfg;
+      Music.play('shift');                     // смена звучит азартнее кафе
       this.naya={x:150,y:378,tx:150,ty:378,step:0};
       this.guests=[]; this.pass=[]; this.carry=null; this.cooking=null;
       this.menuOpen=false; this.served=0; this.missed=0; this.wrong=0;
@@ -5498,6 +6222,7 @@ const Shift = {
   finish(){
     if(!this.resolve)return;
     cancelAnimationFrame(this.raf);
+    Music.forRoom('cafe');                     // после смены — обратно к спокойной теме
     document.getElementById('shiftScreen').classList.remove('show');
     Game.mode='cutscene';
     setFlag('cafeShiftFinished');
@@ -6815,7 +7540,7 @@ street: {
 
 /* ---------------------------------------------------------------- */
 cafe: {
-  name:"Кафе «У Мардж»", music:'warm', w:300, h:300,
+  name:"Кафе «У Мардж»", music:'cafe', w:300, h:300,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.03, wind:0 },
   light:{ tint:'#2a1c14', dark:.16 },
   lights:[
@@ -9654,7 +10379,7 @@ playgroundNow: {
    и только потом попадает в холл. Это не заменяет внутренний двор — это
    отдельная южная территория перед главным входом. */
 uniFrontYard: {
-  name:"Университет. Передний двор", music:'street', w:640, h:400,
+  name:"Университет. Передний двор", music:'uni', w:640, h:400,
   zone:'town', weather:{ rain:.18, fog:.10, wind:.24, leaves:.55 },
   light:{ tint:'#171a24', dark:.28 },
   lights:[
@@ -9857,7 +10582,7 @@ uniFrontYard: {
    игроку, что здание замкнуто в кольцо. Справа парадная лестница,
    слева вахта. Потолок высокий: стена занимает треть кадра.          */
 uniHall: {
-  name:"Университет. Главный холл", music:'home', w:560, h:430,
+  name:"Университет. Главный холл", music:'uni', w:560, h:430,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1a1a22', dark:.18 },
   lights:[
@@ -10113,7 +10838,7 @@ uniHall: {
    Самое живое крыло корпуса: афиши, реквизит по стенам, вечно чем-то
    заставленный проход.                                              */
 uniWestHall: {
-  name:"Университет. Западное крыло", music:'home', w:260, h:700,
+  name:"Университет. Западное крыло", music:'uni', w:260, h:700,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1d150f', dark:.22 },
   lights:[
@@ -10272,7 +10997,7 @@ uniWestHall: {
    Академическая половина корпуса: ровные ряды шкафчиков, стенды,
    расписания, и тихо так, как в театральном не бывает никогда.      */
 uniEastHall: {
-  name:"Университет. Восточное крыло", music:'home', w:260, h:740,
+  name:"Университет. Восточное крыло", music:'uni', w:260, h:740,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1d150f', dark:.24 },
   lights:[
@@ -10425,7 +11150,7 @@ uniEastHall: {
    премьеры. Зеркальная стена слева, высокие окна справа, между ними
    размеченная площадка. Дверь — в правой стене, коридор за ней.       */
 uniRehearsal: {
-  name:"Университет. Репетиционный зал", music:'warm', w:340, h:360,
+  name:"Университет. Репетиционный зал", music:'uni', w:340, h:360,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
   light:{ tint:'#1c1820', dark:.24 },
   lights:[
@@ -10556,7 +11281,7 @@ uniRehearsal: {
    дверь костюмерной из коридора заперта и так и задумано.
    Тесно, тепло и слишком много света в одном углу.                   */
 uniDressing: {
-  name:"Университет. Гримёрная", music:'warm', w:260, h:280,
+  name:"Университет. Гримёрная", music:'uni', w:260, h:280,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#201a20', dark:.22 },
   lights:[{x:74,y:88,r:44,c:'#ffe8c0',i:.55},{x:180,y:88,r:44,c:'#ffe8c0',i:.55},
@@ -10636,7 +11361,7 @@ uniDressing: {
    здание кажется глубже, чем один коридор с дверями. Окон почти нет:
    ткань выгорает, и это единственная причина.                        */
 uniCostume: {
-  name:"Университет. Костюмерная", music:'warm', w:220, h:240,
+  name:"Университет. Костюмерная", music:'uni', w:220, h:240,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
   light:{ tint:'#221a1c', dark:.34 },
   lights:[{x:110,y:100,r:48,c:'#e8c890',i:.34,flicker:true}],
@@ -10702,7 +11427,7 @@ uniCostume: {
    премьеру Сью. Единственное помещение корпуса без окон: свет тут
    только тот, который включили.                                      */
 uniTheatre: {
-  name:"Университет. Театральный зал", music:'warm', w:340, h:440,
+  name:"Университет. Театральный зал", music:'uni', w:340, h:440,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.10, wind:0 },
   light:{ tint:'#181420', dark:.36 },
   lights:[
@@ -10837,7 +11562,7 @@ uniTheatre: {
    западного крыла, которая смотрит во внутренний двор: отсюда видно
    и фонтан, и восточное крыло напротив.                              */
 uniTeachersRoom: {
-  name:"Университет. Преподавательская", music:'home', w:260, h:220,
+  name:"Университет. Преподавательская", music:'uni', w:260, h:220,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1e1a16', dark:.22 },
   lights:[{x:130,y:100,r:60,c:'#ffdca0',i:.44},{x:52,y:82,r:34,c:'#ffe6b0',i:.22}],
@@ -10908,7 +11633,7 @@ uniTeachersRoom: {
 /* БИБЛИОТЕКА (читальный зал). Дверь запертого архива — здесь же, в
    торце: именно она отправляет Наю искать настоящий архив внизу.     */
 uniLibrary: {
-  name:"Университет. Библиотека", music:'tense', w:320, h:300,
+  name:"Университет. Библиотека", music:'uni', w:320, h:300,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
   light:{ tint:'#1c1820', dark:.30 },
   lights:[
@@ -10983,7 +11708,7 @@ uniLibrary: {
 /* ---------------------------------------------------------------- */
 /* КАБИНЕТ ЖЕНЕВЬЕВЫ МОРЕЛЬ. Открыт только на четвёртый день.        */
 uniMorelOffice: {
-  name:"Университет. Кабинет Морель", music:'tense', w:220, h:240,
+  name:"Университет. Кабинет Морель", music:'uni', w:220, h:240,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
   light:{ tint:'#1d1710', dark:.30 },
   lights:[{x:110,y:110,r:52,c:'#ffd89a',i:.44}],
@@ -11039,7 +11764,7 @@ uniMorelOffice: {
 /* ---------------------------------------------------------------- */
 /* АУДИТОРИЯ 14 — та самая, где Морель читает историю театра.        */
 uniAud14: {
-  name:"Университет. Аудитория 14", music:'home', w:280, h:240,
+  name:"Университет. Аудитория 14", music:'uni', w:280, h:240,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1c1a16', dark:.24 },
   lights:[{x:140,y:100,r:64,c:'#ffe0aa',i:.46}],
@@ -11093,7 +11818,7 @@ uniAud14: {
 /* ---------------------------------------------------------------- */
 /* МУЗЫКАЛЬНАЯ АУДИТОРИЯ. Сюжету не нужна — нужна зданию.            */
 uniMusicRoom: {
-  name:"Университет. Музыкальная аудитория", music:'home', w:240, h:220,
+  name:"Университет. Музыкальная аудитория", music:'uni', w:240, h:220,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
   light:{ tint:'#1c1a20', dark:.26 },
   lights:[{x:120,y:96,r:58,c:'#ffdca0',i:.42}],
@@ -11145,7 +11870,7 @@ uniMusicRoom: {
 /* ХУДОЖЕСТВЕННАЯ АУДИТОРИЯ. Тоже не про сюжет — про то, что в этом
    здании учатся живые люди.                                          */
 uniArtRoom: {
-  name:"Университет. Художественная аудитория", music:'home', w:260, h:240,
+  name:"Университет. Художественная аудитория", music:'uni', w:260, h:240,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
   light:{ tint:'#1c1c1a', dark:.24 },
   lights:[{x:130,y:100,r:62,c:'#f4e6c0',i:.46}],
@@ -11199,7 +11924,7 @@ uniArtRoom: {
 /* ВНУТРЕННИЙ ДВОР. Замкнут четырьмя корпусами — те самые окна, что
    игрок видел изнутри, отсюда видны снаружи. Это одно здание.        */
 uniCourtyard: {
-  name:"Университет. Внутренний двор", music:'street', w:480, h:360, wet:true, wetFrom:120,
+  name:"Университет. Внутренний двор", music:'uni', w:480, h:360, wet:true, wetFrom:120,
   zone:'town', weather:{ rain:.22, fog:.12, wind:.24, leaves:.45 },
   light:{ tint:'#151a24', dark:.30 },
   lights:[
@@ -11384,7 +12109,7 @@ uniCourtyard: {
    двор виден отсюда сверху, как и положено со второго этажа. В середине
    южной стены эркер с лестницей вниз, в холл.                        */
 uniCorr2: {
-  name:"Университет. Второй этаж", music:'home', w:720, h:320,
+  name:"Университет. Второй этаж", music:'uni', w:720, h:320,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
   light:{ tint:'#1c1710', dark:.22 },
   lights:[
@@ -11547,7 +12272,7 @@ uniCorr2: {
    заперты, но лестница вниз работает — крылья связаны на обоих этажах.
    Тише, чем внизу, и светлее: окон больше, людей меньше.             */
 uniWest2: {
-  name:"Университет. Западное крыло, второй этаж", music:'home', w:260, h:440,
+  name:"Университет. Западное крыло, второй этаж", music:'uni', w:260, h:440,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.07, wind:0 },
   light:{ tint:'#1d1710', dark:.26 },
   lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.28},{x:130,y:250,r:44,c:'#ffdc9a',i:.28},
@@ -11622,7 +12347,7 @@ uniWest2: {
 /* ВОСТОЧНОЕ КРЫЛО, ВТОРОЙ ЭТАЖ. Тоже почти всё заперто: за дверями
    кафедры и кабинеты, в которые студентов не зовут.                  */
 uniEast2: {
-  name:"Университет. Восточное крыло, второй этаж", music:'home', w:260, h:440,
+  name:"Университет. Восточное крыло, второй этаж", music:'uni', w:260, h:440,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.07, wind:0 },
   light:{ tint:'#1d1710', dark:.26 },
   lights:[{x:130,y:90,r:44,c:'#ffdc9a',i:.28},{x:130,y:250,r:44,c:'#ffdc9a',i:.28},
@@ -11696,7 +12421,7 @@ uniEast2: {
    Оно ещё принадлежит университету: те же двери, те же таблички, тот
    же карниз. Просто здесь двадцать лет никто не делал ремонт.        */
 uniOldWing: {
-  name:"Университет. Старое крыло", music:'tense', w:560, h:340,
+  name:"Университет. Старое крыло", music:'oldWing', w:560, h:340,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.16, wind:0 },
   light:{ tint:'#151220', dark:.42 },
   lights:[{x:140,y:200,r:38,c:'#d8c8a0',i:.20,flicker:true},
@@ -11797,7 +12522,7 @@ uniOldWing: {
    через которое Ная возвращается в корпус мимо охраны. Бетон, металл,
    трубы: парадной отделки здесь никогда и не было.                   */
 uniServiceStair: {
-  name:"Университет. Служебная лестница", music:'tense', w:220, h:420,
+  name:"Университет. Служебная лестница", music:'oldWing', w:220, h:420,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.20, wind:0 },
   light:{ tint:'#101018', dark:.44 },
   lights:[
@@ -11911,7 +12636,7 @@ uniServiceStair: {
    никто из тех, кто наверху, об этом не думает. Бетон, трубы под
    потолком, железные двери, влага по стенам.                        */
 uniBasement: {
-  name:"Университет. Цоколь", music:'tense', w:440, h:280,
+  name:"Университет. Цоколь", music:'basement', w:440, h:280,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.22, wind:0 },
   light:{ tint:'#0e1018', dark:.52 },
   lights:[
@@ -12024,7 +12749,7 @@ uniBasement: {
    Не библиотека: металлические стеллажи, коробки без описи, одна
    лампа и пыль, которая висит в её свете.                           */
 uniArchive: {
-  name:"Университет. Цокольный архив", music:'tense', w:320, h:280,
+  name:"Университет. Цокольный архив", music:'archive', w:320, h:280,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.26, wind:0 },
   light:{ tint:'#0c0e16', dark:.56 },
   lights:[{x:160,y:110,r:44,c:'#d8c890',i:.30,flicker:true}],
@@ -12103,7 +12828,7 @@ uniArchive: {
    парапет, вентиляция, антенны и полгорода внизу — место, ради
    которого сюда и поднимаются. Здесь Морель говорит правду.          */
 uniRoof: {
-  name:"Университет. Крыша", music:'sad', w:420, h:300, wet:true, wetFrom:70,
+  name:"Университет. Крыша", music:'roof', w:420, h:300, wet:true, wetFrom:70,
   zone:'town', weather:{ rain:.18, fog:.20, wind:.5, leaves:.1 },
   light:{ tint:'#141824', dark:.34 },
   lights:[{x:76,y:110,r:44,c:'#ffcf7a',i:.36},{x:340,y:110,r:36,c:'#9fb0c8',i:.22}],
@@ -12207,7 +12932,7 @@ uniRoof: {
 /* ЗАДНИЙ ДВОР. Забор, вход для сотрудников (закрыт) и низкое окно
    служебной лестницы — единственный путь в корпус мимо охраны.       */
 uniBackYard: {
-  name:"Университет. Задний двор", music:'street', w:480, h:310, wet:true, wetFrom:140,
+  name:"Университет. Задний двор", music:'uni', w:480, h:310, wet:true, wetFrom:140,
   zone:'town', weather:{ rain:.24, fog:.20, wind:.3, leaves:.3 },
   light:{ tint:'#12141e', dark:.38 },
   lights:[{x:392,y:150,r:44,c:'#ffcf7a',i:.32},{x:240,y:172,r:26,c:'#9fb0c8',i:.20},
@@ -12471,9 +13196,11 @@ async function changeRoom(roomKey, x, y) {
   Game.cast = [];
   const room = Rooms[roomKey];
   Patrol.reset(room);
-  Music.play(room.music || 'home');
+  Music.forRoom(room.music || 'home');
+  Daylight.update(400);
   Weather.apply(room);
   Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
+  Ambience.setProfile.apply(Ambience, Ambience.profileFor(gameState.currentRoom, room));
   Game.mode = wasCutscene ? 'cutscene' : 'explore';
   await fadeIn(300);
   UI.toast(room.name, 1200);
@@ -14370,11 +15097,15 @@ function applySettings() {
   const s = gameState.settings;
   Audio.volume = s.volume;
   Music.setVolume(s.music);
+  Audio.ambientVolume = (s.ambient === undefined) ? 0.55 : s.ambient;
+  if (typeof Ambience !== 'undefined') Ambience.refresh();
   FX.enabled = true;
   document.getElementById('volSlider').value = Math.round(s.volume*100);
   document.getElementById('volVal').textContent = Math.round(s.volume*100);
   document.getElementById('musSlider').value = Math.round(s.music*100);
   document.getElementById('musVal').textContent = Math.round(s.music*100);
+  document.getElementById('ambSlider').value = Math.round(Audio.ambientVolume*100);
+  document.getElementById('ambVal').textContent = Math.round(Audio.ambientVolume*100);
   document.getElementById('spdSlider').value = s.textSpeed;
   document.getElementById('spdVal').textContent = s.textSpeed;
   document.getElementById('fxSlider').value = s.effects ? 1 : 0;
@@ -14391,7 +15122,7 @@ const Scripts = {
 /* ---------- PROLOGUE ---------- */
 prologue: [
   { resetProlog:true },
-  { music:'hell' },
+  { music:'prologue' },
   { room:'prologueHell', x:120, y:200 },
   { wait:900 },
   { dlg:[
@@ -17488,7 +18219,7 @@ evilRecognition: [
 
 /* ---------- 5. ФИНАЛ ---------- */
 evilFinale: [
-  { music:'none' },
+  { music:'endWitch' },
   { dlg:[
     {who:'nayaHell',expr:'empty',name:'Ная',text:'(Портал в полный рост. Он открыт всегда — теперь для меня.)'},
     {who:'nayaHell',expr:'empty',name:'Ная',text:'(Я получила всё, о чём просила. Ровно всё. Ни больше, ни меньше.)'},
@@ -17826,6 +18557,7 @@ reflectionScene: [
 /* ---------- ENDING III: RED ---------- */
 hellFinalScene: [
   { chapter:'13red' },
+  { music:'endRevenge' },
   { dlg:[
     {who:'naya',expr:'talk',text:'Сью. Идём со мной. В ад. Пожалуйста. Один раз, просто посмотреть.'},
     {if:()=> S('trustSue') >= 55, then:[
@@ -17902,7 +18634,7 @@ hellFinalScene: [
 /* ---------- ENDING IV: EARTH ---------- */
 earthEnding: [
   { chapter:'13earth' },
-  { music:'sad' },
+  { music:'endStay' },
   { dlg:[
     {who:'charlotte',expr:'angry',text:'Ты пожалеешь. Не сегодня. Но пожалеешь.'},
     {who:'naya',expr:'normal',text:'Наверное. Я вообще много о чём жалею.'},
@@ -18145,7 +18877,7 @@ lonerCaughtScene: [
 ],
 
 endingLoner: [
-  { music:'none' },
+  { music:'endLoner' },
   { wait:1200 },
   { dlg:[
     {who:'naya',expr:'empty',text:'...'},
@@ -18484,6 +19216,7 @@ function tick(t) {
   }
 
   if (!Game.paused && gameState) {
+    Daylight.update(dt);
     if (Game.mode === 'explore' && !Dialogue.active) {
       const { dx, dy } = Input.getMove();
       if (dx || dy) {
@@ -18807,9 +19540,10 @@ const DevTools = {
       FX.clearAll(); FX.refreshCorruption();
       const room = Rooms[gameState.currentRoom];
       if (room) {
-        Music.play(room.music || 'home');
+        Music.forRoom(room.music || 'home');
         Weather.apply(room);
         Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
+  Ambience.setProfile.apply(Ambience, Ambience.profileFor(gameState.currentRoom, room));
       }
       World.invalidate();
       UI.updateInventory();
@@ -18881,6 +19615,7 @@ const DevTools = {
     // Сначала формируем тестовое сюжетное состояние.
     point.apply.call(this);
     this.normalize();
+    Daylight.snap();
     this.ensureRunning();     // состояние уже есть — можно поднимать цикл
 
     // ВАЖНО: не меняем currentRoom вручную. Используем штатный changeRoom(),
@@ -19041,8 +19776,73 @@ const DevTools = {
     const all = Object.keys(Rooms);
     fill(rg, all.filter(k => /^uni/.test(k)));
     fill(wg, all.filter(k => !/^uni/.test(k)));
+    this.fillMusic();
 
     this.updateReadout();
+  },
+
+  /* ---------- прослушивание саундтрека ----------
+     Список строится из Music.TRACKS и не зависит ни от одного сюжетного
+     флага: послушать крышу или концовку можно, не проходя игру. Петля
+     секвенсора просто идёт дальше, поэтому тема зациклена сама собой. */
+  musCur:null,
+  fillMusic() {
+    const g = document.getElementById('devMusGrid');
+    if (!g) return;
+    g.innerHTML = '';
+    for (const key of Object.keys(Music.TRACKS)) {
+      const tr = Music.TRACKS[key];
+      const b = document.createElement('button');
+      b.className = 'devBtn';
+      b.dataset.track = key;
+      b.innerHTML = '<span class="devTitle">' + tr.title + '</span>' +
+                    '<span class="devDesc">' + key + ' · ' + tr.bpm + ' bpm · ' +
+                    tr.meter + '/4 · ' + tr.chords.length + ' т.</span>';
+      b.addEventListener('click', () => this.musPlay(key));
+      g.appendChild(b);
+    }
+    this.musMark();
+  },
+  musPlay(key) {
+    Audio.resume();
+    const el = document.getElementById('devMusLayer');
+    const lay = el ? +el.value : 0;
+    this.musCur = key;
+    Music.cur = null;                       // слушаем именно выбранное, без кроссфейда
+    Music.play(key, lay);
+    this.musMark();
+  },
+  musMark() {
+    const now = document.getElementById('devMusNow');
+    const tr = this.musCur && Music.TRACKS[this.musCur];
+    if (now) now.textContent = tr
+      ? '▶ ' + tr.title + '  ·  слой ' + Music.layer + '  ·  ' + tr.bpm + ' bpm'
+      : '— ничего не играет —';
+    document.querySelectorAll('#devMusGrid .devBtn').forEach(b => {
+      b.classList.toggle('playing', b.dataset.track === this.musCur && !!Music.timer);
+    });
+  },
+  musWire() {
+    const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+    on('devMusPlay', 'click', () => {
+      if (this.musCur) this.musPlay(this.musCur);
+      else this.musPlay(Object.keys(Music.TRACKS)[0]);
+    });
+    on('devMusPause', 'click', () => { Music.stopTimer(); this.musMark(); });
+    on('devMusStop',  'click', () => { Music.stop(); this.musCur = null; this.musMark(); });
+    on('devMusLayer', 'input', e => {
+      const v = +e.target.value;
+      const lbl = document.getElementById('devMusLayerLbl');
+      if (lbl) lbl.textContent = 'слой ' + v;
+      Music.layer = v;
+      this.musMark();
+    });
+    on('devMusVol', 'input', e => {
+      const v = +e.target.value;
+      const lbl = document.getElementById('devMusVolLbl');
+      if (lbl) lbl.textContent = v + '%';
+      Music.setVolume(v / 100);
+    });
   },
 
   /* Метка сборки. Без неё вопрос «а точно ли это новая версия?» решается
@@ -19095,6 +19895,7 @@ function hideMenu() {
 }
 
 function beginPlay() {
+  Daylight.snap();
   /* Новая игра, загрузка и перемотка к чекпоинту могут прийтись на
      середину катсцены. Её надо оборвать, иначе она продолжит менять
      комнаты и гасить экран поверх уже загруженного состояния. */
@@ -19107,9 +19908,11 @@ function beginPlay() {
   document.getElementById('endingScreen').classList.remove('show');
   FX.clearAll(); FX.refreshCorruption();
   const room = Rooms[gameState.currentRoom];
-  Music.play(room.music || 'home');
+  Music.forRoom(room.music || 'home');
+  Daylight.update(400);
   Weather.apply(room);
   Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
+  Ambience.setProfile.apply(Ambience, Ambience.profileFor(gameState.currentRoom, room));
   World.invalidate();
   requestAnimationFrame(tick);
   if (!F('prologueComplete')) { Scene.play('prologue'); saveGame(); return; }
@@ -19257,6 +20060,8 @@ window.addEventListener('load', () => {
     pendingSettings = Object.assign({}, prev.settings);
     Audio.volume = prev.settings.volume;
     Audio.musicVolume = prev.settings.music;
+    Music.setVolume(prev.settings.music);
+    if (prev.settings.ambient !== undefined) Audio.ambientVolume = prev.settings.ambient;
     document.getElementById('volSlider').value = Math.round(prev.settings.volume*100);
     document.getElementById('volVal').textContent = Math.round(prev.settings.volume*100);
     document.getElementById('musSlider').value = Math.round(prev.settings.music*100);
@@ -19285,6 +20090,7 @@ window.addEventListener('load', () => {
   wire('btnContinue', continueGame);
   wire('btnSettings', () => UI.showScreen('settingsPanel', true));
   wire('btnDevMain', () => DevTools.open(true));
+  DevTools.musWire();
   wire('btnBackSettings', () => { UI.showScreen('settingsPanel', false); });
   wire('btnMemories', () => { Memories.renderList(); UI.showScreen('memoriesScreen', true); });
   wire('btnBackMemories', () => UI.showScreen('memoriesScreen', false));
@@ -19323,6 +20129,12 @@ window.addEventListener('load', () => {
     const v = +e.target.value;
     document.getElementById('musVal').textContent = v;
     Music.setVolume(v/100); setSetting('music', v/100);
+  };
+  document.getElementById('ambSlider').oninput = (e) => {
+    const v = +e.target.value;
+    document.getElementById('ambVal').textContent = v;
+    Audio.ambientVolume = v/100; setSetting('ambient', v/100);
+    Ambience.refresh();
   };
   document.getElementById('spdSlider').oninput = (e) => {
     const v = +e.target.value;
