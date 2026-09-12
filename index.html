@@ -368,6 +368,7 @@
   .devBtn .devTitle { color:#f0e4c0; display:block; }
   .devBtn .devDesc { color:#927f88; display:block; margin-top:3px; font-size:10px; }
   .devNow { color:#e0c8a0; font-size:11px; margin:4px 0 6px; min-height:14px; }
+  .devHint { color:#8f7d86; font-size:10px; line-height:1.45; margin:0 0 7px; max-width:52em; }
   .devRow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .devRow input[type=range] { flex:1 1 90px; min-width:70px; }
   .devMini { background:#241820; color:#f0e4c0; border:1px solid #5a3040;
@@ -554,12 +555,17 @@
 
       <div class="devSection">МУЗЫКА / SOUNDTRACK</div>
       <div class="devNow" id="devMusNow">— ничего не играет —</div>
+      <div class="devHint">Каждая тема записана слоями. Слой 0 — только основа
+        (бас и аккомпанемент), 1 — обычное звучание с мелодией, 2 и 3 добавляют
+        голоса: струнные, хор, ударные. В игре слой выбирается сам — по тому,
+        как далеко зашла история; здесь его можно переключить вручную и
+        услышать, как одна и та же тема растёт.</div>
       <div class="devRow">
         <button class="devMini" id="devMusPlay">▶</button>
         <button class="devMini" id="devMusPause">⏸</button>
         <button class="devMini" id="devMusStop">■</button>
-        <span class="devDesc" id="devMusLayerLbl">слой 0</span>
-        <input type="range" id="devMusLayer" min="0" max="3" value="0">
+        <span class="devDesc" id="devMusLayerLbl">слой 1 — с мелодией</span>
+        <input type="range" id="devMusLayer" min="0" max="3" value="1">
         <span class="devDesc" id="devMusVolLbl">60%</span>
         <input type="range" id="devMusVol" min="0" max="100" value="60">
       </div>
@@ -684,7 +690,7 @@ const Audio = {
    Файлы всё ещё можно подсунуть вместо синтеза — см. useFiles().        */
 const Music = {
   /* ---------- шина и состояние ---------- */
-  master:null, bus:null, timer:null, started:false,
+  master:null, bus:null, verb:null, send:null, timer:null, started:false,
   cur:null, layer:0, step:0, nextTime:0, duckAmt:1, vol:0.4,
   LOOKAHEAD:0.18, TICK:35,
 
@@ -707,123 +713,288 @@ const Music = {
     return steps.map(s => 440 * Math.pow(2, (root + s + (oct + 1) * 12 - 69) / 12));
   },
 
-  /* ---------- голоса ---------- */
-  /* Каждый инструмент собирает свою цепочку и сам её гасит: узлы живут
-     ровно столько, сколько звучит нота, иначе на длинной сессии их
-     набираются тысячи. */
-  voice(type, t, freq, dur, vel) {
+  /* ---------- голоса ----------
+     Тембр — это не «какая волна», а чем нота начинается, чем кончается и
+     что происходит со спектром между. Поэтому у каждого инструмента своя
+     огибающая, свой набор обертонов и своё место в панораме: рояль бьёт
+     молоточком и гаснет, струнные наплывают, орган стоит ровно, челеста
+     звенит и обрывается. Два инструмента на одних и тех же нотах должны
+     узнаваться на слух — иначе весь саундтрек звучит одной темой.
+
+     Каждый голос собирает свою цепочку и сам её гасит: узлы живут ровно
+     столько, сколько звучит нота, иначе на длинной сессии их набираются
+     тысячи.                                                              */
+
+  /* Общая для всех инструментов точка выхода: сухой сигнал в шину и
+     столько же, помноженное на wet, — в общий ревербератор. Хвост зала
+     склеивает отдельные ноты в музыку; без него синтез звучит как
+     последовательность писков.                                          */
+  out(node, wet, pan) {
+    const c = Audio.ctx;
+    let tail = node;
+    if (pan && c.createStereoPanner) {
+      const p = c.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      node.connect(p); tail = p;
+    }
+    tail.connect(this.bus);
+    if (this.send && wet > 0) {
+      const w = c.createGain(); w.gain.value = wet;
+      tail.connect(w); w.connect(this.send);
+      return [tail, w];
+    }
+    return [tail];
+  },
+  /* Короткий шумовой призвук: удар молоточка, щипок медиатора, дыхание. */
+  noiseHit(t, dur, freq, amp, type, q) {
+    const c = Audio.ctx;
+    const n = Math.max(1, Math.floor(c.sampleRate * dur));
+    const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter();
+    f.type = type || 'bandpass'; f.frequency.value = freq; f.Q.value = q || 1;
+    const g = c.createGain(); g.gain.value = amp;
+    src.connect(f); f.connect(g);
+    const extra = this.out(g, .12, 0);
+    src.start(t);
+    src.onended = () => { try { f.disconnect(); g.disconnect(); extra.forEach(x=>x.disconnect()); } catch(e){} };
+  },
+  /* Медленное колебание высоты: вибрато струнных, флейты и меди. */
+  vibrato(t, dur, targets, rate, depth) {
+    const c = Audio.ctx;
+    const lfo = c.createOscillator(), amt = c.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = rate; amt.gain.value = depth;
+    lfo.connect(amt);
+    targets.forEach(o => amt.connect(o.detune));
+    lfo.start(t + 0.08); lfo.stop(t + dur + 0.1);
+    lfo.onended = () => { try { amt.disconnect(); } catch(e){} };
+  },
+
+  voice(type, t, freq, dur, vel, pan) {
     const c = Audio.ctx; if (!c || !this.bus) return;
     const amp = vel * this.vol * this.duckAmt;
     if (amp <= 0.0004 || !isFinite(freq)) return;
+    const P = pan === undefined ? 0 : pan;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    const kill = end => {
-      const stopAt = end + 0.05;
-      g.gain.setTargetAtTime(0.0001, end, 0.04);
-      return stopAt;
+    /* Всё, что надо отключить, когда нота отзвучала. */
+    const bin = [g];
+    const osc = [];
+    const done = stopAt => {
+      osc.forEach(o => { o.start(t); o.stop(stopAt); });
+      if (osc[0]) osc[0].onended = () => { try { bin.forEach(n => n.disconnect()); } catch(e){} };
     };
-    let stopAt = t + dur + 0.1;
+    const add = (n) => { bin.push(n); return n; };
+    const sub = (wave, mul, lvl, detune) => {           // обертон отдельной громкости
+      const o = c.createOscillator(); o.type = wave;
+      o.frequency.value = freq * mul;
+      if (detune) o.detune.value = detune;
+      const lg = add(c.createGain()); lg.gain.value = lvl;
+      o.connect(lg); lg.connect(g); osc.push(o);
+      return o;
+    };
 
     if (type === 'piano') {
-      const o1 = c.createOscillator(), o2 = c.createOscillator();
-      o1.type = 'triangle'; o2.type = 'sine';
-      o1.frequency.value = freq; o2.frequency.value = freq * 2;
-      const g2 = c.createGain(); g2.gain.value = 0.16;
-      const f = c.createBiquadFilter(); f.type = 'lowpass';
-      f.frequency.setValueAtTime(Math.min(9000, freq * 9), t);
-      f.frequency.exponentialRampToValueAtTime(Math.max(400, freq * 2.2), t + dur * 0.9);
-      o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(f); f.connect(this.bus);
-      g.gain.exponentialRampToValueAtTime(amp, t + 0.008);
+      /* Три частичных тона с разной скоростью затухания: верхние гаснут
+         первыми, и нота «темнеет» по мере звучания, как у настоящего. */
+      sub('triangle', 1, 1);
+      const o2 = sub('sine', 2, .22), o3 = sub('sine', 3.02, .09);
+      const f = add(c.createBiquadFilter()); f.type = 'lowpass';
+      f.frequency.setValueAtTime(Math.min(9000, freq * 10), t);
+      f.frequency.exponentialRampToValueAtTime(Math.max(320, freq * 1.8), t + Math.max(.2, dur * .8));
+      g.connect(f); bin.push(...this.out(f, .18, P));
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.006);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o1.start(t); o2.start(t); stopAt = t + dur + 0.05;
-      o1.stop(stopAt); o2.stop(stopAt);
-      o1.onended = () => { try { g.disconnect(); g2.disconnect(); f.disconnect(); } catch(e){} };
+      this.noiseHit(t, 0.02, Math.min(5200, freq * 4), amp * 0.5, 'bandpass', 1.4);
+      done(t + dur + 0.06);
       return;
     }
     if (type === 'guitar' || type === 'pluck') {
-      const o = c.createOscillator();
-      o.type = 'sawtooth'; o.frequency.value = freq;
-      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 4;
-      f.frequency.setValueAtTime(Math.min(6000, freq * 7), t);
-      f.frequency.exponentialRampToValueAtTime(Math.max(240, freq * 1.6), t + Math.min(0.5, dur));
-      o.connect(g); g.connect(f); f.connect(this.bus);
-      g.gain.exponentialRampToValueAtTime(amp, t + 0.006);
+      /* Две слегка расстроенные струны и щипок медиатора. */
+      sub('sawtooth', 1, .8, -6); sub('sawtooth', 1, .8, +7); sub('sine', 2, .12);
+      const body = add(c.createBiquadFilter());            // резонанс корпуса
+      body.type = 'peaking'; body.frequency.value = 220; body.gain.value = 6; body.Q.value = 1.2;
+      const f = add(c.createBiquadFilter()); f.type = 'lowpass'; f.Q.value = 3;
+      f.frequency.setValueAtTime(Math.min(6500, freq * 8), t);
+      f.frequency.exponentialRampToValueAtTime(Math.max(200, freq * 1.4), t + Math.min(0.6, dur));
+      g.connect(body); body.connect(f); bin.push(...this.out(f, .22, P));
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.004);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.start(t); stopAt = t + dur + 0.05; o.stop(stopAt);
-      o.onended = () => { try { g.disconnect(); f.disconnect(); } catch(e){} };
+      this.noiseHit(t, 0.015, 2600, amp * 0.35, 'highpass', .7);
+      done(t + dur + 0.06);
+      return;
+    }
+    if (type === 'harp') {
+      /* Как гитара, но чище и с долгим свободным затуханием. */
+      sub('triangle', 1, 1); sub('sine', 2, .18); sub('sine', 4, .05);
+      const f = add(c.createBiquadFilter()); f.type = 'lowpass';
+      f.frequency.value = Math.min(7000, freq * 7);
+      g.connect(f); bin.push(...this.out(f, .30, P));
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.5);
+      done(t + dur * 1.5 + 0.06);
       return;
     }
     if (type === 'bass') {
-      const o = c.createOscillator(), o2 = c.createOscillator();
-      o.type = 'triangle'; o2.type = 'sine';
-      o.frequency.value = freq; o2.frequency.value = freq / 2;
-      const g2 = c.createGain(); g2.gain.value = 0.5;
-      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
-      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(f); f.connect(this.bus);
-      g.gain.exponentialRampToValueAtTime(amp, t + 0.02);
+      sub('triangle', 1, 1); sub('sine', .5, .55); sub('sawtooth', 1, .10);
+      const f = add(c.createBiquadFilter()); f.type = 'lowpass'; f.frequency.value = 340; f.Q.value = .8;
+      g.connect(f); bin.push(...this.out(f, .05, 0));
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.018);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.start(t); o2.start(t); stopAt = t + dur + 0.05; o.stop(stopAt); o2.stop(stopAt);
-      o.onended = () => { try { g.disconnect(); g2.disconnect(); f.disconnect(); } catch(e){} };
+      done(t + dur + 0.06);
       return;
     }
-    if (type === 'pad' || type === 'strings') {
-      const o1 = c.createOscillator(), o2 = c.createOscillator();
-      o1.type = 'sawtooth'; o2.type = 'sawtooth';
-      o1.frequency.value = freq; o2.frequency.value = freq * 1.005;
-      const f = c.createBiquadFilter(); f.type = 'lowpass';
-      f.frequency.value = type === 'strings' ? 1800 : 900; f.Q.value = 0.7;
-      o1.connect(g); o2.connect(g); g.connect(f); f.connect(this.bus);
-      const atk = type === 'strings' ? 0.35 : 0.7;
-      g.gain.linearRampToValueAtTime(amp, t + Math.min(atk, dur * 0.5));
+    if (type === 'pad') {
+      sub('sawtooth', 1, .55, -9); sub('sawtooth', 1, .55, +9); sub('sine', .5, .25);
+      const f = add(c.createBiquadFilter()); f.type = 'lowpass'; f.Q.value = .6;
+      f.frequency.setValueAtTime(420, t);
+      f.frequency.linearRampToValueAtTime(1100, t + dur * .6);     // медленно раскрывается
+      f.frequency.linearRampToValueAtTime(500, t + dur);
+      g.connect(f); bin.push(...this.out(f, .45, P));
+      g.gain.linearRampToValueAtTime(amp, t + Math.min(0.9, dur * 0.5));
+      g.gain.setValueAtTime(amp, t + dur * 0.75);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      done(t + dur + 0.12);
+      return;
+    }
+    if (type === 'strings') {
+      const a = sub('sawtooth', 1, .5, -7), b = sub('sawtooth', 1, .5, +6), d3 = sub('sawtooth', 2, .16, +3);
+      this.vibrato(t, dur, [a, b, d3], 5.2, 7);
+      const f = add(c.createBiquadFilter()); f.type = 'lowpass'; f.Q.value = .7;
+      f.frequency.setValueAtTime(900, t);
+      f.frequency.linearRampToValueAtTime(2300, t + Math.min(.5, dur * .4));
+      g.connect(f); bin.push(...this.out(f, .40, P));
+      g.gain.linearRampToValueAtTime(amp, t + Math.min(0.32, dur * 0.4));
       g.gain.setValueAtTime(amp, t + dur * 0.8);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o1.start(t); o2.start(t); stopAt = t + dur + 0.08; o1.stop(stopAt); o2.stop(stopAt);
-      o1.onended = () => { try { g.disconnect(); f.disconnect(); } catch(e){} };
+      done(t + dur + 0.12);
+      return;
+    }
+    if (type === 'choir') {
+      /* Три расстроенных голоса через две форманты — «а-а» без слов. */
+      const a = sub('sawtooth', 1, .4, -12), b = sub('sawtooth', 1, .4, +11), d3 = sub('sawtooth', 2, .12);
+      this.vibrato(t, dur, [a, b, d3], 4.4, 10);
+      const f1 = add(c.createBiquadFilter()); f1.type = 'bandpass'; f1.frequency.value = 720; f1.Q.value = 2.4;
+      const f2 = add(c.createBiquadFilter()); f2.type = 'bandpass'; f2.frequency.value = 1180; f2.Q.value = 2.0;
+      const mix = add(c.createGain()); mix.gain.value = 1.7;
+      g.connect(f1); g.connect(f2); f1.connect(mix); f2.connect(mix);
+      bin.push(...this.out(mix, .55, P));
+      g.gain.linearRampToValueAtTime(amp, t + Math.min(0.5, dur * 0.45));
+      g.gain.setValueAtTime(amp, t + dur * 0.75);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      done(t + dur + 0.14);
+      return;
+    }
+    if (type === 'organ') {
+      /* Сложение регистров: ровный тон без атаки и без затухания. */
+      sub('sine', 1, .5); sub('sine', 2, .3); sub('sine', 3, .16);
+      sub('sine', 4, .10); sub('sine', 6, .06);
+      bin.push(...this.out(g, .35, P));
+      g.gain.linearRampToValueAtTime(amp, t + 0.05);
+      g.gain.setValueAtTime(amp, t + Math.max(0.06, dur - 0.08));
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      done(t + dur + 0.06);
+      return;
+    }
+    if (type === 'brass') {
+      /* Фильтр распахивается на атаке и садится к концу — «дыхание» меди. */
+      const a = sub('sawtooth', 1, .9, -4), b = sub('sawtooth', 1, .5, +5);
+      this.vibrato(t, dur, [a, b], 5.6, 6);
+      const f = add(c.createBiquadFilter()); f.type = 'lowpass'; f.Q.value = 2.2;
+      f.frequency.setValueAtTime(Math.max(300, freq * 1.2), t);
+      f.frequency.linearRampToValueAtTime(Math.min(5200, freq * 6), t + Math.min(.18, dur * .3));
+      f.frequency.linearRampToValueAtTime(Math.max(400, freq * 2), t + dur);
+      g.connect(f); bin.push(...this.out(f, .30, P));
+      g.gain.linearRampToValueAtTime(amp, t + 0.06);
+      g.gain.setValueAtTime(amp, t + dur * 0.8);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      done(t + dur + 0.1);
+      return;
+    }
+    if (type === 'flute') {
+      const a = sub('sine', 1, 1), b = sub('sine', 2, .07);
+      this.vibrato(t, dur, [a, b], 5.0, 9);
+      bin.push(...this.out(g, .38, P));
+      g.gain.linearRampToValueAtTime(amp, t + 0.09);
+      g.gain.setValueAtTime(amp, t + dur * 0.82);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      this.noiseHit(t, 0.09, Math.min(4200, freq * 3), amp * 0.22, 'bandpass', .8);
+      done(t + dur + 0.08);
       return;
     }
     if (type === 'bell') {
-      const o1 = c.createOscillator(), o2 = c.createOscillator();
-      o1.type = 'sine'; o2.type = 'sine';
-      o1.frequency.value = freq; o2.frequency.value = freq * 2.76;   // негармоничный обертон
-      const g2 = c.createGain(); g2.gain.value = 0.3;
-      o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(this.bus);
-      g.gain.exponentialRampToValueAtTime(amp, t + 0.004);
+      sub('sine', 1, 1); sub('sine', 2.76, .34); sub('sine', 5.4, .12);
+      bin.push(...this.out(g, .45, P));
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.003);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o1.start(t); o2.start(t); stopAt = t + dur + 0.05; o1.stop(stopAt); o2.stop(stopAt);
-      o1.onended = () => { try { g.disconnect(); g2.disconnect(); } catch(e){} };
+      done(t + dur + 0.06);
       return;
     }
-    kill(t + dur);
+    if (type === 'musicbox' || type === 'celesta') {
+      /* Металлический и очень короткий: узнаётся с одной ноты. */
+      sub('sine', 1, 1); sub('sine', 4.16, .26); sub('sine', 9.2, .07);
+      bin.push(...this.out(g, .50, P));
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + Math.min(dur, 0.9));
+      done(t + Math.min(dur, 0.9) + 0.05);
+      return;
+    }
+    if (type === 'glass') {
+      /* Долгий нечеловеческий призвук: кристалл, ад, потусторонние сцены. */
+      sub('sine', 1, 1); sub('sine', 3.5, .22); sub('sine', 7.1, .05);
+      const f = add(c.createBiquadFilter()); f.type = 'highpass'; f.frequency.value = freq * .7;
+      g.connect(f); bin.push(...this.out(f, .60, P));
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.7);
+      done(t + dur * 1.7 + 0.08);
+      return;
+    }
+    /* Незнакомый инструмент: простая синусоида, но не тишина и не сбой. */
+    sub('sine', 1, 1);
+    bin.push(...this.out(g, .2, P));
+    g.gain.exponentialRampToValueAtTime(amp, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    done(t + dur + 0.06);
   },
-  /* Ударные: три коротких шумовых/синусных удара, без сэмплов. */
+  /* Ударные: бочка, малый, хэт, том и тарелка — шум и синус, без сэмплов. */
   drum(kind, t, vel) {
     const c = Audio.ctx; if (!c || !this.bus) return;
     const amp = vel * this.vol * this.duckAmt;
     if (amp <= 0.0004) return;
-    if (kind === 'k') {
+    if (kind === 'k' || kind === 'K') {                  // K — литавра пролога
+      const deep = kind === 'K';
       const o = c.createOscillator(), g = c.createGain();
       o.type = 'sine';
-      o.frequency.setValueAtTime(120, t);
-      o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+      o.frequency.setValueAtTime(deep ? 92 : 120, t);
+      o.frequency.exponentialRampToValueAtTime(deep ? 38 : 45, t + (deep ? .22 : .11));
       g.gain.setValueAtTime(amp, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-      o.connect(g); g.connect(this.bus);
-      o.start(t); o.stop(t + 0.22);
-      o.onended = () => { try { g.disconnect(); } catch(e){} };
+      g.gain.exponentialRampToValueAtTime(0.0001, t + (deep ? .55 : .18));
+      o.connect(g);
+      const extra = this.out(g, deep ? .35 : .06, 0);
+      o.start(t); o.stop(t + (deep ? .62 : .22));
+      o.onended = () => { try { g.disconnect(); extra.forEach(x=>x.disconnect()); } catch(e){} };
+      if (deep) this.noiseHit(t, .05, 180, amp * .3, 'lowpass', .7);
       return;
     }
-    const dur = kind === 's' ? 0.16 : 0.05;
-    const n = Math.floor(c.sampleRate * dur);
+    const map = {
+      s:{ dur:.16, type:'bandpass', f:1900, q:.8,  lvl:.9,  wet:.20, pan:-.15 },
+      h:{ dur:.05, type:'highpass', f:7000, q:.7,  lvl:.5,  wet:.08, pan:.22 },
+      t:{ dur:.20, type:'bandpass', f:420,  q:1.2, lvl:.85, wet:.18, pan:-.30 },
+      c:{ dur:.90, type:'highpass', f:5200, q:.7,  lvl:.42, wet:.40, pan:.30 },
+    };
+    const m = map[kind] || map.h;
+    const n = Math.floor(c.sampleRate * m.dur);
     const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const curve = kind === 'c' ? 1.4 : 1;
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, curve);
     const src = c.createBufferSource(); src.buffer = buf;
-    const f = c.createBiquadFilter();
-    if (kind === 's') { f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.8; }
-    else { f.type = 'highpass'; f.frequency.value = 7000; }
-    const g = c.createGain(); g.gain.value = amp * (kind === 's' ? 0.9 : 0.5);
-    src.connect(f); f.connect(g); g.connect(this.bus);
+    const f = c.createBiquadFilter(); f.type = m.type; f.frequency.value = m.f; f.Q.value = m.q;
+    const g = c.createGain(); g.gain.value = amp * m.lvl;
+    src.connect(f); f.connect(g);
+    const extra = this.out(g, m.wet, m.pan);
     src.start(t);
-    src.onended = () => { try { f.disconnect(); g.disconnect(); } catch(e){} };
+    src.onended = () => { try { f.disconnect(); g.disconnect(); extra.forEach(x=>x.disconnect()); } catch(e){} };
   },
 
   /* ---------- партитуры ----------
@@ -834,200 +1005,306 @@ const Music = {
      layer — с какого «уровня» темы голос вступает: так одна и та же тема
      обрастает слоями по мере расследования, а не подменяется другой.      */
   TRACKS: {
+    /* НАЧАЛО ИГРЫ — вальс. Челеста ведёт, арфа отвечает, бас шагает
+       по «раз», и всё это лёгкое настолько, насколько игра больше
+       никогда не будет.                                                */
     intro: { title:'Начало игры', bpm:116, meter:3, oct:3,
-      chords:['F','Dm','Bb','C'],
+      voicing:'вальс: челеста и арфа',
+      chords:['F','Dm','Bb','C','F','Am','Gm','C'],
       voices:[
-        {i:'bass',  kind:'root', gain:.20, pat:'x.....'},
-        {i:'piano', kind:'arp',  gain:.10, pat:'..0.1.', oct:4},
-        {i:'piano', kind:'melody', gain:.26, notes:[
-          [0,'A4',1],[1,'C5',1],[2,'D5',1],[3,'C5',1.6],[5,'A4',.8],
-          [6,'Bb4',1],[7,'D5',1],[8,'C5',1.6],[10,'A4',.8],[11,'G4',.9]]},
+        {i:'bass',  kind:'root', gain:.20, pat:'x.....', len:1.6, tight:true},
+        {i:'harp',  kind:'chord', gain:.11, pat:'..x.x.', len:1.4, roll:.03, pan:-.28},
+        {i:'musicbox', kind:'melody', gain:.30, pan:.18, notes:[
+          [0,'A4',1],[1,'C5',1],[2,'D5',1],[3,'C5',1.6],[4.5,'A4',.8],
+          [6,'Bb4',1],[7,'D5',1],[8,'C5',1.6],[9.5,'A4',.8],[10.5,'G4',.9],
+          [12,'F4',1],[13,'A4',1],[14,'C5',1],[15,'D5',1.6],[16.5,'C5',.8],
+          [18,'Bb4',1],[19,'G4',1],[20,'A4',2],[22,'F4',2]]},
+        {i:'flute', kind:'melody', gain:.13, layer:1, pan:-.34, notes:[
+          [2,'F5',2],[8,'A5',2],[14,'G5',2],[20,'F5',3]]},
+        {i:'strings', kind:'hold', gain:.07, layer:2, oct:4, bars:2, pan:.40},
       ]},
 
+    /* ПРОЛОГ — самая большая вещь в игре: хор, литавры, медь и струнные.
+       Восемь тактов вниз по минору и обратно, и на каждом круге
+       прибавляется голос.                                              */
     prologue: { title:'Пролог', bpm:74, meter:4, oct:2,
+      voicing:'хор, струнные, медь, литавры',
       chords:['Dm','Bb','F','C','Dm','Bb','Gm','A'],
       voices:[
-        {i:'pad',   kind:'hold', gain:.13, oct:3},
-        {i:'bass',  kind:'root', gain:.22, pat:'x.......'},
-        {i:'bell',  kind:'melody', gain:.20, layer:1, notes:[
+        {i:'bass',  kind:'root', gain:.24, pat:'x.......', len:6.4, tight:true},
+        {i:'organ', kind:'hold', gain:.09, oct:3, pan:-.2},
+        {i:'strings', kind:'hold', gain:.13, oct:4, pan:.30},
+        {i:'bell',  kind:'melody', gain:.19, pan:.10, notes:[
           [0,'D5',2],[2,'F5',1],[3,'E5',1],[4,'D5',2],[6,'C5',2],
           [8,'F5',1],[9,'E5',1],[10,'D5',2],[12,'A4',3],
           [16,'D5',2],[18,'F5',1],[19,'G5',1],[20,'A5',3],[23,'F5',1],
           [24,'G5',2],[26,'F5',1],[27,'E5',1],[28,'D5',4]]},
-        {i:'strings', kind:'hold', gain:.11, layer:2, oct:4},
-        {i:'piano', kind:'arp', gain:.09, layer:2, pat:'0.2.1.2.', oct:4},
-        {i:'drum',  kind:'drums', gain:.16, layer:3, pat:'k...k...'},
+        {i:'choir', kind:'hold', gain:.15, layer:1, oct:3, bars:2, pan:-.36},
+        {i:'drum',  kind:'drums', gain:.30, layer:1, pat:'K.......', tight:true},
+        {i:'brass', kind:'melody', gain:.15, layer:2, pan:-.16, notes:[
+          [4,'D4',2],[6,'F4',2],[12,'A3',3],
+          [20,'A4',2],[22,'G4',1],[23,'F4',1],[28,'D4',4]]},
+        {i:'harp',  kind:'arp', gain:.10, layer:2, pat:'0.2.3.2.', oct:4, len:1.2, pan:.42},
+        {i:'drum',  kind:'drums', gain:.13, layer:3, pat:'..t...t.'},
+        {i:'drum',  kind:'drums', gain:.10, layer:3, pat:'c.......'},
+        {i:'choir', kind:'melody', gain:.12, layer:3, oct:4, pan:.24, notes:[
+          [8,'F4',4],[16,'D4',4],[24,'A4',4],[28,'D4',4]]},
       ]},
 
+    /* УЛИЦА — гитарная. Перебор, ходячий бас, губная гармоника флейтой.  */
     street: { title:'Улица', bpm:94, meter:4, oct:2,
-      chords:['Em','C','G','D'],
+      voicing:'гитарный перебор, ходячий бас',
+      chords:['Em','C','G','D','Em','C','Am','B'],
       voices:[
-        {i:'bass',   kind:'root', gain:.19, pat:'x...x...'},
-        {i:'guitar', kind:'arp',  gain:.15, pat:'0.1.2.1.', oct:3},
-        {i:'guitar', kind:'melody', gain:.17, notes:[
+        {i:'bass',   kind:'root', gain:.19, pat:'x..5x..3', len:1.4, tight:true},
+        {i:'guitar', kind:'arp',  gain:.16, pat:'0.1.2.3.', oct:3, len:1.5, pan:-.30},
+        {i:'guitar', kind:'melody', gain:.18, pan:.22, notes:[
           [0,'B4',1],[1,'G4',.8],[2,'A4',1.4],[4,'E4',1.6],
           [6,'G4',.8],[7,'A4',.8],[8,'B4',1.6],[10,'D5',1.4],
-          [12,'B4',1],[13,'A4',1],[14,'G4',2]]},
-        {i:'drum',   kind:'drums', gain:.10, layer:1, pat:'..h...h.'},
+          [12,'B4',1],[13,'A4',1],[14,'G4',2],
+          [16,'E5',1.4],[18,'D5',1],[19,'B4',1],[20,'A4',2],
+          [22,'G4',1],[23,'A4',1],[24,'B4',2],[26,'A4',1],[27,'G4',1],[28,'E4',3]]},
+        {i:'drum',   kind:'drums', gain:.11, layer:1, pat:'..h.h.h.'},
+        {i:'flute',  kind:'melody', gain:.11, layer:1, pan:-.40, notes:[
+          [4,'B5',2],[12,'G5',2],[20,'E5',2],[28,'B4',3]]},
+        {i:'pad',    kind:'hold', gain:.06, layer:2, oct:3, bars:2, pan:.44},
       ]},
 
-    cafe: { title:'Кафе', bpm:84, meter:4, oct:2,
-      chords:['C','Am','F','G'],
+    /* КАФЕ — расслабленный свинг: гитара боем, щётки, рояль сверху.     */
+    cafe: { title:'Кафе', bpm:84, meter:4, oct:2, swing:.20,
+      voicing:'свинг, гитара боем, щётки',
+      chords:['Cmaj7','Am7','Dm7','G7','Cmaj7','Am7','F','G7'],
       voices:[
-        {i:'bass',   kind:'root', gain:.17, pat:'x.......'},
-        {i:'guitar', kind:'arp',  gain:.14, pat:'0.1.2.1.', oct:3},
-        {i:'piano',  kind:'melody', gain:.16, layer:1, notes:[
+        {i:'bass',   kind:'root', gain:.17, pat:'x...5...', len:1.6, tight:true},
+        {i:'guitar', kind:'chord', gain:.13, pat:'..x...x.', len:1.6, roll:.022, pan:-.32},
+        {i:'piano',  kind:'melody', gain:.19, pan:.20, notes:[
           [0,'E4',1.4],[2,'G4',1],[3,'A4',1],[4,'G4',2],
-          [7,'E4',1],[8,'F4',1.4],[10,'A4',1],[11,'C5',1],[12,'B4',2],[14,'G4',2]]},
+          [6.5,'E4',1],[8,'F4',1.4],[10,'A4',1],[11,'C5',1],[12,'B4',2],[14,'G4',2],
+          [16,'E5',1.4],[18,'C5',1],[19,'A4',1],[20,'G4',2],
+          [22.5,'A4',1],[24,'F4',1.4],[26,'A4',1],[27,'G4',1],[28,'E4',3]]},
+        {i:'drum',   kind:'drums', gain:.08, layer:1, pat:'..h..h.h'},
+        {i:'drum',   kind:'drums', gain:.06, layer:1, pat:'....s...'},
+        {i:'guitar', kind:'arp', gain:.08, layer:2, pat:'...3...2', oct:4, len:1.1, pan:.38},
+        {i:'strings',kind:'hold', gain:.05, layer:3, oct:4, bars:2, pan:.46},
       ]},
 
-    shift: { title:'Кафе — смена', bpm:118, meter:4, oct:2,
-      chords:['C','Am','F','G'],
+    /* СМЕНА — та же гитара, но быстрее и с полной ритм-секцией: у Наи
+       восемь столиков и очень мало времени.                            */
+    shift: { title:'Кафе — смена', bpm:118, meter:4, oct:2, swing:.14,
+      voicing:'быстрый свинг с полной ритм-секцией',
+      chords:['Am7','D7','Gmaj7','Cmaj7','F','Dm7','E7','Am7'],
       voices:[
-        {i:'bass',   kind:'root', gain:.20, pat:'x..x..x.'},
-        {i:'guitar', kind:'arp',  gain:.16, pat:'0.1.2.1.', oct:3},
-        {i:'guitar', kind:'arp',  gain:.10, pat:'..2...1.', oct:4},
-        {i:'drum',   kind:'drums', gain:.15, pat:'k.hshk.h'},
-        {i:'piano',  kind:'melody', gain:.15, notes:[
-          [0,'G4',.5],[.5,'A4',.5],[1,'C5',1],[2,'B4',.5],[2.5,'G4',1],
-          [4,'E4',.5],[4.5,'G4',.5],[5,'A4',1],[6,'G4',1.4],
-          [8,'F4',.5],[8.5,'A4',.5],[9,'C5',1],[10,'A4',1.4],
-          [12,'D5',.5],[12.5,'B4',.5],[13,'G4',1.6]]},
+        {i:'bass',   kind:'root', gain:.19, pat:'x.5.x.3.', len:.9, tight:true},
+        {i:'guitar', kind:'chord', gain:.12, pat:'..x..x.x', len:1.1, roll:.016, pan:-.30},
+        {i:'drum',   kind:'drums', gain:.12, pat:'k..k..s.', tight:true},
+        {i:'drum',   kind:'drums', gain:.07, pat:'h.h.h.h.', tight:true},
+        {i:'piano',  kind:'melody', gain:.19, pan:.22, notes:[
+          [0,'A4',.8],[1,'C5',.8],[2,'E5',1.2],[3.5,'D5',.8],[4,'F#5',1.6],
+          [6,'D5',.8],[7,'C5',.8],[8,'B4',1.6],[10,'D5',1],[11,'G5',1],[12,'E5',2],
+          [16,'C5',.8],[17,'F5',.8],[18,'E5',1.2],[19.5,'C5',.8],[20,'D5',1.6],
+          [22,'F5',.8],[23,'E5',.8],[24,'G#4',1.6],[26,'B4',1],[27,'D5',1],[28,'A4',2]]},
+        {i:'brass',  kind:'melody', gain:.11, layer:1, pan:-.20, notes:[
+          [4,'A4',1.6],[12,'E4',1.6],[20,'F4',1.6],[28,'A4',2]]},
+        {i:'drum',   kind:'drums', gain:.07, layer:2, pat:'.....c..'},
       ]},
 
+    /* ДОМ — тихий рояль и струнные. Ничего не происходит, и это хорошо. */
     home: { title:'Дом', bpm:76, meter:4, oct:2,
-      chords:['C','Em','Am','F'],
+      voicing:'рояль и струнные, тихо',
+      chords:['C','Em','Am','F','C','G','F','G'],
       voices:[
-        {i:'bass',  kind:'root', gain:.14, pat:'x.......'},
-        {i:'piano', kind:'arp',  gain:.11, pat:'0...2...', oct:4},
-        {i:'piano', kind:'melody', gain:.20, notes:[
-          [0,'G4',2],[2,'E4',1.6],[4,'B4',2],[6,'G4',1.6],
-          [8,'A4',2],[10,'C5',1.6],[12,'F4',2],[14,'A4',1.6]]},
+        {i:'bass',   kind:'root', gain:.15, pat:'x.......', len:6.4, tight:true},
+        {i:'piano',  kind:'arp', gain:.12, pat:'0..1..2.', oct:4, len:2.2, pan:-.22},
+        {i:'piano',  kind:'melody', gain:.22, pan:.14, notes:[
+          [0,'G4',2],[2,'E4',1],[3,'C4',1],[4,'E4',2],[6,'G4',2],
+          [8,'A4',2],[10,'C5',1],[11,'B4',1],[12,'A4',3],
+          [16,'G4',2],[18,'E4',1],[19,'G4',1],[20,'C5',2],[22,'B4',2],
+          [24,'A4',1],[25,'G4',1],[26,'F4',2],[28,'G4',4]]},
+        {i:'flute',  kind:'melody', gain:.12, layer:1, pan:-.36, notes:[
+          [4,'C5',3],[12,'A4',3],[20,'E5',3],[28,'G4',4]]},
+        {i:'strings',kind:'hold', gain:.08, layer:2, oct:3, bars:2, pan:.36},
+        {i:'bell',   kind:'melody', gain:.08, layer:3, pan:.42, notes:[
+          [0,'C6',2],[12,'A5',2],[24,'F5',3]]},
       ]},
 
+    /* УНИВЕРСИТЕТ — одно и то же здание четыре дня подряд, поэтому одна
+       и та же тема, к которой каждый день добавляется голос.           */
     uni: { title:'Университет', bpm:72, meter:4, oct:2,
+      voicing:'рояль, к четвёртому дню — орган и литавра',
       chords:['Am','Dm','E','Am','F','C','Dm','E'],
       voices:[
-        {i:'piano', kind:'arp', gain:.12, pat:'0.1.2.1.', oct:4},
-        {i:'piano', kind:'melody', gain:.21, notes:[
-          [0,'A4',1.6],[2,'C5',1],[3,'B4',1],[4,'A4',2],[6,'F4',1.6],
-          [8,'E4',2],[10,'A4',1.6],[12,'C5',2],[14,'B4',1.6],
-          [16,'A4',1],[17,'C5',1],[18,'E5',2],[20,'D5',1.6],
-          [22,'C5',1.6],[24,'D5',2],[26,'F4',1.6],[28,'E4',3]]},
-        {i:'bass',  kind:'root', gain:.17, layer:1, pat:'x.......'},
-        {i:'strings', kind:'hold', gain:.10, layer:2, oct:3},
-        {i:'bell',  kind:'melody', gain:.13, layer:3, notes:[
-          [0,'A5',2],[4,'E5',2],[8,'C5',2],[12,'E5',2],
-          [16,'A5',2],[20,'G5',2],[24,'F5',2],[28,'E5',3]]},
-        {i:'drum',  kind:'drums', gain:.09, layer:3, pat:'k.......'},
+        {i:'piano',  kind:'arp', gain:.13, pat:'0.1.2.1.', oct:4, len:1.7, pan:-.26},
+        {i:'piano',  kind:'melody', gain:.21, pan:.16, notes:[
+          [0,'A4',1.6],[2,'C5',1],[3,'B4',1],[4,'A4',2],[6,'E4',2],
+          [8,'G#4',1.6],[10,'B4',1],[11,'A4',1],[12,'E4',3],
+          [16,'F4',1.6],[18,'A4',1],[19,'C5',1],[20,'E5',2],[22,'C5',2],
+          [24,'D5',1.6],[26,'C5',1],[27,'B4',1],[28,'A4',4]]},
+        {i:'bass',   kind:'root', gain:.17, pat:'x.......', len:6.4, tight:true},
+        {i:'strings',kind:'hold', gain:.10, layer:1, oct:3, bars:2, pan:.34},
+        {i:'organ',  kind:'hold', gain:.07, layer:2, oct:4, bars:2, pan:-.40},
+        {i:'bell',   kind:'melody', gain:.12, layer:2, pan:.44, notes:[
+          [0,'A5',2],[8,'E5',2],[16,'C6',2],[24,'A5',3]]},
+        {i:'drum',   kind:'drums', gain:.16, layer:3, pat:'K.......', tight:true},
+        {i:'choir',  kind:'hold', gain:.09, layer:3, oct:3, bars:2, pan:.22},
       ]},
 
+    /* СТАРОЕ КРЫЛО — пустой коридор: орган держит, стекло отвечает эхом. */
     oldWing: { title:'Старое крыло', bpm:60, meter:4, oct:2,
-      chords:['Am','F','E','Am'],
+      voicing:'орган и стеклянные обертоны',
+      chords:['Am','F','Dm','E'],
       voices:[
-        {i:'pad',   kind:'hold', gain:.14, oct:2},
-        {i:'bass',  kind:'root', gain:.16, pat:'x.......'},
-        {i:'piano', kind:'melody', gain:.16, notes:[
-          [0,'A4',2],[3,'G#4',1.4],[6,'E4',2],
-          [8,'F4',2],[11,'E4',1.4],[14,'C4',2]]},
+        {i:'organ',  kind:'hold', gain:.11, oct:3, bars:2, pan:-.18},
+        {i:'bass',   kind:'root', gain:.16, pat:'x.......', len:7.4, tight:true},
+        {i:'glass',  kind:'melody', gain:.14, pan:.26, notes:[
+          [0,'A4',3],[4,'F4',2],[8,'D4',3],[12,'E4',4]]},
+        {i:'harp',   kind:'arp', gain:.07, layer:1, pat:'0...2...', oct:4, len:2.4, pan:.40},
       ]},
 
+    /* ЦОКОЛЬ — ниже всего: один бас, пульс и редкая капля.              */
     basement: { title:'Цоколь', bpm:52, meter:4, oct:1,
+      voicing:'низкий гул, редкий удар',
       chords:['Dm','Dm','Bb','A'],
       voices:[
-        {i:'pad',  kind:'hold', gain:.16, oct:2},
-        {i:'bass', kind:'root', gain:.18, pat:'x.......'},
-        {i:'bell', kind:'melody', gain:.11, notes:[[2,'D4',2],[9,'F4',2],[14,'A3',3]]},
+        {i:'bass',   kind:'root', gain:.22, pat:'x.......', len:7.6, tight:true},
+        {i:'pad',    kind:'hold', gain:.10, oct:2, bars:2, pan:-.14},
+        {i:'glass',  kind:'melody', gain:.10, pan:.30, notes:[
+          [0,'D4',4],[8,'Bb3',3],[12,'A3',4]]},
+        {i:'drum',   kind:'drums', gain:.13, layer:1, pat:'t.......'},
       ]},
 
+    /* АРХИВ — здесь Ная узнаёт имя матери. Челеста поверх органа.       */
     archive: { title:'Архив', bpm:58, meter:4, oct:2,
-      chords:['Dm','Gm','Bb','A'],
+      voicing:'челеста над органом',
+      chords:['Am','Am','F','G','Am','Em','F','E'],
       voices:[
-        {i:'pad',  kind:'hold', gain:.12, oct:3},
-        {i:'bell', kind:'melody', gain:.16, notes:[
-          [0,'D5',2],[3,'F5',1.4],[6,'A4',2],
-          [8,'Bb4',2],[11,'D5',1.4],[14,'C#5',2]]},
-        {i:'bass', kind:'root', gain:.13, layer:1, pat:'x.......'},
+        {i:'organ',  kind:'hold', gain:.09, oct:3, bars:2, pan:-.20},
+        {i:'bass',   kind:'root', gain:.15, pat:'x.......', len:7.4, tight:true},
+        {i:'musicbox', kind:'melody', gain:.22, pan:.20, notes:[
+          [0,'A4',2],[2,'C5',1],[3,'E5',1],[4,'D5',3],
+          [8,'F4',2],[10,'A4',2],[12,'G4',3],
+          [16,'A4',2],[18,'E5',1],[19,'D5',1],[20,'C5',3],
+          [24,'F4',2],[26,'E4',1],[27,'D4',1],[28,'E4',4]]},
+        {i:'choir',  kind:'hold', gain:.09, layer:1, oct:4, bars:2, pan:.38},
       ]},
 
+    /* КРЫША — выше всего: струнные и флейта, город внизу.              */
     roof: { title:'Крыша', bpm:68, meter:4, oct:2,
-      chords:['D','Bm','G','A','D','Bm','Em','A'],
+      voicing:'струнные и флейта на высоте',
+      chords:['F','C','Dm','Bb','F','Am','Bb','C'],
       voices:[
-        {i:'strings', kind:'hold', gain:.13, oct:3},
-        {i:'bass',    kind:'root', gain:.18, pat:'x.......'},
-        {i:'piano',   kind:'melody', gain:.22, notes:[
-          [0,'D5',2],[2,'F#5',1.6],[4,'E5',2],[6,'D5',1.6],
-          [8,'B4',2],[10,'D5',1.6],[12,'A4',3],
-          [16,'D5',1],[17,'E5',1],[18,'F#5',2],[20,'A5',3],
-          [24,'G5',2],[26,'F#5',1.6],[28,'E5',3]]},
-        {i:'bell',    kind:'melody', gain:.12, layer:1, notes:[[0,'D6',3],[16,'A5',3]]},
+        {i:'strings',kind:'hold', gain:.13, oct:3, bars:2, pan:-.22},
+        {i:'bass',   kind:'root', gain:.14, pat:'x.......', len:6.4, tight:true},
+        {i:'flute',  kind:'melody', gain:.21, pan:.18, notes:[
+          [0,'C5',2],[2,'F5',2],[4,'E5',1],[5,'D5',1],[6,'C5',2],
+          [8,'D5',2],[10,'F5',1],[11,'A5',1],[12,'G5',3],
+          [16,'A5',2],[18,'F5',2],[20,'E5',1],[21,'D5',1],[22,'C5',2],
+          [24,'D5',2],[26,'E5',1],[27,'F5',1],[28,'C5',4]]},
+        {i:'harp',   kind:'arp', gain:.10, layer:1, pat:'0.2.3.2.', oct:4, len:1.3, pan:.42},
+        {i:'choir',  kind:'hold', gain:.08, layer:1, oct:4, bars:2, pan:-.44},
       ]},
 
+    /* ТРЕВОГА — за Наей идут. Тремоло струнных, том, медь в самом верху. */
     tense: { title:'Тревога', bpm:96, meter:4, oct:2,
-      chords:['Am','Am','F','E'],
+      voicing:'тремоло струнных и медь',
+      chords:['Dm','Dm','Ddim','A'],
       voices:[
-        {i:'bass',    kind:'root', gain:.20, pat:'x.x.x.x.'},
-        {i:'strings', kind:'hold', gain:.10, oct:3},
-        {i:'piano',   kind:'arp', gain:.11, pat:'0.0.2.1.', oct:4},
-        {i:'bell',    kind:'melody', gain:.11, layer:1, notes:[[0,'E5',1],[8,'F5',1],[12,'E5',2]]},
+        {i:'bass',   kind:'root', gain:.21, pat:'x.x.x.x.', len:.8, tight:true},
+        {i:'strings',kind:'arp', gain:.11, pat:'00000000', oct:4, len:.6, tight:true, pan:-.28},
+        {i:'drum',   kind:'drums', gain:.14, pat:'t...t..t'},
+        {i:'brass',  kind:'melody', gain:.19, pan:.22, notes:[
+          [0,'D4',1],[1,'D4',1],[2,'F4',2],[4,'E4',1],[5,'E4',1],[6,'C#4',2],
+          [8,'D4',1],[9,'F4',1],[10,'A4',2],[12,'C#5',3]]},
+        {i:'drum',   kind:'drums', gain:.10, layer:1, pat:'....c...'},
+        {i:'choir',  kind:'hold', gain:.10, layer:1, oct:3, pan:.40},
       ]},
 
+    /* ПЕЧАЛЬ — только рояль и виолончельная линия струнных.            */
     sad: { title:'Печаль', bpm:64, meter:4, oct:2,
-      chords:['Am','F','C','G'],
+      voicing:'рояль соло, позже струнные',
+      chords:['Am','F','C','G','Am','Dm','F','E'],
       voices:[
-        {i:'piano', kind:'arp', gain:.10, pat:'0...2...', oct:4},
-        {i:'piano', kind:'melody', gain:.20, notes:[
-          [0,'C5',2],[2,'B4',1.6],[4,'A4',3],
-          [8,'G4',2],[10,'E4',1.6],[12,'F4',3]]},
-        {i:'bass',  kind:'root', gain:.13, layer:1, pat:'x.......'},
+        {i:'piano',  kind:'arp', gain:.12, pat:'0..2..1.', oct:4, len:2.4, pan:-.24},
+        {i:'piano',  kind:'melody', gain:.24, pan:.14, notes:[
+          [0,'E4',2],[2,'A4',2],[4,'G4',1],[5,'F4',1],[6,'E4',2],
+          [8,'C4',2],[10,'E4',1],[11,'G4',1],[12,'B3',3],
+          [16,'A4',2],[18,'C5',2],[20,'D5',1],[21,'C5',1],[22,'A4',2],
+          [24,'F4',2],[26,'E4',1],[27,'D4',1],[28,'E4',4]]},
+        {i:'bass',   kind:'root', gain:.13, pat:'x.......', len:6.4, tight:true},
+        {i:'strings',kind:'hold', gain:.11, layer:1, oct:3, bars:2, pan:.36},
       ]},
 
+    /* АД — ничего человеческого: стекло, хор и пульс.                  */
     hell: { title:'Ад', bpm:54, meter:4, oct:1,
-      chords:['Cm','Cm','Ab','G'],
+      voicing:'стекло, хор, пульс',
+      chords:['Dm','Ddim','Bb','A'],
       voices:[
-        {i:'pad',  kind:'hold', gain:.18, oct:2},
-        {i:'bass', kind:'root', gain:.20, pat:'x.......'},
-        {i:'bell', kind:'melody', gain:.12, notes:[[4,'C4',2],[12,'Eb4',3]]},
-        {i:'drum', kind:'drums', gain:.12, layer:1, pat:'k.......'},
+        {i:'bass',   kind:'root', gain:.24, pat:'x...x...', len:3.4, tight:true},
+        {i:'glass',  kind:'melody', gain:.16, pan:-.26, notes:[
+          [0,'D4',3],[4,'Ab4',3],[8,'Bb3',3],[12,'A3',4]]},
+        {i:'pad',    kind:'hold', gain:.10, oct:2, bars:2, pan:.24},
+        {i:'choir',  kind:'hold', gain:.13, layer:1, oct:3, bars:2, pan:-.42},
+        {i:'drum',   kind:'drums', gain:.16, layer:1, pat:'K.......', tight:true},
       ]},
 
+    /* ФИНАЛЫ. Каждый — своя мысль, и инструмент под неё свой.           */
     endLoner: { title:'Концовка I — Одиночка', bpm:62, meter:4, oct:2,
-      chords:['Cm','Ab','Eb','Bb'],
+      voicing:'один рояль',
+      chords:['Am','Em','F','C','Am','F','Dm','E'],
       voices:[
-        {i:'piano', kind:'melody', gain:.20, notes:[
-          [0,'Eb4',2],[3,'C4',2],[8,'Ab4',2],[11,'G4',3]]},
-        {i:'piano', kind:'arp', gain:.08, pat:'0.......', oct:4},
+        {i:'piano',  kind:'arp', gain:.11, pat:'0..1..2.', oct:4, len:2.4, pan:-.20},
+        {i:'piano',  kind:'melody', gain:.24, pan:.12, notes:[
+          [0,'A4',2],[2,'E4',2],[4,'F4',1],[5,'G4',1],[6,'A4',2],
+          [8,'C5',2],[10,'B4',1],[11,'A4',1],[12,'E4',3],
+          [16,'A4',2],[18,'C5',2],[20,'F4',2],[22,'E4',2],
+          [24,'D4',2],[26,'E4',1],[27,'F4',1],[28,'A4',4]]},
+        {i:'bass',   kind:'root', gain:.12, pat:'x.......', len:6.4, tight:true},
+        {i:'strings',kind:'hold', gain:.07, layer:1, oct:3, bars:2, pan:.40},
       ]},
 
-    endWitch: { title:'Концовка II — Злая ведьма', bpm:86, meter:4, oct:1,
-      chords:['Em','C','Am','B'],
+    endWitch: { title:'Концовка II — Злая ведьма', bpm:86, meter:4, oct:2,
+      voicing:'орган, медь, литавры',
+      chords:['Dm','Bb','F','A','Dm','Gm','Bb','A'],
       voices:[
-        {i:'bass',    kind:'root', gain:.22, pat:'x.x.x.x.'},
-        {i:'pad',     kind:'hold', gain:.15, oct:2},
-        {i:'strings', kind:'hold', gain:.12, layer:1, oct:3},
-        {i:'drum',    kind:'drums', gain:.16, pat:'k..k..s.'},
-        {i:'bell',    kind:'melody', gain:.14, notes:[
-          [0,'B4',2],[4,'E5',2],[8,'C5',2],[12,'B4',3]]},
+        {i:'bass',   kind:'root', gain:.22, pat:'x...x...', len:3.4, tight:true},
+        {i:'organ',  kind:'hold', gain:.13, oct:3, pan:-.24},
+        {i:'brass',  kind:'melody', gain:.21, pan:.18, notes:[
+          [0,'D5',2],[2,'A4',1],[3,'Bb4',1],[4,'F4',2],[6,'A4',2],
+          [8,'D5',2],[10,'F5',1],[11,'E5',1],[12,'C#5',3],
+          [16,'D5',2],[18,'Bb4',2],[20,'G4',2],[22,'Bb4',2],
+          [24,'A4',2],[26,'C#5',1],[27,'E5',1],[28,'D5',4]]},
+        {i:'drum',   kind:'drums', gain:.20, pat:'K...K...', tight:true},
+        {i:'choir',  kind:'hold', gain:.12, layer:1, oct:4, bars:2, pan:.40},
+        {i:'drum',   kind:'drums', gain:.09, layer:1, pat:'..t...t.'},
       ]},
 
     endRevenge: { title:'Концовка III — Месть', bpm:70, meter:4, oct:2,
-      chords:['Bm','G','D','F#'],
+      voicing:'струнные и хор',
+      chords:['Gm','Eb','Bb','F','Gm','Cm','Eb','D'],
       voices:[
-        {i:'strings', kind:'hold', gain:.12, oct:3},
-        {i:'bass',    kind:'root', gain:.18, pat:'x.......'},
-        {i:'piano',   kind:'melody', gain:.22, notes:[
-          [0,'F#5',2],[2,'D5',1.6],[4,'B4',3],
-          [8,'A4',1],[9,'B4',1],[10,'D5',2],[12,'A#4',3]]},
+        {i:'strings',kind:'hold', gain:.14, oct:3, bars:2, pan:-.24},
+        {i:'bass',   kind:'root', gain:.17, pat:'x.......', len:6.4, tight:true},
+        {i:'choir',  kind:'melody', gain:.19, pan:.20, notes:[
+          [0,'G4',3],[4,'Bb4',2],[6,'A4',2],[8,'D5',3],[12,'Bb4',3],
+          [16,'G4',3],[20,'C5',2],[22,'Bb4',2],[24,'Eb5',3],[28,'D5',4]]},
+        {i:'bell',   kind:'melody', gain:.11, layer:1, pan:.42, notes:[
+          [0,'G5',3],[8,'D5',3],[16,'Bb5',3],[24,'G5',4]]},
+        {i:'drum',   kind:'drums', gain:.14, layer:1, pat:'K.......', tight:true},
       ]},
 
     endStay: { title:'Концовка IV — Остаться', bpm:80, meter:4, oct:2,
-      chords:['G','Em','C','D'],
+      voicing:'рояль, арфа, флейта',
+      chords:['G','Em','C','D','G','Bm','C','D'],
       voices:[
-        {i:'bass',  kind:'root', gain:.15, pat:'x.......'},
-        {i:'piano', kind:'arp', gain:.11, pat:'0.1.2.1.', oct:4},
-        {i:'piano', kind:'melody', gain:.22, notes:[
+        {i:'bass',   kind:'root', gain:.15, pat:'x...5...', len:3.2, tight:true},
+        {i:'harp',   kind:'arp', gain:.12, pat:'0.1.2.3.', oct:4, len:1.5, pan:-.28},
+        {i:'piano',  kind:'melody', gain:.22, pan:.16, notes:[
           [0,'D5',1.6],[2,'B4',1],[3,'G4',1],[4,'A4',2],[6,'B4',1.6],
-          [8,'C5',1.6],[10,'E5',1],[11,'D5',1],[12,'G4',3]]},
+          [8,'C5',1.6],[10,'E5',1],[11,'D5',1],[12,'G4',3],
+          [16,'G5',1.6],[18,'D5',1],[19,'B4',1],[20,'A4',2],[22,'D5',2],
+          [24,'E5',1.6],[26,'D5',1],[27,'C5',1],[28,'G4',4]]},
+        {i:'flute',  kind:'melody', gain:.13, layer:1, pan:-.38, notes:[
+          [4,'G5',2],[12,'D5',3],[20,'B5',2],[28,'G5',4]]},
+        {i:'strings',kind:'hold', gain:.08, layer:1, oct:3, bars:2, pan:.40},
       ]},
   },
   /* Старые имена тем остаются рабочими: по ним в сценарии сорок с лишним
@@ -1068,6 +1345,25 @@ const Music = {
     this.bus = c.createGain(); this.bus.gain.value = 1;
     this.master = c.createGain(); this.master.gain.value = 1;
     this.bus.connect(this.master); this.master.connect(c.destination);
+    /* Общий зал: короткий синтезированный импульс. Он не «эффект», а то,
+       что склеивает отдельные ноты в звучание помещения, — без него любой
+       синтез остаётся набором коротких сигналов. Один на всю музыку. */
+    try {
+      const len = Math.floor(c.sampleRate * 1.9);
+      const ir = c.createBuffer(2, len, c.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < len; i++) {
+          const k = i / len;
+          d[i] = (Math.random() * 2 - 1) * Math.pow(1 - k, 2.6) * (i < 400 ? i / 400 : 1);
+        }
+      }
+      this.verb = c.createConvolver(); this.verb.buffer = ir;
+      this.send = c.createGain(); this.send.gain.value = 1;
+      const damp = c.createBiquadFilter(); damp.type = 'lowpass'; damp.frequency.value = 3200;
+      const wet = c.createGain(); wet.gain.value = 0.9;
+      this.send.connect(damp); damp.connect(this.verb); this.verb.connect(wet); wet.connect(this.master);
+    } catch(e) { this.send = null; this.verb = null; }
   },
   resolve(name) {
     if (name in this.ALIAS) name = this.ALIAS[name];
@@ -1076,15 +1372,21 @@ const Music = {
   /* «Уровень» темы по состоянию сюжета. Университет — одно и то же место
      все четыре дня, и музыка у него одна; меняется её плотность. */
   layerFor(name) {
-    if (typeof gameState === 'undefined' || !gameState) return 0;
+    /* Уровень 1 — обычное звучание темы: мелодия, бас и аккомпанемент.
+       Нулевой оставлен для мест, где тема должна быть прозрачнее, а
+       второй и третий добавляют голоса по мере того, как история
+       становится тяжелее. */
+    if (typeof gameState === 'undefined' || !gameState) return 1;
     if (name === 'uni')      return Math.max(0, Math.min(3, (C('uniDay') || 1) - 1));
     if (name === 'prologue') return 3;
     if (name === 'archive' || name === 'sad') return F('sueDead') ? 1 : 0;
-    if (name === 'street' || name === 'cafe') return F('firstAmulet') ? 1 : 0;
+    if (name === 'street' || name === 'cafe') return F('firstAmulet') ? 3 : 1;
+    if (name === 'shift')    return F('firstAmulet') ? 2 : 1;
+    if (name === 'home')     return F('toldSueWitch') ? 3 : (F('portalOpened') ? 2 : 1);
     if (name === 'tense')    return F('secondAmulet') ? 1 : 0;
     if (name === 'hell')     return F('metLilith') ? 1 : 0;
     if (name === 'roof')     return C('uniDay') >= 4 ? 1 : 0;
-    return 0;
+    return 1;
   },
   /* Точка входа для комнат: тема берётся из комнаты, уровень — из сюжета. */
   forRoom(theme) { this.play(theme, this.layerFor(theme)); },
@@ -1106,9 +1408,12 @@ const Music = {
       this.cur = key; this.layer = lay; this.step = 0;
       this.nextTime = Audio.ctx.currentTime + 0.06;
       this.startTimer();
-      try { this.bus.gain.cancelScheduledValues(Audio.ctx.currentTime);
-            this.bus.gain.setValueAtTime(0.0001, Audio.ctx.currentTime);
-            this.bus.gain.linearRampToValueAtTime(1, Audio.ctx.currentTime + 0.7); } catch(e){}
+      try { const now = Audio.ctx.currentTime;
+            this.bus.gain.cancelScheduledValues(now);
+            this.bus.gain.setValueAtTime(0.0001, now);
+            this.bus.gain.linearRampToValueAtTime(1, now + 0.7);
+            if (this.send) { this.send.gain.cancelScheduledValues(now);
+                             this.send.gain.setValueAtTime(1, now); } } catch(e){}
     };
     if (this.cur && this.timer) {              // плавная смена, а не обрыв
       try { this.bus.gain.cancelScheduledValues(Audio.ctx.currentTime);
@@ -1119,8 +1424,13 @@ const Music = {
   },
   silence() {
     if (this.bus && Audio.ctx) { try {
-      this.bus.gain.cancelScheduledValues(Audio.ctx.currentTime);
-      this.bus.gain.linearRampToValueAtTime(0.0001, Audio.ctx.currentTime + 0.4);
+      const t = Audio.ctx.currentTime;
+      this.bus.gain.cancelScheduledValues(t);
+      this.bus.gain.linearRampToValueAtTime(0.0001, t + 0.4);
+      /* Посыл в зал идёт мимо шины, поэтому гасится отдельно — иначе
+         после «стоп» ещё две секунды звенит хвост. */
+      if (this.send) { this.send.gain.cancelScheduledValues(t);
+                       this.send.gain.linearRampToValueAtTime(0.0001, t + 0.4); }
     } catch(e){} }
     this.stopTimer();
   },
@@ -1154,32 +1464,58 @@ const Music = {
     const total = tr.chords.length * perBar;
     let guard = 0;
     while (this.nextTime < c.currentTime + this.LOOKAHEAD && guard++ < 64) {
-      this.emit(tr, this.step % total, this.nextTime, stepDur, perBar);
+      const pos = this.step % total;
+      /* Свинг: каждая вторая восьмая опаздывает. Ровная сетка звучит как
+         метроном, и все темы на ней делаются похожими друг на друга. */
+      const sw = (tr.swing || 0) * stepDur * (pos % 2 ? 1 : 0);
+      this.emit(tr, pos, this.nextTime + sw, stepDur, perBar);
       this.step = (this.step + 1) % total;
       this.nextTime += stepDur;
     }
+  },
+  /* Акцент по месту в такте: сильная доля громче слабой. Без этого
+     последовательность нот не превращается во фразу. */
+  accent(inBar, perBar) {
+    if (inBar === 0) return 1.18;
+    if (inBar === perBar / 2) return 1.06;
+    return inBar % 2 ? 0.84 : 0.96;
   },
   emit(tr, pos, t, stepDur, perBar) {
     const bar = Math.floor(pos / perBar) % tr.chords.length;
     const inBar = pos % perBar;
     const beat = pos / 2;
+    const acc = this.accent(inBar, perBar);
     for (const v of tr.voices) {
       if ((v.layer || 0) > this.layer) continue;
       const oct = v.oct === undefined ? tr.oct : v.oct;
       const ch = this.chordNotes(tr.chords[bar], oct);
+      const pan = v.pan || 0;
+      /* Живая рука: микросдвиг во времени и в громкости. Один и тот же
+         рисунок перестаёт повторяться нота в ноту. */
+      const jitter = (v.tight ? 0.002 : 0.008) * (Math.random() - 0.5);
+      const hum = 1 + (Math.random() - 0.5) * (v.tight ? 0.05 : 0.14);
+      const tt = t + jitter;
       if (v.kind === 'hold') {
         if (inBar !== 0) continue;
-        ch.forEach(f => this.voice(v.i, t, f, stepDur * perBar * 0.98, v.gain / ch.length * 1.6));
+        const bars = v.bars || 1;
+        if ((bar % bars) !== 0) continue;
+        ch.forEach((f, i) => this.voice(v.i, tt + i * 0.012, f,
+          stepDur * perBar * bars * 0.98, v.gain / ch.length * 1.6 * hum, pan));
         continue;
       }
       if (v.kind === 'drums') {
         const k = v.pat[inBar % v.pat.length];
-        if (k && k !== '.') this.drum(k, t, v.gain);
+        if (k && k !== '.') this.drum(k, tt, v.gain * acc * hum);
         continue;
       }
       if (v.kind === 'root') {
-        if (v.pat[inBar % v.pat.length] !== 'x') continue;
-        this.voice(v.i, t, ch[0], stepDur * 3.2, v.gain);
+        const k = v.pat[inBar % v.pat.length];
+        if (!k || k === '.') continue;
+        /* 'x' — основной тон, '5' — квинта, '3' — терция: ходячий бас
+           вместо одной и той же ноты весь такт. */
+        const idx = k === 'x' ? 0 : (k === '5' ? 2 : (k === '3' ? 1 : (+k || 0)));
+        const f = ch[idx % ch.length] / (idx >= ch.length ? 2 : 1);
+        this.voice(v.i, tt, f, stepDur * (v.len || 3.2), v.gain * acc * hum, pan);
         continue;
       }
       if (v.kind === 'arp') {
@@ -1187,13 +1523,24 @@ const Music = {
         if (!k || k === '.') continue;
         const idx = k === 'r' ? 0 : (+k || 0);
         const f = ch[idx % ch.length] * (idx >= ch.length ? 2 : 1);
-        this.voice(v.i, t, f, stepDur * 1.8, v.gain);
+        this.voice(v.i, tt, f, stepDur * (v.len || 1.8), v.gain * acc * hum, pan);
+        continue;
+      }
+      if (v.kind === 'chord') {
+        /* Аккорд целиком по шаблону: гитарный бой, аккомпанемент рояля. */
+        const k = v.pat[inBar % v.pat.length];
+        if (!k || k === '.') continue;
+        const up = k !== 'v';                       // 'v' — удар вниз, ноты в обратном порядке
+        const list = up ? ch : ch.slice().reverse();
+        list.forEach((f, i) => this.voice(v.i, tt + i * (v.roll === undefined ? 0.018 : v.roll),
+          f, stepDur * (v.len || 2.2), v.gain * acc * hum / Math.sqrt(ch.length), pan));
         continue;
       }
       if (v.kind === 'melody') {
         for (const n of v.notes) {
           if (Math.abs(n[0] - beat) > 0.001) continue;
-          this.voice(v.i, t, this.hz(n[1]), n[2] * (60 / tr.bpm) * 0.95, v.gain);
+          this.voice(v.i, tt, this.hz(n[1]), n[2] * (60 / tr.bpm) * 0.95,
+                     v.gain * (n[3] === undefined ? 1 : n[3]) * hum, pan);
         }
       }
     }
@@ -2222,8 +2569,8 @@ function freshState() {
       symbolPhoto:false, libAsked:false, sueDay1Done:false, sawRehearsal:false,
       morelCorridor2:false,
       libPeriods:false, propsSymbol:false, propsMorel:false, morelKnowsName:false,
-      oldWingSearched:false, basementFound:false, archiveMedeaFound:false,
-      archiveMorelFound:false, roofPromise:false, sueDay3Done:false,
+      oldWingSearched:false, basementFound:false, archive30Read:false, archiveMedeaFound:false,
+      archiveFound:false, archiveMorelFound:false, roofPromise:false, sueDay3Done:false,
       chrisCovering:false, libMissing:false, morelPhotoSeen:false,
       universityBanned:false, backWindowUsed:false, knowsServiceRoute:false,
       archiveFolderFound:false, premiereDone:false, morelTruth:false,
@@ -6494,8 +6841,14 @@ const Quests = {
       t:'Проследить за Морель.', s:'Она поднялась по служебной лестнице на крышу.' },
     { w:()=> C('uniDay') === 3 && F('archiveMedeaFound'),
       t:'Досмотреть остальные папки архива.' },
+    /* Первая полка уже прочитана — дальше игрок должен понимать, что
+       ряды подписаны по годам и смотреть надо следующий. */
+    { w:()=> C('uniDay') === 3 && F('archive30Read'),
+      t:'Посмотреть полки дальше.', s:'Ряды подписаны по годам: 30, 15 и 5.' },
+    { w:()=> C('uniDay') === 3 && F('archiveFound'),
+      t:'Разобрать папки в архиве.', s:'Начать с ближнего ряда.' },
     { w:()=> C('uniDay') === 3 && F('sawBasement'),
-      t:'Найти цокольный архив.', s:'Дальняя дверь цоколя.' },
+      t:'Найти цокольный архив.', s:'Дальняя дверь цоколя, справа.' },
     { w:()=> C('uniDay') === 3 && F('sawOldWing'),
       t:'Спуститься по служебной лестнице.', s:'Единственная незапертая дверь старого крыла.' },
     { w:()=> C('uniDay') === 3 && F('sawFloor2'),
@@ -11703,19 +12056,64 @@ uniCostume: {
       right:{ door:[112, 48] }, label:'КОСТЮМЕРНАЯ', labelAt:[28, 228],
       lightA:.10, vignette:.34,
     });
-    /* штанги под потолок: комната набита от пола до верха */
-    ctx.fillStyle = '#5f5040';
-    [70, 104].forEach(y => {
-      ctx.fillRect(26, y, 118, 3);
-      for (let x = 32; x < 142; x += 11) {
-        ctx.fillStyle = ['#6a4a52','#4a5a6a','#6a6a4a','#5a4a6a'][(x / 11 | 0) % 4];
-        ctx.fillRect(x, y + 3, 8, 22);
-        ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fillRect(x, y + 22, 8, 3);
-        ctx.fillStyle = '#5f5040';
+    /* ШТАНГИ ДО ПОТОЛКА. Костюмерная — это не «шкаф с вещами», а склад,
+       набитый так, что между рядами едва проходишь. Каждый костюм на
+       своих плечиках, с биркой, и ряды подписаны по постановкам. */
+    const CLOTH = ['#6a4a52','#4a5a6a','#6a6a4a','#5a4a6a','#7a5a3e','#4a6a58','#6a3a42','#3e4a6a'];
+    const rail = (y, x0, x1, depth) => {
+      ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(x0, y + 2, x1 - x0, 3);   // тень штанги
+      ctx.fillStyle = '#6e6056'; ctx.fillRect(x0, y, x1 - x0, 3);                // сама штанга
+      ctx.fillStyle = '#8a7a6a'; ctx.fillRect(x0, y, x1 - x0, 1);
+      ctx.fillStyle = '#4a3e36';                                                  // кронштейны
+      ctx.fillRect(x0 - 2, y - 5, 4, 9); ctx.fillRect(x1 - 2, y - 5, 4, 9);
+      for (let x = x0 + 5, i = 0; x < x1 - 7; x += 10, i++) {
+        const c = CLOTH[(i + depth) % CLOTH.length];
+        const len = 20 + (i * 7) % 9;
+        ctx.fillStyle = '#9a8a72';                                               // плечики
+        ctx.fillRect(x + 2, y + 2, 4, 2);
+        ctx.fillStyle = shade(c, depth ? .78 : 1);                               // дальний ряд темнее
+        ctx.fillRect(x, y + 4, 8, len);
+        ctx.fillStyle = 'rgba(255,240,220,.10)'; ctx.fillRect(x, y + 4, 2, len);  // блик по складке
+        ctx.fillStyle = 'rgba(0,0,0,.26)'; ctx.fillRect(x + 6, y + 4, 2, len);
+        ctx.fillStyle = 'rgba(0,0,0,.30)'; ctx.fillRect(x, y + 4 + len, 8, 3);
+        if (i % 3 === 0) { ctx.fillStyle = '#d8d0b8'; ctx.fillRect(x + 3, y + 9, 3, 4); }  // бирка
       }
-    });
-    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(26, 54, 118, 90);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('← В ГРИМЁРНУЮ', 110, 226);
+    };
+    rail(62, 24, 146, 1);                                       // дальний ряд
+    rail(100, 20, 150, 0);                                      // ближний
+    ctx.fillStyle = 'rgba(0,0,0,.26)'; ctx.fillRect(20, 54, 130, 96);  // темнота между рядами
+
+    /* Подписи рядов — картонки, привязанные к штанге. */
+    ctx.fillStyle = '#cbbd9e'; ctx.fillRect(150, 60, 22, 8);
+    ctx.fillStyle = '#6a5c46'; ctx.font = '5px Courier New';
+    ctx.fillText('МЕДЕЯ', 152, 66);
+    ctx.fillStyle = '#cbbd9e'; ctx.fillRect(152, 98, 22, 8);
+    ctx.fillStyle = '#6a5c46'; ctx.fillText('ХОР', 156, 104);
+
+    /* ЗЕРКАЛО в рост, прислонённое к стене: в костюмерной меряют здесь. */
+    ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(182, 62, 26, 74);
+    ctx.fillStyle = '#5a4a3a'; ctx.fillRect(180, 60, 26, 74);
+    const mg = ctx.createLinearGradient(183, 63, 203, 131);
+    mg.addColorStop(0, '#5d5c58'); mg.addColorStop(.55, '#47474a'); mg.addColorStop(1, '#3a3a40');
+    ctx.fillStyle = mg; ctx.fillRect(183, 63, 20, 68);
+    ctx.fillStyle = 'rgba(255,246,220,.12)';                                     // отражение лампы
+    ctx.beginPath(); ctx.moveTo(186, 70); ctx.lineTo(196, 66);
+    ctx.lineTo(200, 96); ctx.lineTo(188, 104); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.20)'; ctx.fillRect(183, 124, 20, 7);            // мутный низ
+
+    /* Мел на полу: здесь стоят, когда подгоняют по фигуре. */
+    ctx.strokeStyle = 'rgba(230,226,206,.16)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(122, 178, 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(230,226,206,.12)';
+    ctx.fillRect(116, 191, 12, 1); ctx.fillRect(121, 164, 1, 6);
+
+    /* Обрезки ткани и булавки по углам — их сюда сметают, а не убирают. */
+    ctx.fillStyle = 'rgba(120,80,70,.30)';
+    [[30,206,7,3],[41,212,5,2],[58,200,6,3],[196,196,6,2],[186,210,8,3]]
+      .forEach(([x,y,w,h]) => ctx.fillRect(x, y, w, h));
+
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('← В ГРИМЁРНУЮ', 110, 226);
   },
   objects: [
     { t:'costume_rail', x:80, y:190 },
@@ -12049,6 +12447,62 @@ uniMorelOffice: {
       left:{ door:[112, 46] }, label:'МОРЕЛЬ Ж.', labelAt:[64, 232],
     });
     paintYardWindow(ctx, 138, 6, 74, 48, { ornate:true, rays:true });
+
+    /* СТЕНА ПОСТАНОВОК. Женевьева проработала здесь тридцать лет, и стена
+       это показывает: афиши висят рядами по годам, рамки не подобраны —
+       их вешали по одной, а не развесили однажды. Внизу ряд выцвел
+       сильнее верхнего: солнце из окна достаёт туда каждый день. */
+    const posters = [
+      [10, 10, 24, 30, '#6a3038', '#d8c0a0'], [38, 12, 20, 28, '#2e4450', '#c8b490'],
+      [62, 9,  22, 31, '#4a3a5c', '#d0bc9c'], [88, 13, 19, 27, '#5c4430', '#cbb896'],
+      [12, 44, 21, 28, '#3a4a38', '#c4b08c'], [37, 46, 23, 26, '#6a4a28', '#d4c0a0'],
+      [64, 43, 20, 29, '#403050', '#c8b494'],
+    ];
+    posters.forEach(([x, y, w, h, paper, ink], i) => {
+      const faded = y > 40 ? .72 : 1;
+      ctx.fillStyle = 'rgba(0,0,0,.30)'; ctx.fillRect(x + 1, y + 2, w, h);      // тень от рамки
+      ctx.fillStyle = shade(i % 3 ? '#4a3826' : '#5e4832', 1);                   // рама
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = shade(paper, faded); ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+      ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(x + 2, y + 2, w - 4, 1);
+      ctx.fillStyle = shade(ink, faded);                                         // строки набора
+      ctx.fillRect(x + 4, y + 5, w - 8, 2);
+      for (let k = 0; k < 3; k++) ctx.fillRect(x + 4, y + 11 + k * 4, w - 8 - k * 3, 1);
+      ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(x + 4, y + h - 8, w - 8, 4);
+    });
+    /* Одна афиша — та самая: по её кайме идёт тот же знак, круг с
+       четырьмя лучами. Заметить можно, только если уже знаешь, что искать. */
+    if (F('propsSymbol') || F('learnedMedea')) {
+      const [px, py, pw, ph] = [62, 9, 22, 31];
+      ctx.strokeStyle = 'rgba(200,150,240,.34)'; ctx.lineWidth = 1;
+      ctx.strokeRect(px + 3.5, py + 3.5, pw - 7, ph - 7);
+      ctx.fillStyle = 'rgba(210,170,245,.5)';
+      ctx.fillRect(px + 10, py + h4(ph), 3, 3);
+      [[0,-4],[0,4],[-4,0],[4,0]].forEach(([dx, dy]) =>
+        ctx.fillRect(px + 11 + dx, py + h4(ph) + 1 + dy, 1, 1));
+    }
+    function h4(ph) { return Math.round(ph * .52); }
+
+    /* РАСПИСАНИЕ репетиций мелом — то, по чему Ная сверяет даты. */
+    ctx.fillStyle = '#2c3630'; ctx.fillRect(112, 8, 22, 42);
+    ctx.fillStyle = '#36423a'; ctx.fillRect(113, 9, 20, 40);
+    ctx.fillStyle = 'rgba(226,226,206,.30)';
+    for (let i = 0; i < 6; i++) ctx.fillRect(115, 13 + i * 6, 16 - (i % 3) * 4, 1);
+    ctx.fillStyle = 'rgba(226,226,206,.14)'; ctx.fillRect(113, 9, 20, 1);
+
+    /* КОВЁР перед столом: вытертый ровно там, где отодвигают стул. */
+    ctx.fillStyle = '#5c3a34'; ctx.fillRect(66, 138, 92, 56);
+    ctx.fillStyle = '#6b463c'; ctx.fillRect(69, 141, 86, 50);
+    ctx.fillStyle = '#4e302b';
+    ctx.fillRect(74, 146, 76, 1); ctx.fillRect(74, 185, 76, 1);
+    ctx.fillRect(74, 146, 1, 40); ctx.fillRect(149, 146, 1, 40);
+    ctx.fillStyle = 'rgba(122,106,88,.30)';                                     // протёрто
+    ctx.beginPath(); ctx.ellipse(108, 172, 24, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(66, 190, 92, 4);            // тень края
+
+    /* Половицы под ковром идут к окну, а не поперёк: так комната глубже. */
+    ctx.fillStyle = 'rgba(0,0,0,.06)';
+    for (let x = 12; x < 220; x += 22) ctx.fillRect(x, 56, 1, 184);
   },
   objects: [
     { t:'desk', x:104, y:126 }, { t:'chair_wood', x:104, y:152 },
@@ -12615,7 +13069,7 @@ uniWest2: {
       lightA:.30, vignette:.36,
     });
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 72, 356);
+    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 76, 322);
     ctx.fillText('КОРИДОР →', 92, 22);
     ctx.fillText('КАБИНЕТЫ 305 — 311', 76, 116);
   },
@@ -12634,7 +13088,10 @@ uniWest2: {
   interactables: [
     { x:76,y:14,w:110,h:44, name:'toCorr2', prompt:'В центральный коридор',
       action: async ()=> await changeRoom('uniCorr2', 44, 226) },
-    { x:76,y:366,w:110,h:44, name:'toFloor1', prompt:'Вниз, в театральное крыло',
+    /* Точка стоит НАД лестницей: игрок спускается с этажа тем же местом,
+       где на него поднялся. Раньше она лежала под маршем, внутри его
+       габарита, и к ней приходилось протискиваться сбоку. */
+    { x:104,y:296,w:52,h:36, name:'toFloor1', prompt:'Вниз, в театральное крыло',
       action: async ()=> await changeRoom('uniWestHall', 130, 98) },
     { x:62,y:UNI_W2_LEFT.mid('dept')-24,w:36,h:48, name:'deptDoor', prompt:'Театральное отделение', action(){
         Dialogue.start([
@@ -12690,7 +13147,7 @@ uniEast2: {
       lightA:.30, vignette:.36,
     });
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 72, 356);
+    ctx.fillText('ЛЕСТНИЦА ВНИЗ ↓', 76, 322);
     ctx.fillText('← КОРИДОР', 92, 22);
     ctx.fillText('КАБИНЕТЫ 302 — 308', 76, 116);
   },
@@ -12708,7 +13165,8 @@ uniEast2: {
   interactables: [
     { x:76,y:14,w:110,h:44, name:'toCorr2', prompt:'В центральный коридор',
       action: async ()=> await changeRoom('uniCorr2', 676, 226) },
-    { x:76,y:366,w:110,h:44, name:'toFloor1', prompt:'Вниз, в восточное крыло',
+    /* То же, что и в западном крыле: сходишь там же, где поднялся. */
+    { x:104,y:296,w:52,h:36, name:'toFloor1', prompt:'Вниз, в восточное крыло',
       action: async ()=> await changeRoom('uniEastHall', 130, 98) },
     { x:162,y:UNI_E2_RIGHT.mid('a302')-22,w:36,h:44, name:'aud302', prompt:'Аудитория 302', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Заперто. За дверью слышно, как двигают стулья, — значит, всё-таки не заперто, а занято.'}]);
@@ -12861,75 +13319,178 @@ uniServiceStair: {
     {x:30,y:224,r:32,c:'#8fa4bc',i:.28},
   ],
   bgPaint(ctx) {
-    const W = 220, H = 420;
-    /* бетонная шахта: блоки со швами и потёками */
-    ctx.fillStyle = '#2f2f36'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#373740';
-    for (let y = 0; y < H; y += 14)
-      for (let x = ((y / 14) % 2) * 16; x < W; x += 32) ctx.fillRect(x, y, 30, 13);
-    ctx.fillStyle = 'rgba(20,20,26,.5)';
-    for (let y = 13; y < H; y += 14) ctx.fillRect(0, y, W, 1);
-    ctx.fillStyle = 'rgba(90,110,120,.10)';                       // потёки по бетону
-    for (let i = 0; i < 10; i++) ctx.fillRect((i * 47) % W, (i * 83) % H, 3, 20 + (i % 4) * 14);
+    const W = 220, H = 420, CX = 110;
+    /* СТЕНЫ ШАХТЫ: бетон, залитый в опалубку, — видны доски, отверстия
+       от стяжек и холодные потёки. Ремонта здесь не было никогда, и это
+       единственное место корпуса, где университет не притворяется. */
+    ctx.fillStyle = '#232329'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#292932';
+    for (let y = 0; y < H; y += 17) ctx.fillRect(0, y, W, 15);
+    ctx.fillStyle = 'rgba(12,12,18,.6)';
+    for (let y = 15; y < H; y += 17) ctx.fillRect(0, y, W, 2);
+    ctx.fillStyle = 'rgba(10,10,16,.5)';
+    for (let y = 24; y < H; y += 68) for (let x = 8; x < W; x += 44) ctx.fillRect(x, y, 3, 3);
+    ctx.fillStyle = 'rgba(96,118,128,.09)';
+    for (let i = 0; i < 14; i++)
+      ctx.fillRect((i * 37) % W, (i * 71) % (H - 70), 2 + i % 3, 26 + (i % 5) * 20);
 
-    /* пролёт: площадка посередине, марши вверх и вниз */
-    ctx.fillStyle = '#3c3c46'; ctx.fillRect(34, 0, 152, H);
-    ctx.fillStyle = '#45454f';
-    for (let y = 8; y < H; y += 18) ctx.fillRect(34, y, 152, 2);
-    ctx.fillStyle = '#42424c'; ctx.fillRect(34, 176, 152, 92);     // площадка
-    ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fillRect(34, 176, 152, 4);
-    for (let i = 0; i < 8; i++) {                                  // марш вверх сужается
-      const w = 132 - i * 9, x = 44 + i * 4.5;
-      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x, 26 + i * 9 + 7, w, 2);
-      ctx.fillStyle = '#575764'; ctx.fillRect(x, 26 + i * 9, w, 8);
-      ctx.fillStyle = '#6d6d7c'; ctx.fillRect(x, 26 + i * 9, w, 2);
-    }
-    for (let i = 7; i >= 0; i--) {                                 // марш вниз расширяется
-      const w = 132 - i * 9, x = 44 + i * 4.5;
-      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x, 292 + (7 - i) * 9 + 7, w, 2);
-      ctx.fillStyle = '#4c4c58'; ctx.fillRect(x, 292 + (7 - i) * 9, w, 8);
-      ctx.fillStyle = '#61616e'; ctx.fillRect(x, 292 + (7 - i) * 9, w, 2);
-    }
-    /* металлические перила со стойками — не сплошная полоса */
-    [36, 182].forEach(x => {
-      ctx.fillStyle = '#5c5c66'; ctx.fillRect(x, 0, 3, H);
-      ctx.fillStyle = '#74747e'; ctx.fillRect(x, 0, 1, H);
-      ctx.fillStyle = '#4a4a54';
-      for (let y = 6; y < H; y += 22) ctx.fillRect(x - 1, y, 5, 3);
+    /* ПРОЛЁТ. Он уходит от камеры и вверх, и вниз, поэтому обе лестницы
+       сужаются к своему концу: это и делает шахту глубокой, а не плоской. */
+    const TOP = { y0:18, n:15, step:10, wNear:128, wFar:62 };    // вверх, к крыше
+    const BOT = { y0:290, n:13, step:10, wNear:128, wFar:62 };   // вниз, в цоколь
+    const LAND = { y:174, h:96 };
+
+    /* Пол шахты под всем этим — чтобы между маршами не просвечивала стена. */
+    const shaft = ctx.createLinearGradient(CX - 70, 0, CX + 70, 0);
+    shaft.addColorStop(0, '#30303a'); shaft.addColorStop(.5, '#3e3e4a'); shaft.addColorStop(1, '#2c2c36');
+    ctx.fillStyle = shaft; ctx.fillRect(CX - 66, 0, 132, H);
+
+    /* Сам марш: проступь, подступёнок, тень под носком, светлая кромка и
+       косоуры по краям. Без этого ступени читаются полосатыми обоями. */
+    const flight = (F, up) => {
+      for (let i = 0; i < F.n; i++) {
+        /* i = 0 — ближняя к площадке ступень, самая широкая */
+        const k = i / (F.n - 1);
+        const w = F.wNear + (F.wFar - F.wNear) * k;
+        const x = CX - w / 2;
+        const y = up ? F.y0 + (F.n - 1 - i) * F.step : F.y0 + i * F.step;
+        const shade = 1 - k * 0.32;                         // дальние ступени темнее
+        const c = v => 'rgb(' + [v, v, Math.round(v * 1.12)].map(q => Math.round(q * shade)).join(',') + ')';
+        ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.fillRect(x, y + F.step - 3, w, 4);
+        ctx.fillStyle = c(78);  ctx.fillRect(x, y, w, F.step - 3);        // подступёнок
+        ctx.fillStyle = c(104); ctx.fillRect(x, y, w, 3);                 // проступь
+        ctx.fillStyle = 'rgba(232,236,216,' + (.16 * shade).toFixed(2) + ')';
+        ctx.fillRect(x, y, w, 1);                                          // светлая кромка
+        ctx.fillStyle = 'rgba(0,0,0,.26)';                                 // косоуры
+        ctx.fillRect(x, y, 4, F.step - 3); ctx.fillRect(x + w - 4, y, 4, F.step - 3);
+      }
+    };
+    flight(TOP, true);
+    flight(BOT, false);
+
+    /* ПЛОЩАДКА между маршами: бетонные карты, шов посередине и затёртый
+       до блеска след у самой двери — дверью пользуются. */
+    ctx.fillStyle = '#45454f'; ctx.fillRect(CX - 66, LAND.y, 132, LAND.h);
+    ctx.fillStyle = '#3d3d47';
+    for (let y = LAND.y + 22; y < LAND.y + LAND.h; y += 24) ctx.fillRect(CX - 66, y, 132, 1);
+    ctx.fillRect(CX, LAND.y, 1, LAND.h);
+    ctx.fillStyle = 'rgba(0,0,0,.36)'; ctx.fillRect(CX - 66, LAND.y, 132, 6);
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(CX - 66, LAND.y + LAND.h - 3, 132, 3);
+    ctx.fillStyle = 'rgba(206,212,186,.05)';
+    ctx.beginPath(); ctx.ellipse(CX + 44, LAND.y + 34, 28, 20, 0, 0, Math.PI*2); ctx.fill();
+
+    /* ПЕРИЛА идут по краю марша и вместе с ним сходятся к концу пролёта:
+       две сходящиеся линии — то, по чему глаз читает глубину. */
+    const rail = (F, up, side) => {
+      const pts = [];
+      for (let i = 0; i < F.n; i++) {
+        const k = i / (F.n - 1);
+        const w = F.wNear + (F.wFar - F.wNear) * k;
+        const x = CX + side * w / 2;
+        const y = up ? F.y0 + (F.n - 1 - i) * F.step : F.y0 + i * F.step;
+        pts.push([x, y]);
+      }
+      ctx.fillStyle = '#43434d';                                  // стойки
+      pts.forEach(([x, y], i) => { if (i % 2) return;
+        ctx.fillRect(x - side * 3, y - 14, 3, 16); });
+      ctx.strokeStyle = '#63636f'; ctx.lineWidth = 3;             // поручень
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => i ? ctx.lineTo(x - side * 2, y - 13) : ctx.moveTo(x - side * 2, y - 13));
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(216,220,200,.22)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => i ? ctx.lineTo(x - side * 2, y - 14) : ctx.moveTo(x - side * 2, y - 14));
+      ctx.stroke();
+    };
+    rail(TOP, true, -1); rail(TOP, true, 1);
+    rail(BOT, false, -1); rail(BOT, false, 1);
+    /* перила по краю площадки, между маршами */
+    [-1, 1].forEach(side => {
+      const x = CX + side * 64;
+      ctx.fillStyle = '#43434d';
+      for (let y = LAND.y + 4; y < LAND.y + LAND.h; y += 24) ctx.fillRect(x - side * 3, y, 3, 16);
+      ctx.fillStyle = '#63636f'; ctx.fillRect(x - side * 4, LAND.y, 4, LAND.h);
+      ctx.fillStyle = 'rgba(216,220,200,.20)'; ctx.fillRect(x - side * 4, LAND.y, 1, LAND.h);
     });
-    /* низкое окно на задний двор — в левой стене, у самого пола */
-    uniWindow(ctx, 4, 200, 26, 48, { view:'back', wall:'#3a3a44', reveal:4, cols:2, rows:4, dir:1 });
-    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(6, 236, 9, 5);          // книга, подпирающая створку
-    /* дверь в старое крыло — служебная, металлическая */
-    uniDoorInWall(ctx, 190, 70, 28, 54, { style:'service', warm:'#3a3a44', threshold:false });
-    /* технические лампы в решётчатых плафонах */
-    [[110, 22], [110, 356]].forEach(([lx, ly]) => {
-      ctx.fillStyle = '#3a3a42'; ctx.fillRect(lx - 9, ly - 5, 18, 9);
-      ctx.fillStyle = '#c8d0a0'; ctx.fillRect(lx - 7, ly - 3, 14, 5);
-      ctx.fillStyle = '#3a3a42'; ctx.fillRect(lx - 7, ly - 3, 14, 1); ctx.fillRect(lx - 1, ly - 3, 2, 5);
+
+    /* ТРУБЫ прижаты к стене, а не идут посреди прохода: по ним тепло
+       поднимается из цоколя во всё здание. */
+    ctx.fillStyle = '#3f3f49'; ctx.fillRect(20, 0, 8, H); ctx.fillRect(31, 0, 5, H);
+    ctx.fillStyle = '#53535e'; ctx.fillRect(20, 0, 2, H); ctx.fillRect(31, 0, 1, H);
+    ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(28, 0, 3, H);
+    for (let y = 46; y < H; y += 108) {
+      ctx.fillStyle = '#2e2e34'; ctx.fillRect(17, y, 22, 6);
+      ctx.fillStyle = '#7a6a3a'; ctx.fillRect(21, y + 1, 4, 3);
+    }
+
+    /* НИЗКОЕ ОКНО на задний двор — вровень с землёй снаружи. */
+    uniWindow(ctx, 2, 200, 26, 48, { view:'back', wall:'#33333c', reveal:4, cols:2, rows:4, dir:1 });
+    ctx.fillStyle = '#7d6a4e'; ctx.fillRect(4, 236, 9, 5);                     // книга под створкой
+    ctx.fillStyle = 'rgba(150,172,196,.09)';                                   // свет со двора на пол
+    ctx.beginPath(); ctx.moveTo(28, 204); ctx.lineTo(28, 246);
+    ctx.lineTo(96, 262); ctx.lineTo(96, 190); ctx.closePath(); ctx.fill();
+
+    /* СЛУЖЕБНАЯ ДВЕРЬ в старое крыло. */
+    uniDoorInWall(ctx, 190, 70, 28, 54, { style:'service', warm:'#33333c', threshold:false });
+    ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(186, 66, 4, 62);
+
+    /* ЛАМПЫ в решётчатых плафонах, и от каждой — пятно на бетоне. */
+    [[CX, 26], [CX, 352]].forEach(([lx, ly]) => {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const lg = ctx.createRadialGradient(lx, ly + 8, 2, lx, ly + 8, 62);
+      lg.addColorStop(0, 'rgba(200,208,160,.20)'); lg.addColorStop(1, 'rgba(200,208,160,0)');
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(lx, ly + 8, 62, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#2c2c34'; ctx.fillRect(lx - 2, ly - 10, 4, 6);
+      ctx.fillStyle = '#3a3a42'; ctx.fillRect(lx - 11, ly - 5, 22, 11);
+      ctx.fillStyle = '#c8d0a0'; ctx.fillRect(lx - 9, ly - 3, 18, 7);
+      ctx.fillStyle = '#3a3a42';
+      for (let i = 0; i < 4; i++) ctx.fillRect(lx - 8 + i * 5, ly - 3, 1, 7);
+      ctx.fillRect(lx - 9, ly - 1, 18, 1);
+      ctx.fillStyle = '#565660'; ctx.fillRect(lx - 11, ly - 5, 22, 1);
     });
+
+    /* НАДПИСИ — трафаретом по бетону, как во всякой технической шахте. */
     ctx.fillStyle = '#b8c0a0'; ctx.font = '6px Courier New';
-    ctx.fillText('КРЫША ↑', 82, 16);
-    ctx.fillText('ЦОКОЛЬ ↓', 78, 414);
-    ctx.fillText('СТАРОЕ КРЫЛО →', 120, 66);
-    ctx.fillText('ОКНО', 4, 196);
+    ctx.fillText('КРЫША ↑', 86, 14);
+    ctx.fillText('ЦОКОЛЬ ↓', 84, 416);
+    ctx.fillText('СТАРОЕ КРЫЛО →', 118, 66);
+    ctx.fillText('ОКНО', 2, 196);
+    ctx.fillStyle = 'rgba(184,192,160,.32)';
+    ctx.fillText('2 ЭТАЖ', 52, LAND.y + 18);
+    ctx.fillStyle = 'rgba(184,192,160,.18)';
+    ctx.fillText('ПОЖАРНЫЙ ВЫХОД', 46, LAND.y + 86);
+
+    /* Наверх и вниз шахта уходит в темноту. */
+    const vg = ctx.createLinearGradient(0, 0, 0, H);
+    vg.addColorStop(0, 'rgba(0,0,0,.48)'); vg.addColorStop(.20, 'rgba(0,0,0,0)');
+    vg.addColorStop(.80, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.52)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   },
+  /* Всё, что здесь стоит, стоит на площадке: на маршах ничего не держится.
+     Трубы теперь нарисованы по стене, отдельный предмет для них не нужен. */
   objects: [
-    { t:'pipe_run', x:110, y:0 },
-    { t:'bin', x:60, y:180 }, { t:'archive_box', x:162, y:190 },
-    { t:'book_stack', x:64, y:284 },
-    { t:'crate_stack', x:158, y:266 },
+    { t:'bin', x:58, y:188 }, { t:'archive_box', x:160, y:194 },
+    { t:'book_stack', x:62, y:252 },
+    { t:'crate_stack', x:154, y:248 },
   ],
   ambient() { if (Math.random() < 0.015) FX.spawn(110, 200, 1, {color:'#6a7a88', rise:.3, life:80, spread:6}); },
+  /* Стены идут ступенями по силуэту маршей: пролёт сужается к концам,
+     и ходить по нарисованной стене больше нельзя. Справа между 70 и 130 —
+     карман перед служебной дверью, чтобы к ней было где встать. */
   walls: [
-    {x:0,y:0,w:34,h:196},{x:0,y:252,w:34,h:168},
-    {x:186,y:0,w:34,h:70},{x:186,y:124,w:34,h:296},
-    {x:34,y:0,w:152,h:14},{x:34,y:412,w:152,h:8},
+    {x:0,y:0,w:220,h:14}, {x:0,y:412,w:220,h:8},
+    {x:0,y:14,w:74,h:46},  {x:0,y:60,w:62,h:50},  {x:0,y:110,w:50,h:64},
+    {x:0,y:174,w:42,h:96},
+    {x:0,y:270,w:50,h:54}, {x:0,y:324,w:62,h:50}, {x:0,y:374,w:74,h:38},
+    {x:146,y:14,w:74,h:56}, {x:178,y:70,w:42,h:60}, {x:170,y:130,w:50,h:44},
+    {x:178,y:174,w:42,h:96},
+    {x:170,y:270,w:50,h:54}, {x:158,y:324,w:62,h:50}, {x:146,y:374,w:74,h:38},
   ],
   interactables: [
-    { x:44,y:16,w:132,h:44, name:'up', prompt:'Наверх, на крышу',
+    { x:80,y:20,w:60,h:40, name:'up', prompt:'Наверх, на крышу',
       action: async ()=> await changeRoom('uniRoof', 70, 244) },
-    { x:38,y:346,w:144,h:64, name:'down', prompt:'Спуститься в цоколь',
+    { x:80,y:368,w:60,h:40, name:'down', prompt:'Спуститься в цоколь',
       action: async ()=> {
         if (C('uniDay') < 3) return Dialogue.start([
           {who:'naya',expr:'normal',text:'Лестница вниз закрыта для студентов.'},
@@ -12952,7 +13513,7 @@ uniServiceStair: {
         Audio.door();
         await changeRoom('uniBackYard', 240, 236);
       }},
-    { x:140,y:250,w:52,h:40, name:'stairCrates', prompt:'Ящики на площадке', action(){
+    { x:136,y:232,w:48,h:36, name:'stairCrates', prompt:'Ящики на площадке', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Ящики стоят на площадке так, чтобы не мешать двери. Значит, дверью пользуются.'},
         ]);
@@ -13007,14 +13568,21 @@ uniBasement: {
     [[186, 'ЩИТОВАЯ'], [268, 'БОЙЛЕРНАЯ']].forEach(([x, l]) => {
       uniDoorInWall(ctx, x, wallH - 46, 44, 46, { style:'metal', warm:'#33333c', label:l, threshold:true });
     });
+    /* Дверь в архив — такая же железная дверь в той же стене. Раньше про
+       архив говорила только стрелка на штукатурке, и входить было
+       некуда: игрок искал дверь там, где её не нарисовали. */
+    uniDoorInWall(ctx, 378, wallH - 52, 44, 52,
+      { style:'metal', warm:'#33333c', label:'АРХИВ', threshold:true });
+    ctx.fillStyle = 'rgba(216,200,144,.13)';                         // полоса света из-под двери
+    ctx.beginPath(); ctx.moveTo(380, wallH); ctx.lineTo(420, wallH);
+    ctx.lineTo(438, wallH + 58); ctx.lineTo(362, wallH + 58); ctx.closePath(); ctx.fill();
     /* вентиляционная решётка */
-    ctx.fillStyle = '#3a3a44'; ctx.fillRect(348, 20, 40, 26);
+    ctx.fillStyle = '#3a3a44'; ctx.fillRect(310, 20, 40, 26);
     ctx.fillStyle = '#4c4c58';
-    for (let y = 23; y < 44; y += 5) ctx.fillRect(350, y, 36, 3);
-    ctx.fillStyle = '#2c2c34'; ctx.fillRect(348, 20, 40, 2);
+    for (let y = 23; y < 44; y += 5) ctx.fillRect(312, y, 36, 3);
+    ctx.fillStyle = '#2c2c34'; ctx.fillRect(310, 20, 40, 2);
     ctx.fillStyle = '#b8c0a0'; ctx.font = '6px Courier New';
     ctx.fillText('← ЛЕСТНИЦА НАВЕРХ', 14, 90);
-    ctx.fillText('АРХИВ →', 384, 90);
     ctx.fillStyle = 'rgba(184,192,160,.4)';
     ctx.fillText('ПОСТОРОННИМ ВХОД ВОСПРЕЩЁН', 132, 90);
   },
@@ -13025,7 +13593,7 @@ uniBasement: {
     { t:'metal_shelf', x:340, y:150 },
     { t:'crate_stack', x:296, y:160 },
     { t:'archive_box', x:246, y:150 },
-    { t:'library_shelf', x:416, y:156 },
+    { t:'library_shelf', x:352, y:214 },
     { t:'bin', x:100, y:250 }, { t:'book_stack', x:250, y:250 },
     { t:'stool', x:200, y:246 },
     { t:'puddle', x:168, y:212 }, { t:'puddle', x:330, y:236 },
@@ -13035,10 +13603,10 @@ uniBasement: {
     {x:0,y:0,w:440,h:74},{x:0,y:0,w:8,h:280},{x:432,y:0,w:8,h:280},{x:0,y:275,w:440,h:5},
   ],
   interactables: [
-    { x:26,y:120,w:64,h:44, name:'up', prompt:'Наверх, по служебной лестнице',
+    { x:26,y:152,w:64,h:34, name:'up', prompt:'Наверх, по служебной лестнице',
       action: async ()=> await changeRoom('uniServiceStair', 110, 340) },
-    { x:396,y:120,w:40,h:52, name:'toArchive', prompt:'Цокольный архив',
-      action: async ()=> await changeRoom('uniArchive', 42, 220) },
+    { x:378,y:80,w:46,h:36, name:'toArchive', prompt:'Цокольный архив',
+      action: async ()=> await changeRoom('uniArchive', 32, 106) },
     { x:180,y:32,w:56,h:52, name:'switchRoom', prompt:'Щитовая', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'«ЩИТОВАЯ. ПОСТОРОННИМ ВХОД ВОСПРЕЩЁН». Дверь железная и заперта на два оборота.'}]);
       }},
@@ -13099,7 +13667,10 @@ uniArchive: {
     for (let x = 0; x < W; x += 48) ctx.fillRect(x, wallH, 1, H - wallH);
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, wallH, W, 9);
     /* низкая техническая дверь обратно в цоколь */
-    uniDoorInWall(ctx, 12, wallH - 44, 34, 44, { style:'metal', warm:'#2e2c36', threshold:true });
+    uniDoorInWall(ctx, 14, wallH - 50, 40, 50, { style:'metal', warm:'#2e2c36', threshold:true });
+    ctx.fillStyle = 'rgba(150,160,180,.10)';                        // серый свет цоколя в проёме
+    ctx.beginPath(); ctx.moveTo(16, wallH); ctx.lineTo(54, wallH);
+    ctx.lineTo(70, wallH + 52); ctx.lineTo(4, wallH + 52); ctx.closePath(); ctx.fill();
     /* лампа в решётке под потолком: единственный источник света */
     ctx.fillStyle = '#3a3a42'; ctx.fillRect(150, 6, 22, 10);
     ctx.fillStyle = '#d8c890'; ctx.fillRect(153, 8, 16, 6);
@@ -13113,7 +13684,7 @@ uniArchive: {
     ctx.restore();
     /* стеллажные ряды подписаны по годам — по ним Ная и ищет */
     ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('← ЦОКОЛЬ', 12, 84);
+    ctx.fillText('← ЦОКОЛЬ', 14, 86);
     ctx.fillStyle = 'rgba(200,184,160,.55)';
     ctx.fillText('30', 76, 96); ctx.fillText('15', 156, 96); ctx.fillText('5  ЛЕТ НАЗАД', 232, 96);
   },
@@ -13132,8 +13703,8 @@ uniArchive: {
     {x:0,y:0,w:320,h:66},{x:0,y:0,w:8,h:280},{x:312,y:0,w:8,h:280},{x:0,y:275,w:320,h:5},
   ],
   interactables: [
-    { x:14,y:200,w:44,h:44, name:'back', prompt:'Обратно в цоколь',
-      action: async ()=> await changeRoom('uniBasement', 404, 200) },
+    { x:8,y:76,w:48,h:36, name:'back', prompt:'Обратно в цоколь',
+      action: async ()=> await changeRoom('uniBasement', 400, 112) },
     { x:54,y:126,w:56,h:44, name:'arch30', prompt:'Папки: 30 лет назад',
       action(){ Scene.play('archiveFolder30'); }},
     { x:134,y:126,w:56,h:44, name:'arch15', prompt:'Папки: 15 лет назад',
@@ -13151,6 +13722,9 @@ uniArchive: {
       }},
   ],
   npcs: [],
+  /* Ная дошла до архива — цель дня перестаёт звать её сюда и начинает
+     говорить, что здесь делать. */
+  onEnter() { setFlag('archiveFound'); },
 },
 
 /* ---------------------------------------------------------------- */
@@ -16547,6 +17121,7 @@ archiveFolder30: [
     {who:'naya',expr:'talk',text:'(Одна строка вычеркнута дважды и подписана сверху другой рукой.)'},
     {who:'naya',expr:'normal',text:'Ниже, в той же коробке, — папка на пять лет моложе. Двадцать пять. Тот же почерк на описи.'},
   ]},
+  { flag:'archive30Read' },
   ()=>{ addC('libClues'); },
 ],
 archiveFolder15: [
@@ -20116,6 +20691,7 @@ const DevTools = {
      флага: послушать крышу или концовку можно, не проходя игру. Петля
      секвенсора просто идёт дальше, поэтому тема зациклена сама собой. */
   musCur:null,
+  LAYER_NAME:['только основа', 'с мелодией', 'плотнее', 'полностью'],
   fillMusic() {
     const g = document.getElementById('devMusGrid');
     if (!g) return;
@@ -20125,9 +20701,10 @@ const DevTools = {
       const b = document.createElement('button');
       b.className = 'devBtn';
       b.dataset.track = key;
+      const kit = [...new Set(tr.voices.map(v => v.i))].join(', ');
       b.innerHTML = '<span class="devTitle">' + tr.title + '</span>' +
-                    '<span class="devDesc">' + key + ' · ' + tr.bpm + ' bpm · ' +
-                    tr.meter + '/4 · ' + tr.chords.length + ' т.</span>';
+                    '<span class="devDesc">' + tr.bpm + ' bpm · ' + tr.meter + '/4 · ' +
+                    tr.chords.length + ' т. · ' + (tr.voicing || kit) + '</span>';
       b.addEventListener('click', () => this.musPlay(key));
       g.appendChild(b);
     }
@@ -20146,7 +20723,9 @@ const DevTools = {
     const now = document.getElementById('devMusNow');
     const tr = this.musCur && Music.TRACKS[this.musCur];
     if (now) now.textContent = tr
-      ? '▶ ' + tr.title + '  ·  слой ' + Music.layer + '  ·  ' + tr.bpm + ' bpm'
+      ? '▶ ' + tr.title + '  ·  слой ' + Music.layer + ' (' + this.LAYER_NAME[Music.layer] + ')' +
+        '  ·  ' + tr.bpm + ' bpm  ·  голосов ' +
+        tr.voices.filter(v => (v.layer || 0) <= Music.layer).length + ' из ' + tr.voices.length
       : '— ничего не играет —';
     document.querySelectorAll('#devMusGrid .devBtn').forEach(b => {
       b.classList.toggle('playing', b.dataset.track === this.musCur && !!Music.timer);
@@ -20172,7 +20751,7 @@ const DevTools = {
     on('devMusLayer', 'input', e => {
       const v = +e.target.value;
       const lbl = document.getElementById('devMusLayerLbl');
-      if (lbl) lbl.textContent = 'слой ' + v;
+      if (lbl) lbl.textContent = 'слой ' + v + ' — ' + DevTools.LAYER_NAME[v];
       Music.layer = v;
       this.musMark();
     });

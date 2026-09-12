@@ -10,7 +10,7 @@ const H = require('./harness.js');
 const CHAIN = {
   1: ['uniTeacherList','sawRehearsal','metGenevieveUni','symbolPhoto','libAsked'],
   2: ['libPeriods','propsSymbol','propsMorel','morelKnowsName'],
-  3: ['basementFound','sawFloor2','sawOldWing','sawBasement','archiveMedeaFound','archiveMorelFound','roofPromise'],
+  3: ['basementFound','sawFloor2','sawOldWing','sawBasement','archiveFound','archive30Read','archiveMedeaFound','archiveMorelFound','roofPromise'],
   4: ['libMissing','morelPhotoSeen','universityBanned','backWindowUsed','sawBasement','archiveFolderFound','premiereDone','morelTruth'],
 };
 /* Шаги, на которых игрок должен физически перейти в другое место, —
@@ -18,7 +18,7 @@ const CHAIN = {
 const NEEDS_PLACE = {
   1: ['uniTeacherList','metGenevieveUni','symbolPhoto','libAsked'],
   2: ['start','libPeriods','propsSymbol','morelKnowsName'],
-  3: ['start','shift','basementFound','sawFloor2','sawOldWing','sawBasement','archiveMorelFound','roofPromise'],
+  3: ['start','shift','basementFound','sawFloor2','sawOldWing','sawBasement','archiveFound','archive30Read','archiveMorelFound','roofPromise'],
   4: ['libMissing','universityBanned','archiveFolderFound','premiereDone'],
 };
 
@@ -41,7 +41,8 @@ const NEEDS_PLACE = {
         } else peek(day, 'start');
         CHAIN[day].forEach(f => { gameState.flags[f] = true; peek(day, f); });
         CHAIN[day].forEach(f => { gameState.flags[f] = false; });
-        if (day === 3) gameState.flags.sawBasement = false;
+        if (day === 3) { gameState.flags.sawBasement = false;
+                         gameState.flags.archiveFound = false; gameState.flags.archive30Read = false; }
       }
       return rows;
     }, [CHAIN, NEEDS_PLACE]);

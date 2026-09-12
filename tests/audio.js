@@ -53,6 +53,25 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   console.log('тем:', tracks.length);
   tracks.forEach(t => { if (t.notes < 6) bad.push('тема ' + t.key + ': всего ' + t.notes + ' нот'); });
 
+  /* 1б. Темы должны отличаться друг от друга, а не играть одни и те же
+     ноты разной скоростью: свой состав инструментов, свои аккорды. */
+  const kits = await p.evaluate(() => Object.keys(Music.TRACKS).map(key => {
+    const tr = Music.TRACKS[key];
+    const kit = [...new Set(tr.voices.filter(v => (v.layer || 0) <= 1).map(v => v.i))].sort();
+    const pats = tr.voices.filter(v => v.pat).map(v => v.pat);
+    return { key, kit, chords: tr.chords.join(' '), bpm: tr.bpm, pats,
+             base: tr.voices.filter(v => (v.layer || 0) === 0).length };
+  }));
+  const seen = new Map();
+  for (const t of kits) {
+    if (t.base < 2) bad.push('тема ' + t.key + ': на нулевом слое всего ' + t.base + ' голос(ов)');
+    if (t.kit.length < 3) bad.push('тема ' + t.key + ': инструментов всего ' + t.kit.length + ' — ' + t.kit.join(','));
+    const sig = t.kit.join(',') + '|' + t.chords + '|' + t.bpm;
+    if (seen.has(sig)) bad.push('темы ' + seen.get(sig) + ' и ' + t.key + ' неотличимы: ' + sig);
+    seen.set(sig, t.key);
+  }
+  console.log('составов:', kits.map(t => t.key + '[' + t.kit.join('+') + ']').join(' '));
+
   /* 2. Секвенсор: выбранная тема должна реально идти. */
   const grid = await p.evaluate(() => document.querySelectorAll('#devMusGrid .devBtn').length);
   console.log('кнопок в плеере:', grid);
