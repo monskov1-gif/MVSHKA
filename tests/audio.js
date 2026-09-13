@@ -123,6 +123,7 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
     res.endings = ['endLoner','endWitch','endRevenge','endStay'].map(e => {
       Music.cur = null; Music.play(e); return Music.cur;
     });
+    Music.cur = null; Music.play('intro'); res.intro = Music.cur;
     set({});
     Music.cur = null;
     return res;
@@ -138,6 +139,10 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   if (!same(mourn.revived)) bad.push('после возрождения музыка не вернулась: ' + JSON.stringify(mourn.revived));
   if (!same(mourn.left))    bad.push('после «оставить мёртвой» музыка не вернулась: ' + JSON.stringify(mourn.left));
   mourn.endings.forEach((e, i) => { if (!/^end/.test(e || '')) bad.push('концовка ' + i + ' в трауре подменена на ' + e); });
+  /* Главное меню стоит вне сюжета: его тема не должна зависеть от того,
+     в каком состоянии лежит сохранение. */
+  if (mourn.intro !== 'intro') bad.push('заглавная тема в трауре подменена на ' + mourn.intro);
+  console.log('       заглавная в трауре=%s', mourn.intro);
 
   /* 2. Секвенсор: выбранная тема должна реально идти. */
   const grid = await p.evaluate(() => document.querySelectorAll('#devMusGrid .devBtn').length);
