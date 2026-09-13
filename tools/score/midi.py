@@ -1,5 +1,8 @@
 import struct, sys, json
 F=sys.argv[1] if len(sys.argv)>1 else '/root/.claude/uploads/4d7ee2a2-8e77-572e-9f4d-652736e06d10/9f26415a-Free-scores.com_glin-reinhold-prelude-204768.midi'
+# Путь вывода — вторым доводом. Раньше он был зашит в код, и разбор
+# второго файла молча затирал разбор первого.
+OUT=sys.argv[2] if len(sys.argv)>2 else 'score.json'
 d=open(F,'rb').read()
 assert d[:4]==b'MThd', d[:4]
 hl=struct.unpack('>I', d[4:8])[0]
@@ -51,4 +54,5 @@ print('нот', len(notes), '· темпы', [(t, round(60_000_000/u)) for t,u i
 print('размер', tsig[:3])
 print('диапазон тиков', notes[0]['t'], '..', max(n['t']+n['d'] for n in notes))
 print('нажатий педали:', len(pedal))
-json.dump({'div':div,'tempos':tempos,'tsig':tsig,'pedal':sorted(pedal),'notes':notes}, open(f'{sys.path[0] if False else "/tmp/claude-0/-home-user-MVSHKA/4d7ee2a2-8e77-572e-9f4d-652736e06d10/scratchpad"}/gliere.json','w'))
+print('записано в', OUT)
+json.dump({'div':div,'tempos':tempos,'tsig':tsig,'pedal':sorted(pedal),'notes':notes}, open(OUT,'w'))

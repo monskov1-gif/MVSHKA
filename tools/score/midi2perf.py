@@ -38,7 +38,18 @@ def pedal_release(t):
     return None
 
 sel = [n for n in notes if lo <= n['t'] < hi]
-sel.sort(key=lambda n: (n['t'], n['n']))
+if 'tracks' in OPT:
+    # В файлах бывают дорожки-дубликаты: одна и та же партия записана
+    # дважды, и если взять обе, каждый аккорд сыграется вдвое громче.
+    keep = {int(x) for x in OPT['tracks'].split(',')}
+    sel = [n for n in sel if n.get('trk', 0) in keep]
+# Одинаковые ноты в один и тот же момент — тоже дубликат: оставляем одну,
+# самую длинную, иначе движок построит на неё две цепочки осцилляторов.
+best = {}
+for n in sel:
+    k = (n['t'], n['n'])
+    if k not in best or n['d'] > best[k]['d']: best[k] = n
+sel = sorted(best.values(), key=lambda n: (n['t'], n['n']))
 out = []
 for n in sel:
     beat = (n['t'] - lo) / div

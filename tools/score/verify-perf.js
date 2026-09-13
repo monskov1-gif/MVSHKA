@@ -13,6 +13,9 @@ const JOBS = [
   { key:'hell',     src:'chopin.json', first:5,  last:20, beats:4, exact:true },
   { key:'sad',      src:'chopin.json', first:45, last:60, beats:4, exact:true },
   { key:'uni',      src:'gliere.json', first:1,  last:12, beats:6, exact:false, slack:0.06 },
+  /* У заглавной в файле три дорожки, из них две — дубликаты друг друга;
+     берутся нулевая и первая, одинаковые ноты схлопнуты в одну. */
+  { key:'intro',    src:'food.json',   first:1,  last:24, beats:4, exact:true, tracks:[0,1] },
 ];
 
 (async () => {
@@ -24,8 +27,14 @@ const JOBS = [
   for (const job of JOBS) {
     const m = JSON.parse(fs.readFileSync(SCRATCH + '/' + job.src, 'utf8'));
     const div = m.div, span = job.beats * div;
-    const want = m.notes
-      .filter(n => n.t >= (job.first-1)*span && n.t < job.last*span)
+    let src = m.notes.filter(n => n.t >= (job.first-1)*span && n.t < job.last*span);
+    if (job.tracks) src = src.filter(n => job.tracks.includes(n.trk));
+    const best = new Map();                     // дубликаты схлопываем, как и конвертер
+    for (const n of src) {
+      const k = n.t + ':' + n.n;
+      if (!best.has(k) || n.d > best.get(k).d) best.set(k, n);
+    }
+    const want = [...best.values()]
       .sort((a, c) => a.t - c.t || a.n - c.n)
       .map(n => [Math.round(((n.t - (job.first-1)*span)/div)*1000)/1000, n.n, n.v]);
     const got = await p.evaluate(k => {
@@ -47,13 +56,35 @@ const JOBS = [
         }
       }
     } else {
-      if (gp !== wp) { console.log(job.key, 'ПОСЛЕДОВАТЕЛЬНОСТЬ ВЫСОТ РАЗОШЛАСЬ'); diff++; }
-      for (let i = 0; i < Math.min(got.n.length, want.length); i++) {
-        const d = Math.abs(got.n[i][0] - want[i][0]);
+      /* Огранка двигает ноты во времени, и порядок соседних может
+         поменяться. Поэтому сверяем не порядок, а состав: ни одна нота
+         не потеряна и не добавлена, и каждая стоит в пределах допуска
+         от своего места в исходнике. */
+      const bag = new Map();                    // высота -> список времён
+      for (const w of want) {
+        if (!bag.has(w[1])) bag.set(w[1], []);
+        bag.get(w[1]).push(w[0]);
+      }
+      for (const g of got.n) {
+        const times = bag.get(g[1]);
+        if (!times || !times.length) {
+          if (diff < 5) console.log(job.key, 'лишняя нота', JSON.stringify(g));
+          diff++; continue;
+        }
+        let bi = 0;
+        for (let i = 1; i < times.length; i++)
+          if (Math.abs(times[i] - g[0]) < Math.abs(times[bi] - g[0])) bi = i;
+        const d = Math.abs(times[bi] - g[0]);
         if (d > job.slack) {
-          if (diff < 5) console.log(job.key, 'нота', i, 'сдвинута на', d.toFixed(3), '— больше допуска', job.slack);
+          if (diff < 5) console.log(job.key, 'нота', JSON.stringify(g), 'сдвинута на', d.toFixed(3),
+                                    '— больше допуска', job.slack);
           diff++;
         }
+        times.splice(bi, 1);
+      }
+      for (const [pitch, rest] of bag) if (rest.length) {
+        if (diff < 5) console.log(job.key, 'потеряна нота', pitch, 'x' + rest.length);
+        diff += rest.length;
       }
     }
     console.log(job.key.padEnd(9), 'нот', String(got.n.length).padStart(4),
