@@ -38,11 +38,15 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   const tracks = await p.evaluate(() => {
     const out = [];
     for (const key of Object.keys(Music.TRACKS)) {
+      const tr = Music.TRACKS[key];
+      /* Тема-исполнение играет не сеткой, а списком нот: её и считаем
+         по списку, прогонять emit по ней бессмысленно. */
+      if (tr.perf) { out.push({ key, notes: tr.perf.length, drums: 0, title: tr.title, perf: true }); continue; }
       let notes = 0, drums = 0;
       const rv = Music.voice.bind(Music), rd = Music.drum.bind(Music);
       Music.voice = () => { notes++; }; Music.drum = () => { drums++; };
       Music.cur = key; Music.layer = 3;
-      const tr = Music.TRACKS[key], perBar = tr.meter * 2, total = tr.chords.length * perBar;
+      const perBar = tr.meter * 2, total = tr.chords.length * perBar;
       for (let s = 0; s < total; s++) Music.emit(tr, s, 0, 60 / tr.bpm / 2, perBar);
       Music.voice = rv; Music.drum = rd;
       out.push({ key, notes, drums, title: tr.title });
@@ -55,7 +59,7 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
 
   /* 1б. Темы должны отличаться друг от друга, а не играть одни и те же
      ноты разной скоростью: свой состав инструментов, свои аккорды. */
-  const kits = await p.evaluate(() => Object.keys(Music.TRACKS).map(key => {
+  const kits = await p.evaluate(() => Object.keys(Music.TRACKS).filter(k => !Music.TRACKS[k].perf).map(key => {
     const tr = Music.TRACKS[key];
     const kit = [...new Set(tr.voices.filter(v => (v.layer || 0) <= 1).map(v => v.i))].sort();
     const pats = tr.voices.filter(v => v.pat).map(v => v.pat);
@@ -71,6 +75,32 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
     seen.set(sig, t.key);
   }
   console.log('составов:', kits.map(t => t.key + '[' + t.kit.join('+') + ']').join(' '));
+
+  /* 1в. Темы-исполнения: ноты должны быть на месте, петля замкнута, а
+     длительности — в разумных пределах. Сверку с исходным MIDI делает
+     tools/score, здесь проверяется целостность самих данных. */
+  const perfs = await p.evaluate(() => Object.keys(Music.TRACKS)
+    .filter(k => Music.TRACKS[k].perf)
+    .map(k => {
+      const tr = Music.TRACKS[k];
+      const n = tr.perf;
+      let unsorted = 0, bad = 0, maxBeat = 0;
+      for (let i = 0; i < n.length; i++) {
+        const [beat, midi, dur, vel] = n[i];
+        if (i && beat < n[i-1][0] - 1e-6) unsorted++;
+        if (!(midi >= 12 && midi <= 108) || !(dur > 0) || !(vel > 0 && vel <= 127)) bad++;
+        if (beat > maxBeat) maxBeat = beat;
+      }
+      return { key: k, notes: n.length, loop: tr.loopBeats, maxBeat, unsorted, bad, bpm: tr.bpm };
+    }));
+  perfs.forEach(t => {
+    console.log('  %s: %d нот, петля %d долей, последняя на %s, %d bpm',
+                t.key, t.notes, t.loop, t.maxBeat.toFixed(2), t.bpm);
+    if (t.unsorted) bad.push('тема ' + t.key + ': ' + t.unsorted + ' нот не по порядку');
+    if (t.bad)      bad.push('тема ' + t.key + ': ' + t.bad + ' нот с негодными значениями');
+    if (t.maxBeat >= t.loop) bad.push('тема ' + t.key + ': нота на доле ' + t.maxBeat + ' вне петли ' + t.loop);
+    if (t.notes < 20) bad.push('тема ' + t.key + ': всего ' + t.notes + ' нот');
+  });
 
   /* 2. Секвенсор: выбранная тема должна реально идти. */
   const grid = await p.evaluate(() => document.querySelectorAll('#devMusGrid .devBtn').length);

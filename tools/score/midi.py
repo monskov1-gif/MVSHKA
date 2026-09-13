@@ -11,7 +11,7 @@ def vlq(i):
     while True:
         b=d[i]; i+=1; v=(v<<7)|(b&0x7f)
         if not (b&0x80): return v,i
-notes=[]; tempos=[]; tsig=[]
+notes=[]; tempos=[]; tsig=[]; pedal=[]
 for t in range(ntrk):
     assert d[pos:pos+4]==b'MTrk', (t, d[pos:pos+4])
     ln=struct.unpack('>I', d[pos+4:pos+8])[0]
@@ -31,7 +31,10 @@ for t in range(ntrk):
                 if on.get(k):
                     s,vv=on[k].pop(0)
                     notes.append({'t':s,'d':tick-s,'n':n,'v':vv,'ch':ch,'trk':t})
-        elif ev in (0xA0,0xB0,0xE0): i+=2
+        elif ev==0xB0:
+            cc=d[i]; val=d[i+1]; i+=2
+            if cc==64: pedal.append((tick, 1 if val>=64 else 0))   # правая педаль
+        elif ev in (0xA0,0xE0): i+=2
         elif ev in (0xC0,0xD0): i+=1
         elif st==0xFF:
             mt=d[i]; i+=1; L,i=vlq(i); data=d[i:i+L]; i+=L
@@ -47,4 +50,5 @@ notes.sort(key=lambda x:(x['t'], x['n']))
 print('нот', len(notes), '· темпы', [(t, round(60_000_000/u)) for t,u in tempos][:6])
 print('размер', tsig[:3])
 print('диапазон тиков', notes[0]['t'], '..', max(n['t']+n['d'] for n in notes))
-json.dump({'div':div,'tempos':tempos,'tsig':tsig,'notes':notes}, open(f'{sys.path[0] if False else "/tmp/claude-0/-home-user-MVSHKA/4d7ee2a2-8e77-572e-9f4d-652736e06d10/scratchpad"}/gliere.json','w'))
+print('нажатий педали:', len(pedal))
+json.dump({'div':div,'tempos':tempos,'tsig':tsig,'pedal':sorted(pedal),'notes':notes}, open(f'{sys.path[0] if False else "/tmp/claude-0/-home-user-MVSHKA/4d7ee2a2-8e77-572e-9f4d-652736e06d10/scratchpad"}/gliere.json','w'))
