@@ -102,6 +102,43 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
     if (t.notes < 20) bad.push('тема ' + t.key + ': всего ' + t.notes + ' нот');
   });
 
+  /* 1г. Траур: после смерти Сью везде играет «Печаль» и ничего больше.
+     Возвращается обычная музыка только после возрождения или после
+     решения оставить её мёртвой. */
+  const mourn = await p.evaluate(() => {
+    DevTools.baseUni(1); DevTools.ensureRunning();
+    const themes = ['street','cafe','uni','home','shift','roof','tense','oldWing','hell'];
+    const set = f => { for (const k of ['sueDead','sueRevived','sueLeftDead']) gameState.flags[k] = !!f[k]; };
+    const probe = () => {                      // во что превращается каждая тема
+      const out = {};
+      for (const t of themes) { Music.cur = null; Music.play(t); out[t] = Music.cur; }
+      return out;
+    };
+    const res = {};
+    set({});                                    res.alive   = probe();
+    set({sueDead:1});                           res.dead    = probe();
+    set({sueDead:1, sueRevived:1});             res.revived = probe();
+    set({sueDead:1, sueLeftDead:1});            res.left    = probe();
+    set({sueDead:1});
+    res.endings = ['endLoner','endWitch','endRevenge','endStay'].map(e => {
+      Music.cur = null; Music.play(e); return Music.cur;
+    });
+    set({});
+    Music.cur = null;
+    return res;
+  });
+  const same = o => Object.keys(o).every(k => o[k] === k);
+  const allSad = o => Object.keys(o).every(k => o[k] === 'sad');
+  console.log('траур: при жизни своя музыка=%s · после смерти всё в «Печаль»=%s',
+              same(mourn.alive), allSad(mourn.dead));
+  console.log('       после возрождения вернулась=%s · после «оставить мёртвой»=%s · концовки=%s',
+              same(mourn.revived), same(mourn.left), mourn.endings.join(','));
+  if (!same(mourn.alive))   bad.push('до смерти Сью музыка уже подменяется: ' + JSON.stringify(mourn.alive));
+  if (!allSad(mourn.dead))  bad.push('после смерти Сью играет не только «Печаль»: ' + JSON.stringify(mourn.dead));
+  if (!same(mourn.revived)) bad.push('после возрождения музыка не вернулась: ' + JSON.stringify(mourn.revived));
+  if (!same(mourn.left))    bad.push('после «оставить мёртвой» музыка не вернулась: ' + JSON.stringify(mourn.left));
+  mourn.endings.forEach((e, i) => { if (!/^end/.test(e || '')) bad.push('концовка ' + i + ' в трауре подменена на ' + e); });
+
   /* 2. Секвенсор: выбранная тема должна реально идти. */
   const grid = await p.evaluate(() => document.querySelectorAll('#devMusGrid .devBtn').length);
   console.log('кнопок в плеере:', grid);

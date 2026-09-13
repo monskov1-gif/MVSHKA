@@ -11,7 +11,7 @@ const ENTRY = {
   uniHall:[220,336], uniWestHall:[130,584], uniEastHall:[130,624],
   uniCourtyard:[210,286], uniRehearsal:[274,176], uniDressing:[212,150],
   uniCostume:[168,130], uniTeachersRoom:[28,130], uniTheatre:[274,250],
-  uniLibrary:[28,160], uniMorelOffice:[28,140], uniAud14:[28,140],
+  uniLibrary:[34,190], uniMorelOffice:[28,140], uniAud14:[28,140],
   uniMusicRoom:[28,130], uniArtRoom:[28,140],
   uniCorr2:[312,238], uniWest2:[130,280], uniEast2:[130,280],
   uniOldWing:[468,226], uniServiceStair:[110,92], uniBasement:[60,190],
