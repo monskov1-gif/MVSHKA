@@ -171,6 +171,39 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   if (await p.evaluate(() => !!Music.timer || !!Music.cur)) bad.push('стоп не сбрасывает');
   await p.keyboard.press('Escape'); await p.waitForTimeout(250);
 
+  /* 2b. Погодные варианты зоны: улица под дождём — другая тема. */
+  const vari = await p.evaluate(() => {
+    const out = {};
+    for (const zone of Object.keys(Music.VARIANT)) {
+      Weather.cur.rain = 0.15; const dry = Music.VARIANT[zone]();
+      Weather.cur.rain = 0.80; const wet = Music.VARIANT[zone]();
+      out[zone] = [dry, wet];
+    }
+    Music.cur = null; Weather.cur.rain = 0.80; Music.forRoom('street');
+    out.play = Music.cur;
+    return out;
+  });
+  console.log('варианты по погоде:', JSON.stringify(vari));
+  for (const zone of Object.keys(vari)) {
+    if (zone === 'play') continue;
+    const [dry, wet] = vari[zone];
+    if (dry === wet) bad.push('зона ' + zone + ': дождь ничего не меняет (' + dry + ')');
+    for (const k of [dry, wet])
+      if (!tracks.some(t => t.key === k)) bad.push('вариант ' + k + ' зоны ' + zone + ' — не тема');
+  }
+  if (vari.play !== 'streetRain')
+    bad.push('forRoom в дождь включил ' + vari.play + ', а не streetRain');
+  await p.evaluate(() => { Music.stop(); });
+
+  /* 2c. Сказ о ведьмах идёт под свою тему, а не под музыку комнаты.
+     Ломалось молча: { music } стояло до { room }, и changeRoom его затирал. */
+  await p.evaluate(() => localStorage.clear());
+  await p.reload(); await p.waitForTimeout(800);
+  await p.click('#btnNew'); await p.waitForTimeout(2600);
+  const pro = await p.evaluate(() => ({ room:gameState.currentRoom, cur:Music.cur, scene:Scene.active }));
+  console.log('пролог: комната=%s тема=%s', pro.room, pro.cur);
+  if (pro.cur !== 'prologue') bad.push('в прологе играет ' + pro.cur + ', а не тема пролога');
+
   /* 3. Фон: у каждой комнаты профиль, все события отрабатывают. */
   const amb = await p.evaluate(() => {
     const noProf = [], crashed = [], badEv = [];
