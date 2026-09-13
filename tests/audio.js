@@ -150,7 +150,15 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   if (grid !== tracks.length) bad.push('в плеере ' + grid + ' кнопок, а тем ' + tracks.length);
   for (const t of tracks) {
     await p.evaluate(k => DevTools.musPlay(k), t.key);
-    await p.waitForTimeout(420);
+    /* Ждать фиксированные полсекунды нельзя: у медленной темы первая нота
+       может стоять на полутора долях, и на 56 bpm это почти две секунды
+       тишины — законной, а не сломанной. Считаем, когда она прозвучит. */
+    const lead = await p.evaluate(k => {
+      const tr = Music.TRACKS[k];
+      const first = tr.perf ? (tr.perf[0] ? tr.perf[0][0] : 0) : 0;
+      return first * 60 / tr.bpm * 1000;
+    }, t.key);
+    await p.waitForTimeout(Math.max(420, lead + 320));
     const st = await p.evaluate(() => ({ cur:Music.cur, timer:!!Music.timer, step:Music.step }));
     if (st.cur !== t.key || !st.timer || st.step === 0)
       bad.push('тема ' + t.key + ' не играет: ' + JSON.stringify(st));

@@ -66,19 +66,28 @@ const URL='file://'+path.resolve('/home/user/MVSHKA','index.html');
     await seeRoom('точка ' + r.id);
   }
 
-  // 3. обе сетки должны заполниться кнопками
+  // 3. плашки должны заполниться кнопками, и ни одна комната не должна
+  //    потеряться между группами
   await p.evaluate(()=>DevTools.open(false)); await p.waitForTimeout(300);
   const grids = await p.evaluate(()=>({
-    story: document.querySelectorAll('#devStoryGrid .devBtn').length,
-    uni:   document.querySelectorAll('#devRoomGrid .devBtn').length,
-    world: document.querySelectorAll('#devWorldGrid .devBtn').length,
-    all:   Object.keys(Rooms).length,
+    story:  document.querySelectorAll('#devStoryGroups .devBtn').length,
+    points: DevTools.storyPoints.length,
+    chFolds:document.querySelectorAll('#devStoryGroups .devFold').length,
+    rooms:  document.querySelectorAll('#devRoomGroups .devBtn').length,
+    rmFolds:document.querySelectorAll('#devRoomGroups .devFold').length,
+    all:    Object.keys(Rooms).length,
+    noCh:   DevTools.storyPoints.filter(x=>x.ch===undefined).map(x=>x.id),
   }));
-  console.log('кнопок: сюжет=%s университет=%s мир=%s (комнат всего %s)',
-              grids.story, grids.uni, grids.world, grids.all);
-  if(!grids.story) bad.push('сетка сюжетных точек пуста');
-  if(grids.uni + grids.world !== grids.all)
-    bad.push('в сетках переходов ' + (grids.uni+grids.world) + ' кнопок, а комнат ' + grids.all);
+  console.log('плашки: глав=%s точек=%s · групп локаций=%s кнопок=%s (комнат всего %s)',
+              grids.chFolds, grids.story, grids.rmFolds, grids.rooms, grids.all);
+  if(!grids.story) bad.push('плашки сюжетных точек пусты');
+  if(grids.story !== grids.points)
+    bad.push('в плашках ' + grids.story + ' точек, а в storyPoints ' + grids.points);
+  if(grids.noCh.length) bad.push('точки без главы: ' + grids.noCh.join(', '));
+  if(grids.chFolds < 2) bad.push('сюжетные точки не разбиты по главам');
+  if(grids.rmFolds < 2) bad.push('локации не разбиты по группам');
+  if(grids.rooms !== grids.all)
+    bad.push('в плашках локаций ' + grids.rooms + ' кнопок, а комнат ' + grids.all);
   await p.keyboard.press('Escape'); await p.waitForTimeout(250);
 
   // 4. телепорт во ВСЕ комнаты игры

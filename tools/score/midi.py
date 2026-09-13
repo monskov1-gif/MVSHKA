@@ -14,7 +14,7 @@ def vlq(i):
     while True:
         b=d[i]; i+=1; v=(v<<7)|(b&0x7f)
         if not (b&0x80): return v,i
-notes=[]; tempos=[]; tsig=[]; pedal=[]
+notes=[]; tempos=[]; tsig=[]; pedal=[]; progs={}; tnames={}
 for t in range(ntrk):
     assert d[pos:pos+4]==b'MTrk', (t, d[pos:pos+4])
     ln=struct.unpack('>I', d[pos+4:pos+8])[0]
@@ -38,11 +38,18 @@ for t in range(ntrk):
             cc=d[i]; val=d[i+1]; i+=2
             if cc==64: pedal.append((tick, 1 if val>=64 else 0))   # правая педаль
         elif ev in (0xA0,0xE0): i+=2
-        elif ev in (0xC0,0xD0): i+=1
+        elif ev==0xC0:
+            # какой инструмент назначен дорожке — для оркестровых файлов
+            # это единственный ключ к тому, кто здесь скрипка, а кто литавра
+            progs.setdefault((t,ch), d[i]); i+=1
+        elif ev==0xD0: i+=1
         elif st==0xFF:
             mt=d[i]; i+=1; L,i=vlq(i); data=d[i:i+L]; i+=L
             if mt==0x51: tempos.append((tick, struct.unpack('>I', b'\x00'+data)[0]))
             elif mt==0x58: tsig.append((tick, data[0], 2**data[1], data[2], data[3]))
+            elif mt==0x03:
+                try: tnames[t]=data.decode('utf-8')
+                except Exception: tnames[t]=data.decode('latin-1')
             elif mt==0x59: print('знаки при ключе:', struct.unpack('b', data[:1])[0], 'минор' if data[1] else 'мажор')
         elif st in (0xF0,0xF7):
             L,i=vlq(i); i+=L
@@ -55,4 +62,7 @@ print('размер', tsig[:3])
 print('диапазон тиков', notes[0]['t'], '..', max(n['t']+n['d'] for n in notes))
 print('нажатий педали:', len(pedal))
 print('записано в', OUT)
-json.dump({'div':div,'tempos':tempos,'tsig':tsig,'pedal':sorted(pedal),'notes':notes}, open(OUT,'w'))
+json.dump({'div':div,'tempos':tempos,'tsig':tsig,'pedal':sorted(pedal),
+           'progs':{f'{a},{b}':v for (a,b),v in progs.items()},
+           'tnames':{str(k):v for k,v in tnames.items()},
+           'notes':notes}, open(OUT,'w'))
