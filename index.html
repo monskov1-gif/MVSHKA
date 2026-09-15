@@ -7,33 +7,90 @@
 <title>Месть Ведьмы</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  /* ==================== МАСШТАБ ИНТЕРФЕЙСА ====================
+     Одна база на весь интерфейс — --u, «единица». Она считается от
+     короткой стороны экрана и зажата снизу и сверху: на маленьком
+     телефоне интерфейс не вылезает за края, на мониторе не становится
+     микроскопическим, на очень большом — не разрастается до нелепого.
+
+     Всё остальное считается от неё множителями. Игрок меняет множители
+     в «Настройках отображения», и они же питают живой предпросмотр —
+     одна система на игру и на её превью, поэтому превью не может
+     разойтись с настоящим экраном.
+
+     Значения --u и --gap ставит Screen.measure() при каждом resize;
+     здесь стоят запасные на случай, если скрипт ещё не отработал.    */
+  :root {
+    --u: 15px;            /* единица интерфейса */
+    --gap: 14px;          /* базовый отступ от края */
+    --safe-t: 0px; --safe-b: 0px; --safe-l: 0px; --safe-r: 0px;
+    --s-ui: 1;            /* общий масштаб */
+    --s-move: 1;          /* джойстик */
+    --s-btn: 1;           /* действие и крупные кнопки */
+    --s-top: 1;           /* верхние кнопки */
+    --s-text: 1;          /* текст */
+    --s-panel: 1;         /* плашки */
+    /* производные: считаются один раз, дальше только читаются */
+    /* Нижний порог в 34 пикселя — это минимум, по которому палец
+       попадает. Формула от единицы на маленьком экране даёт меньше, и
+       без max() верхние кнопки становились нажимаемыми через раз. */
+    --top-size:  max(34px, calc(var(--u) * 3.0 * var(--s-ui) * var(--s-top)));
+    --top-font:  calc(var(--top-size) * 0.46);
+    --move-size: calc(var(--u) * 7.40 * var(--s-ui) * var(--s-move));
+    --act-size:  calc(var(--u) * 5.20 * var(--s-ui) * var(--s-btn));
+    --text-sm:   calc(var(--u) * 0.72 * var(--s-text));
+    --text-md:   calc(var(--u) * 0.83 * var(--s-text));
+    --text-lg:   calc(var(--u) * 0.92 * var(--s-text));
+    --pad:       calc(var(--u) * 0.60 * var(--s-panel));
+    --panel-r:   calc(var(--u) * 0.30);
+  }
+
   html, body {
-    width:100%; height:100%; overflow:hidden; background:#000;
+    width:100%; height:100%; overflow:hidden; background:#05040a;
     font-family:'Courier New', Courier, monospace; color:#e8e8e8;
     overscroll-behavior:none;
   }
   body {
-    display:flex; align-items:center; justify-content:center;
+    display:block;
     touch-action:none; user-select:none; -webkit-user-select:none;
   }
+  /* Контейнер — это весь экран. Раньше он был колонкой шириной 520px по
+     центру: на мониторе игра превращалась в узкую полосу с чёрными
+     полями, а в горизонтальной ориентации ещё и обрезалась снизу. */
   #gameContainer {
-    position:relative;
-    width:100vw; height:100vh;
+    position:fixed; inset:0;
+    width:100vw;  height:100vh;
     width:100dvw; height:100dvh;
-    max-width:520px;
     background:#0a0a0f;
     overflow:hidden;
-    box-shadow:0 0 40px rgba(120,20,60,.4);
   }
-  #gameCanvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#08060c; }
+  /* Сцена — прямоугольник, отведённый миру. В вертикальной ориентации
+     под ней остаётся полоса управления, в горизонтальной она занимает
+     весь экран, а кнопки ложатся поверх по углам. Границы ставит
+     Screen.measure(). */
+  #stage { position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; }
+  #safeProbe {
+    position:fixed; left:0; top:0; width:0; height:0; visibility:hidden; pointer-events:none;
+    padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);
+    padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right);
+  }
+  #gameCanvas {
+    display:block; position:absolute;
+    image-rendering:pixelated; image-rendering:crisp-edges; background:#08060c;
+  }
 
   button { font-family:inherit; cursor:pointer; }
 
   /* ==================== MENUS ==================== */
+  /* Экраны меню: колонка по центру, с ограничением ширины — на широком
+     мониторе кнопки не растягиваются на два метра, а стоят колонкой. */
   .screen {
     position:absolute; inset:0;
     display:none; flex-direction:column; align-items:center; justify-content:center;
-    padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
+    padding:calc(var(--gap) + var(--safe-t)) calc(var(--gap) + var(--safe-r))
+            calc(var(--gap) + var(--safe-b)) calc(var(--gap) + var(--safe-l));
+    overflow-y:auto;
   }
   .screen.show { display:flex; }
 
@@ -46,33 +103,46 @@
     color:#c0304d; letter-spacing:4px; margin-bottom:6px;
     text-shadow:0 0 22px #6a0020, 2px 2px 0 #000; text-align:center;
   }
-  #mainMenu .sub { color:#7a5060; font-size:12px; margin-bottom:26px; letter-spacing:2px; text-align:center; }
-  #menuEndCount { color:#9a6070; font-size:11px; margin-top:14px; letter-spacing:1px; }
+  #mainMenu .sub { color:#7a5060; font-size:calc(var(--u) * .8 * var(--s-text)); margin-bottom:26px; letter-spacing:2px; text-align:center; }
+  #menuEndCount { color:#9a6070; font-size:calc(var(--u) * .74 * var(--s-text)); margin-top:14px; letter-spacing:1px; }
 
   .menuBtn {
     background:rgba(60,10,25,.7);
     border:1px solid #7a1030; color:#e8c8d0;
-    padding:13px 24px; font-size:15px; margin:5px;
-    letter-spacing:2px; min-width:238px; max-width:100%;
+    padding:calc(var(--u) * .62 * var(--s-btn)) calc(var(--u) * 1.4 * var(--s-btn));
+    font-size:calc(var(--u) * 1.0 * var(--s-text)); margin:calc(var(--u) * .24);
+    letter-spacing:2px;
+    min-width:min(100%, calc(var(--u) * 15.5 * var(--s-btn))); max-width:100%;
+    min-height:calc(var(--u) * 2.6 * var(--s-btn));
     transition:background .18s, box-shadow .18s, color .18s;
   }
   .menuBtn:hover, .menuBtn:active { background:#7a1030; color:#fff; box-shadow:0 0 15px #c0304d; }
   .menuBtn:disabled { opacity:.32; cursor:not-allowed; box-shadow:none; background:rgba(60,10,25,.7); color:#e8c8d0; }
-  .menuBtn.small { min-width:150px; font-size:13px; padding:10px 18px; }
+  .menuBtn.small { min-width:min(100%, calc(var(--u) * 10 * var(--s-btn)));
+                   font-size:calc(var(--u) * .87 * var(--s-text));
+                   padding:calc(var(--u) * .5 * var(--s-btn)) calc(var(--u) * 1.1 * var(--s-btn));
+                   min-height:calc(var(--u) * 2.1 * var(--s-btn)); }
 
-  #settingsPanel, #memoriesScreen, #endingsScreen, #statusScreen, #creditsPanel {
+  #settingsPanel, #memoriesScreen, #endingsScreen, #statusScreen, #creditsPanel, #displayPanel {
     background:rgba(5,3,10,.96); z-index:76; overflow-y:auto; justify-content:flex-start;
   }
-  .screen h2 { color:#c0304d; margin:6px 0 16px; letter-spacing:3px; font-size:19px; text-align:center; }
-  #settingsPanel label { display:block; margin:12px 0 4px; color:#c8a8b0; font-size:13px; text-align:center; }
-  #settingsPanel input[type=range] { width:230px; max-width:80vw; accent-color:#c0304d; }
+  .screen h2 { color:#c0304d; margin:6px 0 calc(var(--u) * .9); letter-spacing:3px;
+               font-size:calc(var(--u) * 1.25 * var(--s-text)); text-align:center; }
+  #settingsPanel label, .dspLabel { display:block; margin:calc(var(--u) * .7) 0 4px;
+               color:#c8a8b0; font-size:calc(var(--u) * .88 * var(--s-text)); text-align:center; }
+  #settingsPanel input[type=range], .dspRange {
+               width:min(86vw, calc(var(--u) * 18)); max-width:100%; accent-color:#c0304d;
+               height:calc(var(--u) * 1.5); }
 
   /* Memories / endings lists */
-  .listWrap { width:100%; max-width:420px; margin-bottom:14px; }
+  .listWrap { width:100%; max-width:min(100%, calc(var(--u) * 30)); margin-bottom:14px;
+              max-height:62vh; overflow-y:auto; }
   .listItem {
     display:flex; align-items:center; gap:10px;
     background:rgba(30,12,20,.7); border:1px solid #56122c;
-    padding:9px 11px; margin-bottom:7px; color:#e0c0c8; font-size:12.5px;
+    padding:var(--pad) calc(var(--pad) * 1.2); margin-bottom:7px; color:#e0c0c8;
+    font-size:calc(var(--u) * .84 * var(--s-text));
+    min-height:calc(var(--u) * 2.3 * var(--s-btn));
     text-align:left; width:100%; letter-spacing:.5px;
   }
   .listItem.locked { opacity:.4; border-color:#33202a; cursor:default; color:#8a7078; }
@@ -84,25 +154,34 @@
     padding:24px 20px;
   }
   #memoryView.show { display:flex; }
-  #memoryView h3 { color:#e0a0b0; letter-spacing:2px; margin-bottom:12px; font-size:16px; text-align:center; }
-  #memoryCanvas { border:1px solid #56122c; image-rendering:pixelated; margin-bottom:14px; background:#000; }
-  #memoryText { color:#c8b0b8; font-size:13px; line-height:1.55; max-width:400px; text-align:center; white-space:pre-wrap; margin-bottom:18px; }
+  #memoryView h3 { color:#e0a0b0; letter-spacing:2px; margin-bottom:12px;
+                   font-size:calc(var(--u) * 1.06 * var(--s-text)); text-align:center; }
+  #memoryCanvas { border:1px solid #56122c; image-rendering:pixelated; margin-bottom:14px; background:#000;
+                  width:min(90vw, calc(var(--u) * 22)); height:auto; }
+  #memoryText { color:#c8b0b8; font-size:calc(var(--u) * .87 * var(--s-text)); line-height:1.55;
+                max-width:min(100%, calc(var(--u) * 28)); text-align:center; white-space:pre-wrap; margin-bottom:18px; }
 
   /* Status screen */
   .statRow {
-    display:flex; justify-content:space-between; width:100%; max-width:340px;
-    padding:9px 4px; border-bottom:1px solid #331824; font-size:13px; color:#d0b0b8;
+    display:flex; justify-content:space-between; width:100%; max-width:min(100%, calc(var(--u) * 24));
+    padding:9px 4px; border-bottom:1px solid #331824;
+    font-size:calc(var(--u) * .87 * var(--s-text)); color:#d0b0b8;
   }
   .statRow span:last-child { color:#e0a0b0; }
 
   /* ==================== DIALOGUE ==================== */
+  /* Плашка диалога: ширина и отступ снизу приходят из layout (Screen),
+     размеры — из единицы. Высота НЕ фиксирована: если игрок увеличил
+     текст, плашка растёт сама, а не обрезает реплику. */
   #dialogueBox {
-    position:absolute; left:8px; right:8px;
-    bottom:calc(134px + env(safe-area-inset-bottom));
-    min-height:104px;
+    position:absolute;
+    left:var(--dlg-l, 8px); right:var(--dlg-r, 8px);
+    bottom:var(--dlg-b, 134px);
+    max-width:var(--dlg-max, none);
+    min-height:calc(var(--u) * 6.4 * var(--s-panel));
     background:linear-gradient(180deg, rgba(20,8,15,.97), rgba(10,4,8,.99));
-    border:2px solid #7a1030; border-radius:6px;
-    padding:9px 12px 14px;
+    border:2px solid #7a1030; border-radius:var(--panel-r);
+    padding:calc(var(--pad) * 1.0) calc(var(--pad) * 1.3) calc(var(--pad) * 1.6);
     display:none; z-index:44;
     box-shadow:0 0 15px rgba(120,20,50,.5);
   }
@@ -113,19 +192,20 @@
   @keyframes txtJitter { 0%{transform:translate(0,0)} 50%{transform:translate(.7px,-.7px)} 100%{transform:translate(-.5px,.4px)} }
 
   #portrait {
-    position:absolute; left:8px; top:-56px;
-    width:64px; height:64px;
+    position:absolute; left:var(--pad); top:calc(var(--u) * -3.7 * var(--s-panel));
+    width:calc(var(--u) * 4.0 * var(--s-panel)); height:calc(var(--u) * 4.0 * var(--s-panel));
     background:#2a1220; border:2px solid #7a1030; border-radius:4px;
     image-rendering:pixelated; box-shadow:0 0 10px #000;
     background-size:cover;
   }
   #speakerName {
-    color:#e0a0b0; font-size:13.5px; font-weight:bold;
-    margin-left:78px; margin-bottom:5px; letter-spacing:1px;
-    text-shadow:1px 1px 0 #000; min-height:17px;
+    color:#e0a0b0; font-size:var(--text-lg); font-weight:bold;
+    margin-left:calc(var(--u) * 4.9 * var(--s-panel)); margin-bottom:4px; letter-spacing:1px;
+    text-shadow:1px 1px 0 #000; min-height:1.25em;
   }
-  #dialogueText { color:#e8e8e8; font-size:13.5px; line-height:1.45; min-height:58px; white-space:pre-wrap; }
-  #dialogueHint { position:absolute; right:10px; bottom:5px; color:#a06070; font-size:11px; animation:blink 1s infinite; }
+  #dialogueText { color:#e8e8e8; font-size:var(--text-lg); line-height:1.45; min-height:3.4em; white-space:pre-wrap; }
+  #dialogueHint { position:absolute; right:calc(var(--pad) * 1.1); bottom:calc(var(--pad) * .5);
+                  color:#a06070; font-size:var(--text-sm); animation:blink 1s infinite; }
   @keyframes blink { 50% { opacity:.25; } }
 
   /* Tap-anywhere catcher while dialogue is open */
@@ -134,29 +214,32 @@
 
   /* ==================== CHOICES ==================== */
   #choiceBox {
-    position:absolute; left:8px; right:8px;
-    bottom:calc(14px + env(safe-area-inset-bottom));
-    max-height:66%; overflow-y:auto;
+    position:absolute;
+    left:var(--dlg-l, 8px); right:var(--dlg-r, 8px);
+    bottom:calc(var(--gap) + var(--safe-b));
+    max-width:var(--dlg-max, none);
+    max-height:72%; overflow-y:auto;
     display:none; z-index:48;
     -webkit-overflow-scrolling:touch;
   }
   #choiceBox.show { display:block; }
   #choiceBox.locked { pointer-events:none; opacity:.55; }
   #choicePrompt {
-    color:#a07080; font-size:11.5px; letter-spacing:1px;
-    padding:0 4px 7px; text-align:center;
+    color:#a07080; font-size:var(--text-md); letter-spacing:1px;
+    padding:0 4px calc(var(--pad) * .8); text-align:center;
   }
   .choiceOpt {
     display:block; width:100%; text-align:left;
     background:linear-gradient(180deg, rgba(40,14,26,.97), rgba(20,7,13,.98));
     border:1px solid #8a1838; color:#f0d8de;
-    padding:13px 14px; margin-bottom:8px; border-radius:5px;
-    font-size:13.5px; line-height:1.4; letter-spacing:.4px;
-    min-height:46px;
+    padding:calc(var(--pad) * 1.4) calc(var(--pad) * 1.5);
+    margin-bottom:calc(var(--pad) * .9); border-radius:var(--panel-r);
+    font-size:var(--text-lg); line-height:1.4; letter-spacing:.4px;
+    min-height:calc(var(--u) * 2.9 * var(--s-btn));
     box-shadow:0 2px 0 rgba(0,0,0,.5);
   }
   .choiceOpt:active { background:#7a1030; color:#fff; transform:translateY(1px); }
-  .choiceOpt .tag { display:block; color:#a86a80; font-size:10.5px; letter-spacing:1.5px; margin-bottom:3px; }
+  .choiceOpt .tag { display:block; color:#a86a80; font-size:calc(var(--text-sm) * .92); letter-spacing:1.5px; margin-bottom:3px; }
 
   /* Options unlocked by a hidden stat — coloured by which stat opened them */
   .choiceOpt.gated { border-width:1px; border-style:solid; position:relative; }
@@ -166,16 +249,22 @@
     display:none;
     border:1px dashed var(--gate, #e8b84a);
     background:var(--gateDim, rgba(232,184,74,.10));
-    color:#e8d8c0; font-size:11.5px; line-height:1.5;
-    padding:9px 11px; margin:0 0 9px; border-radius:5px;
+    color:#e8d8c0; font-size:var(--text-md); line-height:1.5;
+    padding:var(--pad) calc(var(--pad) * 1.2); margin:0 0 var(--pad); border-radius:var(--panel-r);
   }
   #gateHint.show { display:block; }
   #gateHint b { color:var(--gate, #e8b84a); }
 
   /* ==================== TOUCH CONTROLS ==================== */
+  /* Джойстик и кнопка действия стоят по якорям: положение задаётся
+     долями от свободного места (--dpad-x/--dpad-y), поэтому при повороте
+     экрана и при смене размера они остаются там, куда их поставил игрок,
+     а не уезжают за край. Значения ставит Layout.place(). */
   #dpad {
-    position:absolute; left:16px; bottom:calc(16px + env(safe-area-inset-bottom));
-    width:112px; height:112px; z-index:45; touch-action:none;
+    position:absolute;
+    left:var(--dpad-l, 16px); bottom:var(--dpad-b, 16px);
+    width:var(--move-size); height:var(--move-size);
+    z-index:45; touch-action:none;
     transition:opacity .2s;
   }
   #dpad.dim { opacity:.22; pointer-events:none; }
@@ -186,17 +275,18 @@
     border:2px solid rgba(140,40,70,.5); border-radius:50%;
   }
   #dpadStick {
-    position:absolute; width:46px; height:46px; left:33px; top:33px;
+    position:absolute; width:41%; height:41%; left:29.5%; top:29.5%;
     background:radial-gradient(circle, #c0304d 0%, #5a0820 80%);
     border:2px solid #e0a0b0; border-radius:50%;
     box-shadow:0 0 10px rgba(200,50,80,.6);
   }
   #actionBtn {
-    position:absolute; right:20px; bottom:calc(30px + env(safe-area-inset-bottom));
-    width:78px; height:78px;
+    position:absolute;
+    right:var(--act-r, 20px); bottom:var(--act-b, 30px);
+    width:var(--act-size); height:var(--act-size);
     background:radial-gradient(circle, #c0304d 0%, #5a0820 80%);
     border:3px solid #e0a0b0; border-radius:50%;
-    color:#fff; font-size:16px; font-weight:bold; z-index:45;
+    color:#fff; font-size:calc(var(--act-size) * .21); font-weight:bold; z-index:45;
     box-shadow:0 0 15px rgba(200,50,80,.5);
     transition:opacity .2s;
   }
@@ -204,28 +294,33 @@
   #actionBtn:active { transform:scale(.94); background:#8a1030; }
 
   .topBtn {
-    position:absolute; top:calc(8px + env(safe-area-inset-top));
-    width:34px; height:34px;
+    position:absolute; top:var(--top-t, 8px);
+    width:var(--top-size); height:var(--top-size);
     background:rgba(30,10,20,.75); border:1px solid #7a1030;
-    color:#e0a0b0; z-index:26; border-radius:4px; font-size:16px; line-height:1;
+    color:#e0a0b0; z-index:26; border-radius:calc(var(--panel-r) * .8);
+    font-size:var(--top-font); line-height:1;
+    display:flex; align-items:center; justify-content:center;
   }
-  #menuBtnGame { right:8px; }
-  #statusBtnGame { right:48px; }
+  #menuBtnGame   { right:var(--top-r, 8px); }
+  #statusBtnGame { right:calc(var(--top-r, 8px) + var(--top-size) + var(--u) * .4); }
 
   #inventoryPanel {
-    position:absolute; top:calc(8px + env(safe-area-inset-top)); left:8px;
-    background:rgba(20,8,15,.85); border:1px solid #7a1030; border-radius:4px;
-    padding:4px 8px; z-index:26; color:#e0a0b0; font-size:11px;
-    max-width:52%; display:none;
+    position:absolute; top:var(--top-t, 8px); left:var(--hud-l, 8px);
+    background:rgba(20,8,15,.85); border:1px solid #7a1030; border-radius:calc(var(--panel-r) * .8);
+    padding:calc(var(--pad) * .5) var(--pad); z-index:26; color:#e0a0b0; font-size:var(--text-sm);
+    max-width:var(--hud-max, 52%); display:none; line-height:1.35;
   }
   #inventoryPanel.show { display:block; }
 
   /* Текущая цель: одна строка под инвентарём, читается не отрываясь от игры */
+  /* Цель дня. Высота не задана: длинная строка переносится и плашка
+     растёт, а не обрезает текст. */
   #questPanel {
-    position:absolute; top:calc(30px + env(safe-area-inset-top)); left:8px;
+    position:absolute; top:var(--quest-t, 30px); left:var(--hud-l, 8px);
     background:rgba(14,10,20,.82); border-left:2px solid #c0a040; border-radius:0 3px 3px 0;
-    padding:3px 8px; z-index:26; color:#e8d8a0; font-size:10px; letter-spacing:.02em;
-    max-width:64%; display:none; pointer-events:none;
+    padding:calc(var(--pad) * .4) var(--pad); z-index:26; color:#e8d8a0;
+    font-size:var(--text-sm); letter-spacing:.02em; line-height:1.4;
+    max-width:var(--quest-max, 64%); display:none; pointer-events:none;
   }
   #questPanel.show { display:block; }
 
@@ -237,29 +332,40 @@
     text-align:center;
   }
   #shiftScreen.show { display:flex; }
-  #shiftPhase { color:#c8a070; font-size:11px; letter-spacing:2px; min-height:15px; }
+  #shiftPhase { color:#c8a070; font-size:var(--text-sm); letter-spacing:2px; min-height:1.3em; }
+  /* Холст смены держится соотношения и занимает столько, сколько даёт
+     экран: раньше он был прибит к 340 пикселям и на мониторе оставался
+     маркой в центре. Высоту ограничиваем так, чтобы под него влезли
+     фраза, кнопка помощи и полоса фаз. */
   #shiftCanvas {
-    display:block; width:min(94vw, 340px); height:auto; max-height:calc(100vh - 86px);
+    display:block;
+    width:min(94vw, calc((100dvh - var(--u) * 11) * var(--shift-ar, 0.72)));
+    height:auto; aspect-ratio:var(--shift-ar, 0.72);
     image-rendering:pixelated; image-rendering:crisp-edges;
     border:1px solid #6a4630; border-radius:3px; background:#1a1210;
     touch-action:none; cursor:pointer;
   }
-  #shiftSay { color:#c09880; font-size:11px; min-height:28px; max-width:min(94vw, 340px); line-height:1.4; }
+  #shiftSay { color:#c09880; font-size:var(--text-sm); min-height:2.4em;
+              max-width:min(94vw, calc(var(--u) * 32)); line-height:1.4; }
   /* Инструкция: один раз перед первой сменой и дальше по кнопке. */
   #shiftHelpBtn { margin-top:6px; background:#241820; color:#c8a070; border:1px solid #5a3040;
-                  border-radius:8px; padding:6px 14px; font-size:11px; letter-spacing:1px; cursor:pointer; }
+                  border-radius:8px; padding:calc(var(--pad) * .7) calc(var(--pad) * 1.6);
+                  font-size:var(--text-sm); letter-spacing:1px; cursor:pointer;
+                  min-height:calc(var(--u) * 2.1 * var(--s-btn)); }
   #shiftHelpBtn:hover,#shiftHelpBtn:active { background:#3a2030; }
   #shiftHelp { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
                background:rgba(8,6,10,.86); z-index:6; padding:16px; }
   #shiftHelp.show { display:flex; }
   .shiftHelpBox { background:#1a1218; border:2px solid #7a3a52; border-radius:12px;
-                  padding:16px 18px; max-width:min(92vw,360px); color:#e8dcd0; }
-  .shiftHelpBox h3 { margin:0 0 10px; color:#f0c0a0; font-size:13px; letter-spacing:2px; }
-  .shiftHelpBox ol { margin:0; padding-left:20px; font-size:12px; line-height:1.65; }
+                  padding:16px 18px; max-width:min(92vw, calc(var(--u) * 26)); color:#e8dcd0;
+                  max-height:86vh; overflow-y:auto; }
+  .shiftHelpBox h3 { margin:0 0 10px; color:#f0c0a0; font-size:var(--text-lg); letter-spacing:2px; }
+  .shiftHelpBox ol { margin:0; padding-left:20px; font-size:var(--text-md); line-height:1.65; }
   .shiftHelpBox li { margin-bottom:3px; }
-  .shiftHelpNote { color:#c8a070; font-size:11px; margin:10px 0 12px; }
+  .shiftHelpNote { color:#c8a070; font-size:var(--text-sm); margin:10px 0 12px; }
   #shiftHelpOk { width:100%; background:#3a2030; color:#f0e4c0; border:1px solid #7a3a52;
-                 border-radius:8px; padding:9px; font-size:12px; letter-spacing:1px; cursor:pointer; }
+                 border-radius:8px; padding:var(--pad); font-size:var(--text-md); letter-spacing:1px;
+                 cursor:pointer; min-height:calc(var(--u) * 2.3 * var(--s-btn)); }
 
   /* ==================== OVERLAYS ==================== */
   #fade { position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:40; transition:opacity .5s; }
@@ -287,7 +393,7 @@
   /* подсказка появляется не сразу: сначала карточку надо дочитать */
   #titleHint {
     position:absolute; left:0; right:0; bottom:calc(52px + env(safe-area-inset-bottom));
-    text-align:center; color:#c8a8b8; font-size:11px; letter-spacing:2px;
+    text-align:center; color:#c8a8b8; font-size:var(--text-sm); letter-spacing:2px;
     z-index:82; display:none; animation:hintPulse 1.6s ease-in-out infinite;
     pointer-events:none;
   }
@@ -297,12 +403,13 @@
   #pauseMenu { background:rgba(5,3,10,.93); z-index:70; }
 
   #toast {
-    position:absolute; top:calc(58px + env(safe-area-inset-top)); left:50%;
+    position:absolute; top:var(--toast-t, 58px); left:50%;
     transform:translateX(-50%);
     background:rgba(20,8,15,.92); border:1px solid #7a1030; color:#e0a0b0;
-    padding:8px 15px; border-radius:4px; z-index:35; font-size:12.5px;
+    padding:var(--pad) calc(var(--pad) * 1.7); border-radius:calc(var(--panel-r) * .8);
+    z-index:35; font-size:var(--text-md);
     opacity:0; transition:opacity .3s; pointer-events:none;
-    max-width:88%; text-align:center;
+    max-width:min(88%, calc(var(--u) * 30)); text-align:center; line-height:1.4;
   }
   #toast.show { opacity:1; }
 
@@ -310,63 +417,77 @@
   #endingScreen {
     position:absolute; inset:0; z-index:100; display:none;
     flex-direction:column; align-items:center; justify-content:center;
-    background:#000; padding:26px 22px; overflow-y:auto;
+    background:#000; overflow-y:auto;
+    padding:calc(var(--gap) * 1.6 + var(--safe-t)) calc(var(--gap) + var(--safe-r))
+            calc(var(--gap) * 1.6 + var(--safe-b)) calc(var(--gap) + var(--safe-l));
   }
   #endingScreen.show { display:flex; }
-  #endingRoman { color:#7a5060; font-size:13px; letter-spacing:6px; margin-bottom:8px; }
+  #endingRoman { color:#7a5060; font-size:calc(var(--u) * .86 * var(--s-text)); letter-spacing:6px; margin-bottom:8px; }
   #endingName {
     color:#c0304d; font-size:clamp(24px,7.5vw,34px); letter-spacing:7px;
     text-shadow:0 0 22px #6a0020; margin-bottom:14px; text-align:center;
   }
   #endingSub {
-    color:#9a7a86; font-size:12.5px; line-height:1.6; max-width:380px;
+    color:#9a7a86; font-size:calc(var(--u) * .84 * var(--s-text)); line-height:1.6;
+    max-width:min(100%, calc(var(--u) * 27));
     text-align:center; margin-bottom:22px; font-style:italic;
   }
-  #endingStats { width:100%; max-width:320px; margin-bottom:20px; }
-  #endingBody { color:#c8b0b8; font-size:13px; line-height:1.6; max-width:380px; text-align:center; margin-bottom:22px; white-space:pre-wrap; }
+  #endingStats { width:100%; max-width:min(100%, calc(var(--u) * 23)); margin-bottom:20px; }
+  #endingBody { color:#c8b0b8; font-size:calc(var(--u) * .87 * var(--s-text)); line-height:1.6;
+                max-width:min(100%, calc(var(--u) * 27)); text-align:center; margin-bottom:22px; white-space:pre-wrap; }
 
 
   /* ===== Developer test menu ===== */
   #devToolsScreen {
     position:fixed; inset:0; z-index:9500; display:none;
     align-items:flex-start; justify-content:center;
-    padding:18px; box-sizing:border-box;
+    padding:calc(var(--gap) + var(--safe-t)) calc(var(--gap) + var(--safe-r))
+            calc(var(--gap) + var(--safe-b)) calc(var(--gap) + var(--safe-l));
+    box-sizing:border-box;
     background:rgba(7,4,8,.96); color:#eadfc8;
     overflow:auto;
   }
   #devToolsScreen.show { display:flex; }
   #devToolsPanel {
-    width:min(680px,100%); max-height:calc(100vh - 36px);
+    /* Ширина панели растёт вместе с экраном, но не бесконечно: список
+       из полутора сотен кнопок на два метра в ширину не читается. */
+    width:min(calc(var(--u) * 46), 100%);
+    max-height:calc(100dvh - var(--gap) * 2 - var(--safe-t) - var(--safe-b));
     overflow:auto; box-sizing:border-box;
-    padding:18px; border:1px solid rgba(170,120,150,.45);
+    padding:calc(var(--u) * 1.1); border:1px solid rgba(170,120,150,.45);
     background:linear-gradient(180deg,#171019,#0d090f);
     box-shadow:0 12px 50px rgba(0,0,0,.55);
   }
   #devToolsPanel h2 {
     margin:0 0 4px; color:#f0e4c0; letter-spacing:3px;
   }
+  #devToolsPanel h2 { font-size:calc(var(--u) * 1.15 * var(--s-text)); }
   #devToolsPanel .devSub {
-    margin:0 0 16px; color:#9e8992; font-size:12px; line-height:1.45;
+    margin:0 0 16px; color:#9e8992; font-size:calc(var(--u) * .78 * var(--s-text)); line-height:1.45;
   }
   .devSection {
     margin:16px 0 8px; padding-bottom:5px;
     border-bottom:1px solid rgba(200,170,190,.18);
-    color:#c89caf; font-size:11px; letter-spacing:2px;
+    color:#c89caf; font-size:calc(var(--u) * .74 * var(--s-text)); letter-spacing:2px;
   }
+  /* Колонок столько, сколько влезает: на узком телефоне одна, на
+     мониторе три. Без списка ширин экранов — auto-fit сам решает. */
   .devGrid {
-    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px;
+    display:grid; gap:7px;
+    grid-template-columns:repeat(auto-fit, minmax(min(100%, calc(var(--u) * 12)), 1fr));
   }
   /* Раскрывающаяся плашка: в меню полторы сотни кнопок, и списком они
      не читаются. Свёрнутая плашка показывает только заголовок и счёт. */
   .devFold { border:1px solid rgba(180,135,155,.22); margin:7px 0; background:rgba(255,255,255,.02); }
   .devFold > summary {
     list-style:none; cursor:pointer; padding:9px 10px;
-    color:#e2cdd8; font:12px "Courier New",monospace; letter-spacing:1px;
+    color:#e2cdd8; font:calc(var(--u) * .78 * var(--s-text))/1.3 "Courier New",monospace; letter-spacing:1px;
+    min-height:calc(var(--u) * 2.4);
     display:flex; justify-content:space-between; align-items:center;
   }
   .devFold > summary::-webkit-details-marker { display:none; }
   .devFold > summary:hover { background:rgba(200,150,175,.10); }
-  .devFold > summary .devCount { color:#8d7480; font-size:11px; letter-spacing:0; }
+  .devFold > summary .devCount { color:#8d7480; font-size:calc(var(--u) * .7 * var(--s-text)); letter-spacing:0; }
   .devFold > summary::before { content:'▸ '; color:#c07a90; }
   .devFold[open] > summary::before { content:'▾ '; }
   .devFold[open] > summary { border-bottom:1px solid rgba(180,135,155,.18); }
@@ -374,23 +495,27 @@
   .devBtn {
     appearance:none; border:1px solid rgba(180,135,155,.28);
     background:rgba(255,255,255,.035); color:#dfd1c4;
-    padding:10px 9px; min-height:44px; text-align:left;
-    font:12px "Courier New",monospace; cursor:pointer;
+    padding:calc(var(--u) * .62) calc(var(--u) * .58);
+    min-height:calc(var(--u) * 2.9); text-align:left;
+    font:calc(var(--u) * .78 * var(--s-text))/1.35 "Courier New",monospace; cursor:pointer;
   }
   .devBtn:hover,.devBtn:active {
     background:rgba(170,80,120,.16); border-color:rgba(220,145,175,.55);
   }
   .devBtn .devTitle { color:#f0e4c0; display:block; }
-  .devBtn .devDesc { color:#927f88; display:block; margin-top:3px; font-size:10px; }
-  .devNow { color:#e0c8a0; font-size:11px; margin:4px 0 6px; min-height:14px; }
-  .devHint { color:#8f7d86; font-size:10px; line-height:1.45; margin:0 0 7px; max-width:52em; }
-  .credLine { color:#bda8b4; font-size:12px; line-height:1.5; margin:0 0 8px; max-width:30em; }
+  .devBtn .devDesc { color:#927f88; display:block; margin-top:3px;
+                     font-size:calc(var(--u) * .66 * var(--s-text)); }
+  .devNow { color:#e0c8a0; font-size:calc(var(--u) * .74 * var(--s-text)); margin:4px 0 6px; min-height:1.3em; }
+  .devHint { color:#8f7d86; font-size:calc(var(--u) * .68 * var(--s-text)); line-height:1.45; margin:0 0 7px; max-width:52em; }
+  .credLine { color:#bda8b4; font-size:calc(var(--u) * .8 * var(--s-text)); line-height:1.5; margin:0 0 8px; max-width:34em; }
   .credLine b { color:#e8d4c0; }
-  .credSec { color:#8f7d86; font-size:10px; letter-spacing:2px; margin:16px 0 8px; }
+  .credSec { color:#8f7d86; font-size:calc(var(--u) * .68 * var(--s-text)); letter-spacing:2px; margin:16px 0 8px; }
   .devRow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .devRow input[type=range] { flex:1 1 90px; min-width:70px; }
   .devMini { background:#241820; color:#f0e4c0; border:1px solid #5a3040;
-             border-radius:6px; padding:5px 11px; font-size:13px; cursor:pointer; }
+             border-radius:6px; padding:calc(var(--u) * .34) calc(var(--u) * .74);
+             font-size:calc(var(--u) * .86 * var(--s-text)); cursor:pointer;
+             min-width:calc(var(--u) * 2.3); min-height:calc(var(--u) * 2.1); }
   .devMini:hover,.devMini:active { background:#3a2030; }
   .devBtn.playing { border-color:#c07a90; background:#3a2030; }
   .devDanger { border-color:rgba(180,70,80,.45); }
@@ -411,16 +536,119 @@
     #dialogueBox.shakeText #dialogueText { animation:none; }
   }
 
+  /* ===== НАСТРОЙКИ ОТОБРАЖЕНИЯ ===== */
+  #displayPanel { background:rgba(5,3,10,.97); z-index:77; justify-content:flex-start; }
+  #displayPanel .dspWrap {
+    width:100%; max-width:min(100%, calc(var(--u) * 34));
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .dspRow { width:100%; display:flex; align-items:center; gap:10px;
+            margin:calc(var(--u) * .28) 0; }
+  .dspRow .dspLabel { flex:1; margin:0; text-align:left; }
+  .dspRow .dspNum { color:#e0a0b0; font-size:calc(var(--u) * .82 * var(--s-text));
+                    min-width:4.2em; text-align:right; }
+  .dspRow input[type=range] { flex:1.25; min-width:0; }
+
+  /* Рамка предпросмотра: внутри неё лежит копия настоящего экрана в
+     выбранном размере, уменьшенная transform-ом. Внутренний экран
+     считается той же функцией, что и настоящий, поэтому показывает
+     ровно то, что игрок увидит. */
+  #dspStageWrap {
+    width:100%; margin:calc(var(--u) * .5) 0 calc(var(--u) * .3);
+    display:flex; align-items:center; justify-content:center;
+    background:#07050c; border:1px solid #4a1a2c; border-radius:6px;
+    overflow:hidden; position:relative;
+  }
+  #dspScreen {
+    position:absolute; left:50%; top:50%; transform-origin:50% 50%;
+    background:#0a0a0f; overflow:hidden; box-shadow:0 0 0 1px #6a2038;
+  }
+  #dspScreen .pv { position:absolute; }
+  #dspWorld { position:absolute; left:0; top:0; image-rendering:pixelated; }
+  #dspScreen .pvTop {
+    top:var(--top-t); width:var(--top-size); height:var(--top-size);
+    background:rgba(30,10,20,.75); border:1px solid #7a1030; color:#e0a0b0;
+    border-radius:calc(var(--panel-r) * .8); font-size:var(--top-font);
+    display:flex; align-items:center; justify-content:center;
+  }
+  #dspScreen .pvQuest {
+    top:var(--quest-t); left:var(--hud-l); max-width:var(--quest-max);
+    background:rgba(14,10,20,.82); border-left:2px solid #c0a040;
+    padding:calc(var(--pad) * .4) var(--pad); color:#e8d8a0;
+    font-size:var(--text-sm); line-height:1.4;
+  }
+  #dspScreen .pvInv {
+    top:var(--top-t); left:var(--hud-l); max-width:var(--hud-max);
+    background:rgba(20,8,15,.85); border:1px solid #7a1030;
+    border-radius:calc(var(--panel-r) * .8); padding:calc(var(--pad) * .5) var(--pad);
+    color:#e0a0b0; font-size:var(--text-sm);
+  }
+  #dspScreen .pvDpad {
+    left:var(--dpad-l); bottom:var(--dpad-b);
+    width:var(--move-size); height:var(--move-size); border-radius:50%;
+    background:radial-gradient(circle, rgba(80,20,40,.35) 0%, rgba(0,0,0,.15) 70%);
+    border:2px solid rgba(140,40,70,.5);
+  }
+  #dspScreen .pvDpad::after {
+    content:''; position:absolute; left:29.5%; top:29.5%; width:41%; height:41%;
+    border-radius:50%; background:radial-gradient(circle, #c0304d 0%, #5a0820 80%);
+    border:2px solid #e0a0b0;
+  }
+  #dspScreen .pvAct {
+    right:var(--act-r); bottom:var(--act-b);
+    width:var(--act-size); height:var(--act-size); border-radius:50%;
+    background:radial-gradient(circle, #c0304d 0%, #5a0820 80%);
+    border:3px solid #e0a0b0; color:#fff; font-weight:bold;
+    font-size:calc(var(--act-size) * .21);
+    display:flex; align-items:center; justify-content:center;
+  }
+  #dspScreen .pvDlg {
+    left:var(--dlg-l); right:var(--dlg-r); bottom:var(--dlg-b);
+    min-height:calc(var(--u) * 6.4 * var(--s-panel));
+    background:linear-gradient(180deg, rgba(20,8,15,.97), rgba(10,4,8,.99));
+    border:2px solid #7a1030; border-radius:var(--panel-r);
+    padding:var(--pad) calc(var(--pad) * 1.3) calc(var(--pad) * 1.6);
+  }
+  #dspScreen .pvDlg .nm { color:#e0a0b0; font-size:var(--text-lg); font-weight:bold;
+                          margin-bottom:4px; letter-spacing:1px; }
+  #dspScreen .pvDlg .tx { color:#e8e8e8; font-size:var(--text-lg); line-height:1.45; }
+  /* Режим расстановки: подвижное подсвечивается, показывается зона,
+     дальше которой кнопку уводить нельзя. */
+  #dspScreen.moving .pvDpad, #dspScreen.moving .pvAct {
+    outline:2px dashed #e8b84a; outline-offset:3px; cursor:grab;
+  }
+  #dspScreen .pvSafe { display:none; }
+  #dspScreen.moving .pvSafe {
+    display:block;
+    left:var(--safe-l); right:var(--safe-r); top:var(--safe-t); bottom:var(--safe-b);
+    border:1px dashed rgba(232,184,74,.35); pointer-events:none;
+  }
+  .dspChips { display:flex; flex-wrap:wrap; gap:6px; justify-content:center;
+              margin:calc(var(--u) * .3) 0; }
+  .dspChip {
+    background:rgba(40,14,26,.8); border:1px solid #7a1030; color:#d8b8c0;
+    padding:calc(var(--pad) * .5) calc(var(--pad) * 1.1);
+    font-size:calc(var(--u) * .78 * var(--s-text)); border-radius:4px;
+    font-family:inherit; cursor:pointer; min-height:calc(var(--u) * 1.9);
+  }
+  .dspChip.on { background:#7a1030; color:#fff; border-color:#c0304d; }
+  .dspHint { color:#8a7078; font-size:calc(var(--u) * .74 * var(--s-text));
+             text-align:center; line-height:1.5; margin:calc(var(--u) * .3) 0; }
+
 /* ===== THEATRE STAGING ===== */
 #theaterOverlay{position:fixed;inset:0;z-index:20;display:none;background:#08070a;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
 #theaterOverlay.show{display:flex}
 /* Ширина и высота, заданные независимо, растягивали сцену 640x420 под
    форму экрана: на телефоне она вытягивалась почти вдвое. Размер
    считается по одному масштабу — как у игрового холста. */
-#theaterCanvas{width:min(96vw,calc(78vh * 640 / 420),860px);height:auto;aspect-ratio:640 / 420;image-rendering:pixelated;box-shadow:0 20px 80px rgba(0,0,0,.55)}
+#theaterCanvas{width:min(96vw,calc(82vh * 640 / 420));height:auto;aspect-ratio:640 / 420;image-rendering:pixelated;box-shadow:0 20px 80px rgba(0,0,0,.55)}
 </style>
 </head>
 <body>
+<!-- Зонд безопасной зоны: невидимый элемент, у которого отступы заданы
+     через env(). Скрипт читает у него вычисленные поля и узнаёт реальные
+     вырезы, «остров» и системные полосы — без списка моделей телефонов. -->
+<div id="safeProbe"></div>
 <div id="gameContainer">
   <canvas id="gameCanvas"></canvas>
 
@@ -521,9 +749,64 @@
     <label>Эффекты экрана: <span id="fxVal">вкл</span></label>
     <input type="range" id="fxSlider" min="0" max="1" value="1">
     <div style="height:14px"></div>
+    <button class="menuBtn" id="btnDisplay">НАСТРОЙКИ ОТОБРАЖЕНИЯ</button>
     <button class="menuBtn" id="btnReset">СБРОСИТЬ СОХРАНЕНИЕ</button>
     <button class="menuBtn" id="btnResetAll">СБРОСИТЬ ВСЁ (и галерею)</button>
     <button class="menuBtn" id="btnBackSettings">НАЗАД</button>
+  </div>
+
+  <!-- ===== Настройки отображения ===== -->
+  <div class="screen" id="displayPanel">
+    <h2>НАСТРОЙКИ ОТОБРАЖЕНИЯ</h2>
+    <div class="dspWrap">
+      <!-- Предпросмотр: не картинка, а настоящий интерфейс в уменьшенном
+           экране. Питается теми же переменными, что и игра. -->
+      <div id="dspStageWrap">
+        <div id="dspScreen">
+          <canvas id="dspWorld"></canvas>
+          <div class="pv pvSafe"></div>
+          <div class="pv pvInv">Кристалл</div>
+          <div class="pv pvQuest">ЦЕЛЬ: Найти Женевьеву Морель в университете</div>
+          <div class="pv pvTop" id="dspTop1">✦</div>
+          <div class="pv pvTop" id="dspTop2">☰</div>
+          <div class="pv pvDlg"><div class="nm">Сью</div>
+            <div class="tx">Зайди за мной после смены. Только не жди в коридоре с таким лицом.</div></div>
+          <div class="pv pvDpad" data-move="dpad"></div>
+          <div class="pv pvAct" data-move="act">A</div>
+        </div>
+      </div>
+      <div class="dspChips" id="dspDevices"></div>
+      <div class="dspHint" id="dspHint">Всё, что вы меняете, сразу видно в предпросмотре и сразу применяется в игре.</div>
+
+      <div class="dspRow"><label class="dspLabel">Масштаб интерфейса</label>
+        <span class="dspNum" id="numUi">100%</span></div>
+      <input class="dspRange" type="range" id="rngUi" min="70" max="160" step="5" value="100">
+
+      <div class="dspRow"><label class="dspLabel">Кнопки движения</label>
+        <span class="dspNum" id="numMove">100%</span></div>
+      <input class="dspRange" type="range" id="rngMove" min="60" max="180" step="5" value="100">
+
+      <div class="dspRow"><label class="dspLabel">Кнопки взаимодействия</label>
+        <span class="dspNum" id="numBtn">100%</span></div>
+      <input class="dspRange" type="range" id="rngBtn" min="60" max="180" step="5" value="100">
+
+      <div class="dspRow"><label class="dspLabel">Верхние кнопки</label>
+        <span class="dspNum" id="numTop">100%</span></div>
+      <input class="dspRange" type="range" id="rngTop" min="60" max="180" step="5" value="100">
+
+      <div class="dspRow"><label class="dspLabel">Размер текста</label>
+        <span class="dspNum" id="numText">100%</span></div>
+      <input class="dspRange" type="range" id="rngText" min="80" max="150" step="5" value="100">
+
+      <div class="dspRow"><label class="dspLabel">Размер плашек</label>
+        <span class="dspNum" id="numPanel">100%</span></div>
+      <input class="dspRange" type="range" id="rngPanel" min="80" max="150" step="5" value="100">
+
+      <div style="height:10px"></div>
+      <button class="menuBtn small" id="btnDspMove">НАСТРОИТЬ РАСПОЛОЖЕНИЕ</button>
+      <button class="menuBtn small" id="btnDspReset">СБРОСИТЬ</button>
+      <button class="menuBtn small" id="btnDspDone">ГОТОВО</button>
+    </div>
   </div>
 
   <!-- ===== Memories ===== -->
@@ -5775,7 +6058,8 @@ function loadMeta() {
     const raw = localStorage.getItem(CONFIG.META_KEY);
     if (raw) {
       const m = JSON.parse(raw);
-      META = { endings:m.endings||{}, memories:m.memories||{}, endingStats:m.endingStats||{}, hints:m.hints||{} };
+      META = { endings:m.endings||{}, memories:m.memories||{}, endingStats:m.endingStats||{},
+               hints:m.hints||{}, display:m.display||{} };
     }
   } catch(e) {}
 }
@@ -8019,11 +8303,13 @@ const Daylight = {
 const Lighting = {
   buf:null, bctx:null,
   ensure() {
-    if (this.buf) return;
-    this.buf = document.createElement('canvas');
+    if (this.buf && this.buf.width === CONFIG.VIEW_W && this.buf.height === CONFIG.VIEW_H) return;
+    if (!this.buf) this.buf = document.createElement('canvas');
     this.buf.width = CONFIG.VIEW_W; this.buf.height = CONFIG.VIEW_H;
     this.bctx = this.buf.getContext('2d');
   },
+  /* Кадр поменял размер — буфер света больше не совпадает с ним. */
+  resize() { if (this.buf) { this.buf.width = CONFIG.VIEW_W; this.buf.height = CONFIG.VIEW_H; } },
   /* A wedge of daylight through a window, with dust turning in it and a pool
      where it lands. Rooms opt in with sun:{x,y,w,len,tilt,a}. */
   drawSun(ctx, room, camX, camY) {
@@ -9635,6 +9921,7 @@ const Shift = {
       this.cv=document.getElementById('shiftCanvas');
       this.ctx=this.cv.getContext('2d');
       this.bind();
+      document.documentElement.style.setProperty('--shift-ar', (this.W / this.H).toFixed(4));
       document.getElementById('shiftScreen').classList.add('show');
       /* Перед первой сменой правила показываются сами, дальше — только по
          кнопке: навязчивое обучение на каждой смене раздражает. */
@@ -18970,9 +19257,9 @@ const Montage = {
     md.fr.draw(ctx);
     ctx.globalAlpha = Math.min(1, md.a * 1.2);
     if (md.fr.cap) {
-      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 320, CONFIG.VIEW_W, 24);
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, CONFIG.VIEW_H - 20, CONFIG.VIEW_W, 24);
       ctx.fillStyle = '#e0a0b0'; ctx.font = '10px Courier New'; ctx.textAlign = 'center';
-      ctx.fillText(md.fr.cap, CONFIG.VIEW_W/2, 336); ctx.textAlign = 'left';
+      ctx.fillText(md.fr.cap, CONFIG.VIEW_W/2, CONFIG.VIEW_H - 4); ctx.textAlign = 'left';
     }
     ctx.restore();
   }
@@ -23187,20 +23474,28 @@ const Input = {
 
     const dpad = document.getElementById('dpad');
     const stick = document.getElementById('dpadStick');
-    const CX = 56, CY = 56, MAXR = 34, HOME = 33;
+    /* Геометрия джойстика раньше была зашита числами под размер 112×112.
+       Игрок теперь может сделать его вдвое больше или меньше, поэтому
+       центр, ход ручки и мёртвая зона считаются от реального размера
+       элемента — иначе при другом размере палец бы промахивался. */
+    const geom = () => {
+      const r = dpad.getBoundingClientRect();
+      const s = r.width || 112;
+      return { r, cx:s/2, cy:s/2, maxr:s*0.30, home:s*0.295, dead:s*0.072 };
+    };
     const handleMove = (pt) => {
-      const rect = dpad.getBoundingClientRect();
-      let dx = (pt.clientX - rect.left) - CX, dy = (pt.clientY - rect.top) - CY;
+      const g = geom();
+      let dx = (pt.clientX - g.r.left) - g.cx, dy = (pt.clientY - g.r.top) - g.cy;
       const d = Math.hypot(dx, dy);
-      if (d > MAXR) { dx = dx/d*MAXR; dy = dy/d*MAXR; }
-      stick.style.left = (HOME + dx) + 'px';
-      stick.style.top  = (HOME + dy) + 'px';
-      this.dpad.x = Math.abs(dx) > 8 ? Math.sign(dx) : 0;
-      this.dpad.y = Math.abs(dy) > 8 ? Math.sign(dy) : 0;
+      if (d > g.maxr) { dx = dx/d*g.maxr; dy = dy/d*g.maxr; }
+      stick.style.left = ((g.home + dx) / (g.r.width || 1) * 100) + '%';
+      stick.style.top  = ((g.home + dy) / (g.r.height || 1) * 100) + '%';
+      this.dpad.x = Math.abs(dx) > g.dead ? Math.sign(dx) : 0;
+      this.dpad.y = Math.abs(dy) > g.dead ? Math.sign(dy) : 0;
       this.dpad.active = true;
     };
     const handleEnd = () => {
-      stick.style.left = HOME + 'px'; stick.style.top = HOME + 'px';
+      stick.style.left = '29.5%'; stick.style.top = '29.5%';
       this.dpad.x = 0; this.dpad.y = 0; this.dpad.active = false;
     };
     dpad.addEventListener('touchstart', e => { e.preventDefault(); Audio.resume(); handleMove(e.touches[0]); }, {passive:false});
@@ -23255,20 +23550,488 @@ const Game = {
   cast:[],
 };
 
-function resizeCanvas() {
-  const c = Game.canvas;
-  const cont = document.getElementById('gameContainer');
-  const cw = cont.clientWidth, ch = cont.clientHeight;
-  c.width = CONFIG.VIEW_W; c.height = CONFIG.VIEW_H;
-  const scale = Math.min(cw / CONFIG.VIEW_W, ch / CONFIG.VIEW_H);
-  c.style.width  = (CONFIG.VIEW_W * scale) + 'px';
-  c.style.height = (CONFIG.VIEW_H * scale) + 'px';
-  c.style.position = 'absolute';
-  c.style.left = ((cw - CONFIG.VIEW_W * scale) / 2) + 'px';
-  c.style.top  = '0px';
-  Game.scale = scale;
-  if (Game.ctx) Game.ctx.imageSmoothingEnabled = false;
-}
+/* =====================================================================
+   ЭКРАН
+
+   Два независимых слоя. Мир живёт в своей системе координат и рисуется
+   пиксель в пиксель; интерфейс считается от реального экрана. Раньше
+   это было одно и то же: контейнер был колонкой в 520 пикселей, а весь
+   интерфейс — набором фиксированных размеров под неё. На мониторе игра
+   превращалась в узкую полосу с чёрными полями, в горизонтальной
+   ориентации обрезалась снизу, а на длинном экране интерфейс оставался
+   телефонным и казался крошечным.
+
+   Screen.measure() вызывается на каждый resize и поворот и делает три
+   вещи: считает единицу интерфейса, раскладывает сцену и кнопки по
+   якорям и пересчитывает логический кадр мира.                       */
+const Screen = {
+  w:0, h:0, mode:'portrait', unit:15, band:0,
+  stage:{ x:0, y:0, w:0, h:0 },
+
+  /* Безопасная зона: вырезы, «остров», системные полосы. Читаем то, что
+     реально дал браузер через env(), а не гадаем по модели устройства. */
+  safe() {
+    const probe = document.getElementById('safeProbe');
+    const cs = getComputedStyle(probe);
+    const n = v => Math.max(0, Math.round(parseFloat(v) || 0));
+    return { t:n(cs.paddingTop), b:n(cs.paddingBottom), l:n(cs.paddingLeft), r:n(cs.paddingRight) };
+  },
+
+  /* Единица интерфейса. Считается от КОРОТКОЙ стороны: телефон в руке
+     держат одинаково и вертикально, и горизонтально, и кнопка под
+     большой палец не должна менять размер от поворота. Зажата с обеих
+     сторон, поэтому на 320-пиксельном экране ничего не вылезает, а на
+     мониторе ничего не превращается в точку. */
+  baseUnit(w, h) {
+    const shortSide = Math.min(w, h);
+    return Math.max(11.5, Math.min(27, shortSide / 25.5));
+  },
+
+  /* ЛОГИЧЕСКИЙ КАДР МИРА.
+
+     Правило простое: площадь кадра держим около эталонной, а форму
+     подгоняем под форму экрана. То есть на любом экране видно примерно
+     столько же мира, сколько задумано, — просто он другой формы. Это
+     важнее, чем «показать больше»: композиция комнат, места сцен и
+     границы, за которые игрок не должен заглядывать, рассчитаны на
+     определённый охват.
+
+     На больших экранах площадь растёт, но умеренно (до полутора раз по
+     площади): планшет и монитор показывают чуть больше мира, телефон —
+     ровно столько же, сколько раньше.                                */
+  viewFor(boxW, boxH) {
+    const AREA = 240 * 340;
+    const grow = Math.max(1, Math.min(1.45, Math.min(boxW, boxH) / 420));
+    const area = AREA * grow;
+    let a = boxW / Math.max(1, boxH);
+    a = Math.max(0.52, Math.min(2.15, a));
+    let h = Math.sqrt(area / a), w = a * h;
+    w = Math.max(208, Math.min(500, w));
+    h = Math.max(176, Math.min(440, h));
+    return { w: Math.round(w / 2) * 2, h: Math.round(h / 2) * 2 };
+  },
+
+  /* РАСКЛАДКА КАК ЧИСТЫЙ РАСЧЁТ.
+
+     Одна функция считает всё: единицу, режим, полосу управления, сцену
+     и набор CSS-переменных. Настоящий экран и живой предпросмотр в
+     настройках зовут её одинаково — просто с разными размерами. Поэтому
+     превью не может показать одно, а игра сделать другое: это буквально
+     один и тот же расчёт. */
+  layout(W, H, sa) {
+    const u = this.baseUnit(W - sa.l - sa.r, H - sa.t - sa.b);
+    const gap = Math.round(u * 0.85);
+    const ratio = H / W;
+    const mode = ratio >= 1.18 ? 'portrait' : (ratio >= 0.82 ? 'square' : 'landscape');
+
+    /* Полоса управления снизу — только там, где по вертикали есть что
+       делить. В горизонтальной ориентации её нет вовсе: кнопки ложатся
+       поверх мира по углам, а миру достаётся весь экран. */
+    const ctrl = u * 7.4 * UIScale.get('ui') * UIScale.get('move');
+    let band = 0;
+    if (mode === 'portrait') band = Math.min(H * 0.34, ctrl + gap * 2.2);
+    else if (mode === 'square') band = Math.min(H * 0.26, ctrl * 0.72 + gap * 1.6);
+    band = Math.round(band);
+
+    const stage = { x:sa.l, y:sa.t,
+                    w:Math.max(80, W - sa.l - sa.r),
+                    h:Math.max(80, H - sa.t - sa.b - band) };
+    const vars = {
+      '--u': u.toFixed(2) + 'px', '--gap': gap + 'px',
+      '--safe-t': sa.t + 'px', '--safe-b': sa.b + 'px',
+      '--safe-l': sa.l + 'px', '--safe-r': sa.r + 'px',
+    };
+    Object.assign(vars, Layout.vars({ w:W, h:H, unit:u, mode, band }, sa, gap));
+    return { u, gap, mode, band, stage, vars };
+  },
+
+  measure() {
+    const cont = document.getElementById('gameContainer');
+    const W = Math.max(1, cont.clientWidth), H = Math.max(1, cont.clientHeight);
+    const sa = this.safe();
+    const L = this.layout(W, H, sa);
+    this.w = W; this.h = H; this.unit = L.u; this.mode = L.mode;
+    this.band = L.band; this.stage = L.stage;
+    const root = document.documentElement.style;
+    for (const [k, v] of Object.entries(L.vars)) root.setProperty(k, v);
+    cont.dataset.mode = L.mode;
+    this.fitCanvas();
+  },
+
+  /* Канва: логический кадр под форму сцены, затем растяжение до сцены
+     целым или почти целым множителем. Соотношение сторон сохраняется —
+     мир никогда не растягивается по одной оси. */
+  fitCanvas() {
+    const c = Game.canvas; if (!c) return;
+    const box = this.stage;
+    const v = this.viewFor(box.w, box.h);
+    if (v.w !== CONFIG.VIEW_W || v.h !== CONFIG.VIEW_H) {
+      CONFIG.VIEW_W = v.w; CONFIG.VIEW_H = v.h;
+      World.invalidate();
+      Lighting.resize();
+    }
+    if (c.width !== v.w || c.height !== v.h) { c.width = v.w; c.height = v.h; }
+
+    let scale = Math.min(box.w / v.w, box.h / v.h);
+    /* Целый множитель даёт ровные пиксели. Если до целого меньше семи
+       процентов — округляем к нему, иначе оставляем дробный: лучше
+       чуть неровный пиксель, чем чёрные поля в треть экрана.
+       Округляем только ВНИЗ: округление вверх выносило канву за края
+       сцены — она вылезала за экран на отрицательные координаты. */
+    const near = Math.round(scale);
+    if (near >= 1 && near <= scale && (scale - near) / scale < 0.07) scale = near;
+
+    const cw = Math.round(v.w * scale), ch = Math.round(v.h * scale);
+    c.style.width  = cw + 'px';
+    c.style.height = ch + 'px';
+    c.style.left = Math.round(box.x + (box.w - cw) / 2) + 'px';
+    c.style.top  = Math.round(box.y + (box.h - ch) / 2) + 'px';
+    Game.scale = scale;
+    Game.canvasBox = { x: box.x + (box.w - cw) / 2, y: box.y + (box.h - ch) / 2, w: cw, h: ch };
+    if (Game.ctx) Game.ctx.imageSmoothingEnabled = false;
+    World.invalidate();
+    if (Game.running && gameState && Rooms[gameState.currentRoom]) { try { drawRoom(); } catch(e) {} }
+  },
+};
+
+/* =====================================================================
+   РАСКЛАДКА ИНТЕРФЕЙСА
+
+   Кнопки стоят не в пикселях, а по якорям: «столько-то от левого нижнего
+   угла безопасной зоны». Поэтому поворот экрана и смена размера окна их
+   не роняют за край и не сдвигают в другое место — угол остаётся углом.
+   Игрок может подвинуть их сам (Настройки отображения → расположение), и
+   сдвиг хранится долями свободного места, а не пикселями.            */
+const Layout = {
+  vars(S, sa, gap) {
+    const out = {};
+    const root = { setProperty(k, v) { out[k] = v; } };
+    const u = S.unit;
+    const move = u * 7.4 * UIScale.get('ui') * UIScale.get('move');
+    const act  = u * 5.2 * UIScale.get('ui') * UIScale.get('btn');
+    const top  = Math.max(34, u * 3.0 * UIScale.get('ui') * UIScale.get('top'));
+    const P = UIScale.pos;
+
+    /* Свободное место, по которому можно двигать кнопку, — от края
+       безопасной зоны до половины экрана. Дальше двигать некуда: кнопка
+       уедет под другую руку. */
+    const freeX = Math.max(0, S.w / 2 - move - gap - sa.l);
+    const freeY = Math.max(0, S.h / 2 - move - gap - sa.t);
+    root.setProperty('--dpad-l', Math.round(sa.l + gap + freeX * P.dpadX) + 'px');
+    root.setProperty('--dpad-b', Math.round(sa.b + gap + freeY * P.dpadY) + 'px');
+
+    const freeAX = Math.max(0, S.w / 2 - act - gap - sa.r);
+    const freeAY = Math.max(0, S.h / 2 - act - gap - sa.b);
+    root.setProperty('--act-r', Math.round(sa.r + gap + freeAX * P.actX) + 'px');
+    root.setProperty('--act-b', Math.round(sa.b + gap * 1.4 + freeAY * P.actY) + 'px');
+
+    root.setProperty('--top-t', Math.round(sa.t + gap * 0.55) + 'px');
+    root.setProperty('--top-r', Math.round(sa.r + gap * 0.55) + 'px');
+    root.setProperty('--hud-l', Math.round(sa.l + gap * 0.55) + 'px');
+    root.setProperty('--quest-t', Math.round(sa.t + gap * 0.55 + top * 0.92) + 'px');
+    root.setProperty('--toast-t', Math.round(sa.t + gap * 0.55 + top * 1.9) + 'px');
+
+    /* Ширина плашек. На узком экране — во всю ширину; на широком плашка
+       не растягивается на весь монитор: строка в полтора метра не
+       читается. Диалог держится у нижнего края сцены. */
+    const wide = Math.min(S.w - sa.l - sa.r - gap * 2, u * 44);
+    const side = Math.max(gap * 0.6, (S.w - sa.l - sa.r - wide) / 2 + sa.l);
+    root.setProperty('--dlg-l', Math.round(side) + 'px');
+    root.setProperty('--dlg-r', Math.round(side) + 'px');
+    root.setProperty('--dlg-max', 'none');
+
+    /* Диалог поднимается над полосой управления; в горизонтальной
+       ориентации, где полосы нет, — над кнопкой действия. */
+    const lift = S.mode === 'landscape'
+      ? sa.b + gap * 1.4 + Math.max(0, S.h / 2 - act - gap - sa.b) * P.actY + act * 0.35
+      : sa.b + S.band * 0.96;
+    root.setProperty('--dlg-b', Math.round(Math.min(lift, S.h * 0.55)) + 'px');
+
+    const hudMax = Math.round(Math.min(S.w * 0.52, u * 20));
+    root.setProperty('--hud-max', hudMax + 'px');
+    root.setProperty('--quest-max', Math.round(Math.min(S.w * 0.66, u * 26)) + 'px');
+    return out;
+  },
+};
+
+/* =====================================================================
+   МАСШТАБЫ ИНТЕРФЕЙСА, КОТОРЫМИ УПРАВЛЯЕТ ИГРОК
+
+   Шесть множителей и положения двух подвижных кнопок. Хранятся в общих
+   настройках игры, поэтому переживают перезапуск вместе с громкостью и
+   скоростью текста. Одни и те же значения питают и живой предпросмотр в
+   меню, и настоящий экран: разойтись они не могут.                   */
+const UIScale = {
+  DEF: { ui:1, move:1, btn:1, top:1, text:1, panel:1 },
+  DEFPOS: { dpadX:0, dpadY:0, actX:0, actY:0 },
+  val: { ui:1, move:1, btn:1, top:1, text:1, panel:1 },
+  pos: { dpadX:0, dpadY:0, actX:0, actY:0 },
+
+  get(k) { const v = this.val[k]; return (typeof v === 'number' && isFinite(v)) ? v : 1; },
+
+  /* Настройки отображения лежат в META, а не в сохранении игры: они про
+     экран, а не про сюжет, и должны работать из главного меню, до того
+     как игра вообще начата, и переживать сброс сохранения. */
+  load() {
+    const d = (META && META.display) || {};
+    for (const k of Object.keys(this.DEF))
+      this.val[k] = Math.max(0.6, Math.min(2.0, +d[k] || this.DEF[k]));
+    for (const k of Object.keys(this.DEFPOS)) {
+      const v = d[k];
+      this.pos[k] = (v === undefined || !isFinite(+v)) ? this.DEFPOS[k] : Math.max(0, Math.min(1, +v));
+    }
+    this.apply();
+  },
+  save() {
+    META.display = Object.assign({}, this.val, this.pos);
+    saveMeta();
+  },
+  set(k, v) {
+    if (k in this.val) this.val[k] = Math.max(0.6, Math.min(2.0, v));
+    else if (k in this.pos) this.pos[k] = Math.max(0, Math.min(1, v));
+    this.apply();
+  },
+  reset() {
+    Object.assign(this.val, this.DEF);
+    Object.assign(this.pos, this.DEFPOS);
+    this.apply(); this.save();
+  },
+  apply() {
+    const root = document.documentElement.style;
+    root.setProperty('--s-ui',    this.val.ui);
+    root.setProperty('--s-move',  this.val.move);
+    root.setProperty('--s-btn',   this.val.btn);
+    root.setProperty('--s-top',   this.val.top);
+    root.setProperty('--s-text',  this.val.text);
+    root.setProperty('--s-panel', this.val.panel);
+    if (Screen.w) Screen.measure();
+  },
+};
+
+function resizeCanvas() { Screen.measure(); }
+
+/* =====================================================================
+   НАСТРОЙКИ ОТОБРАЖЕНИЯ
+
+   Шесть ползунков и живой предпросмотр. Предпросмотр — не картинка: это
+   настоящий интерфейс, разложенный той же Screen.layout() на выбранном
+   размере экрана и уменьшенный transform-ом. Поэтому «в превью выглядит
+   правильно, а в игре иначе» здесь невозможно: расчёт один.
+
+   Ещё здесь можно подвинуть джойстик и кнопку действия пальцем или
+   мышью. Положение хранится долями свободного места, а не пикселями, —
+   поэтому переживает поворот экрана и переезд на другой монитор: угол
+   остаётся углом.                                                     */
+const Display = {
+  devices: [
+    { id:'phone',   name:'Телефон',  w:390,  h:844 },
+    { id:'tablet',  name:'Планшет',  w:768,  h:1024 },
+    { id:'desktop', name:'Монитор',  w:1440, h:900 },
+  ],
+  dev:'phone', land:false, moving:false, drag:null,
+
+  open() {
+    this.sync();
+    this.chips();
+    this.render();
+    UI.showScreen('displayPanel', true);
+    if (!this._wired) this.wire();
+    requestAnimationFrame(() => this.render());
+  },
+  close() {
+    this.setMoving(false);
+    UI.showScreen('settingsPanel', true);
+  },
+
+  /* Ползунки показывают то, что реально стоит. */
+  sync() {
+    const put = (id, num, v) => {
+      const s = document.getElementById(id), n = document.getElementById(num);
+      if (s) s.value = Math.round(v * 100);
+      if (n) n.textContent = Math.round(v * 100) + '%';
+    };
+    put('rngUi','numUi',UIScale.get('ui'));       put('rngMove','numMove',UIScale.get('move'));
+    put('rngBtn','numBtn',UIScale.get('btn'));    put('rngTop','numTop',UIScale.get('top'));
+    put('rngText','numText',UIScale.get('text')); put('rngPanel','numPanel',UIScale.get('panel'));
+  },
+
+  chips() {
+    const box = document.getElementById('dspDevices');
+    if (!box) return;
+    box.innerHTML = '';
+    const mk = (label, on, fn) => {
+      const b = document.createElement('button');
+      b.className = 'dspChip' + (on ? ' on' : '');
+      b.textContent = label;
+      b.addEventListener('click', () => { Audio.click(); fn(); this.chips(); this.render(); });
+      box.appendChild(b);
+    };
+    for (const d of this.devices) mk(d.name, this.dev === d.id, () => { this.dev = d.id; });
+    mk('вертикально', !this.land, () => { this.land = false; });
+    mk('горизонтально', this.land, () => { this.land = true; });
+  },
+
+  size() {
+    const d = this.devices.find(x => x.id === this.dev) || this.devices[0];
+    return this.land ? { w:Math.max(d.w, d.h), h:Math.min(d.w, d.h) }
+                     : { w:Math.min(d.w, d.h), h:Math.max(d.w, d.h) };
+  },
+
+  /* Отрисовка предпросмотра: тот же расчёт, что у настоящего экрана. */
+  render() {
+    const wrap = document.getElementById('dspStageWrap');
+    const scr = document.getElementById('dspScreen');
+    if (!wrap || !scr) return;
+    const S = this.size();
+    /* Безопасную зону в превью показываем условную: на телефоне сверху
+       вырез, снизу полоса жестов. Так видно, что кнопки под них не
+       уезжают. */
+    const sa = this.dev === 'phone'
+      ? (this.land ? { t:0, b:14, l:34, r:34 } : { t:34, b:18, l:0, r:0 })
+      : { t:0, b:0, l:0, r:0 };
+    const L = Screen.layout(S.w, S.h, sa);
+
+    scr.style.width = S.w + 'px';
+    scr.style.height = S.h + 'px';
+    for (const [k, v] of Object.entries(L.vars)) scr.style.setProperty(k, v);
+
+    /* Рамка: высота под форму устройства, но не выше трети экрана
+       настроек — ползунки должны остаться видны. */
+    const availW = Math.max(120, wrap.clientWidth || 260);
+    const availH = Math.max(120, Math.min(window.innerHeight * 0.34, availW * 1.25));
+    const k = Math.min(availW / S.w, availH / S.h);
+    wrap.style.height = Math.round(S.h * k) + 'px';
+    scr.style.transform = `translate(-50%, -50%) scale(${k.toFixed(4)})`;
+    this.scale = k;
+
+    /* Мир в превью: тот же кадр, что выбрал бы движок, залитый фоном
+       комнаты — чтобы было видно, сколько места остаётся игре. */
+    const c = document.getElementById('dspWorld');
+    const v = Screen.viewFor(L.stage.w, L.stage.h);
+    const sc = Math.min(L.stage.w / v.w, L.stage.h / v.h);
+    c.width = v.w; c.height = v.h;
+    c.style.width = Math.round(v.w * sc) + 'px';
+    c.style.height = Math.round(v.h * sc) + 'px';
+    c.style.left = Math.round(L.stage.x + (L.stage.w - v.w * sc) / 2) + 'px';
+    c.style.top  = Math.round(L.stage.y + (L.stage.h - v.h * sc) / 2) + 'px';
+    this.paintWorld(c);
+  },
+
+  /* Условная комната: пол, стена, Ная посередине. Нужна не красота, а
+     чувство масштаба — сколько мира остаётся под интерфейсом. */
+  paintWorld(c) {
+    const g = c.getContext('2d');
+    const W = c.width, H = c.height;
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#6f5a44'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#5f4c38';
+    for (let y = 0; y < H; y += 13) g.fillRect(0, y, W, 1);
+    g.fillStyle = '#4a3f47'; g.fillRect(0, 0, W, Math.round(H * 0.16));
+    g.fillStyle = '#3d343b'; g.fillRect(0, Math.round(H * 0.16) - 3, W, 3);
+    g.fillStyle = 'rgba(255,240,200,.07)';
+    g.beginPath(); g.moveTo(W * .25, H * .16); g.lineTo(W * .62, H * .16);
+    g.lineTo(W * .78, H); g.lineTo(W * .10, H); g.closePath(); g.fill();
+    const img = (typeof Assets !== 'undefined' && Assets.images) ? Assets.images.naya : null;
+    if (img) g.drawImage(img, Math.round(W / 2 - img.width / 2), Math.round(H * 0.52));
+    else { g.fillStyle = '#c0304d'; g.fillRect(W / 2 - 5, H * 0.52, 10, 16); }
+  },
+
+  setMoving(on) {
+    this.moving = !!on;
+    const scr = document.getElementById('dspScreen');
+    if (scr) scr.classList.toggle('moving', this.moving);
+    const b = document.getElementById('btnDspMove');
+    if (b) b.textContent = this.moving ? 'ГОТОВО — РАСПОЛОЖЕНИЕ' : 'НАСТРОИТЬ РАСПОЛОЖЕНИЕ';
+    const h = document.getElementById('dspHint');
+    if (h) h.textContent = this.moving
+      ? 'Тяните джойстик и кнопку действия. За пунктирную рамку — нельзя: там системные панели.'
+      : 'Всё, что вы меняете, сразу видно в предпросмотре и сразу применяется в игре.';
+  },
+
+  wire() {
+    this._wired = true;
+    const bind = (id, key, num) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const onInput = () => {
+        const v = (+el.value) / 100;
+        document.getElementById(num).textContent = Math.round(v * 100) + '%';
+        UIScale.set(key, v);        // сразу в игре
+        this.render();              // и сразу в превью
+      };
+      el.addEventListener('input', onInput);
+      el.addEventListener('change', () => { onInput(); UIScale.save(); });
+    };
+    bind('rngUi','ui','numUi');       bind('rngMove','move','numMove');
+    bind('rngBtn','btn','numBtn');    bind('rngTop','top','numTop');
+    bind('rngText','text','numText'); bind('rngPanel','panel','numPanel');
+
+    /* Перетаскивание. Координата переводится в долю свободного места,
+       поэтому не зависит ни от размера превью, ни от размера экрана. */
+    const scr = document.getElementById('dspScreen');
+    const pick = (e) => {
+      if (!this.moving) return null;
+      const t = e.target.closest('[data-move]');
+      return t ? t.dataset.move : null;
+    };
+    const toLocal = (e) => {
+      const r = scr.getBoundingClientRect();
+      const k = this.scale || 1;
+      return { x:(e.clientX - r.left) / k, y:(e.clientY - r.top) / k };
+    };
+    scr.addEventListener('pointerdown', (e) => {
+      const which = pick(e);
+      if (!which) return;
+      e.preventDefault();
+      this.drag = which;
+      try { scr.setPointerCapture(e.pointerId); } catch(err) {}
+    });
+    scr.addEventListener('pointermove', (e) => {
+      if (!this.drag) return;
+      e.preventDefault();
+      const S = this.size(), p = toLocal(e);
+      const cs = getComputedStyle(scr);
+      const num = n => parseFloat(cs.getPropertyValue(n)) || 0;
+      const gap = num('--gap');
+      const sl = num('--safe-l'), sr = num('--safe-r'), sb = num('--safe-b'), st = num('--safe-t');
+      if (this.drag === 'dpad') {
+        const size = num('--move-size');
+        const freeX = Math.max(1, S.w / 2 - size - gap - sl);
+        const freeY = Math.max(1, S.h / 2 - size - gap - st);
+        const wantL = p.x - size / 2 - sl - gap;
+        const wantB = (S.h - p.y) - size / 2 - sb - gap;
+        UIScale.set('dpadX', wantL / freeX);
+        UIScale.set('dpadY', wantB / freeY);
+      } else {
+        const size = num('--act-size');
+        const freeX = Math.max(1, S.w / 2 - size - gap - sr);
+        const freeY = Math.max(1, S.h / 2 - size - gap - sb);
+        const wantR = (S.w - p.x) - size / 2 - sr - gap;
+        const wantB = (S.h - p.y) - size / 2 - sb - gap * 1.4;
+        UIScale.set('actX', wantR / freeX);
+        UIScale.set('actY', wantB / freeY);
+      }
+      this.render();
+    });
+    const drop = () => { if (this.drag) { this.drag = null; UIScale.save(); } };
+    scr.addEventListener('pointerup', drop);
+    scr.addEventListener('pointercancel', drop);
+
+    const wireBtn = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', () => { Audio.resume(); Audio.click(); fn(); });
+    };
+    wireBtn('btnDspMove', () => this.setMoving(!this.moving));
+    wireBtn('btnDspReset', () => {
+      if (!confirm('Вернуть размеры и расположение к стандартным?')) return;
+      UIScale.reset(); this.sync(); this.render();
+    });
+    wireBtn('btnDspDone', () => { UIScale.save(); this.close(); });
+    window.addEventListener('resize', () => {
+      if (document.getElementById('displayPanel').classList.contains('show')) this.render();
+    });
+  },
+};
 
 function drawRoom() {
   const ctx = Game.ctx;
@@ -24537,14 +25300,20 @@ window.addEventListener('load', () => {
   Game.canvas = document.getElementById('gameCanvas');
   Game.ctx = Game.canvas.getContext('2d');
   Game.ctx.imageSmoothingEnabled = false;
+  loadMeta();
+  UIScale.load();                 // масштабы нужны до первого расчёта экрана
   resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
-  window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
+  /* Пересчёт на всё, что меняет размер: поворот, изменение окна, выезд
+     адресной строки на телефоне (visualViewport), возврат из фона. */
+  const relayout = () => resizeCanvas();
+  window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', () => { relayout(); setTimeout(relayout, 250); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', relayout);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) relayout(); });
 
   Audio.init();
   Assets.build();
   Input.init();
-  loadMeta();
 
   // restore settings shown on the title screen from the last save
   const prev = loadGame();
@@ -24595,6 +25364,7 @@ window.addEventListener('load', () => {
   wire('btnBackEndings', () => UI.showScreen('endingsScreen', false));
   wire('btnBackStatus', () => UI.showScreen('statusScreen', false));
 
+  wire('btnDisplay', () => Display.open());
   wire('btnReset', () => {
     if (confirm('Удалить сохранение?')) {
       try { localStorage.removeItem(CONFIG.SAVE_KEY); localStorage.removeItem(CONFIG.CHECKPOINT_KEY); } catch(e) {}
