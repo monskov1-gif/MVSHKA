@@ -5397,6 +5397,59 @@ const Music = {
        идёт расследование, и здание звучит «Кампанеллой». */
     uni(){ return C('uniDay') >= 2 ? 'uniBell' : 'uni'; },
   },
+  /* ---------- СЛЫШНО ИЗ-ЗА ДВЕРИ ----------
+
+     Обычно музыка принадлежит комнате целиком: вошёл — играет, вышел —
+     сменилась. В восточном крыле это неверно. За одной из дверей живые
+     люди репетируют к концерту, и по коридору их слышно тем лучше, чем
+     ближе подойти, — это единственная музыка в игре, у которой есть
+     источник в конкретной точке, а не «настроение этажа».
+
+     Комната объявляет nearMusic:{x, y, r, track}. Пока игрок внутри
+     радиуса, тема коридора подменяется темой из-за двери, а общий гейн
+     ведётся по расстоянию. Порог на выход шире порога на вход: без
+     этого тема дёргалась бы туда-сюда, стоит постоять ровно на границе.
+
+     Когда источника нет или игрок ушёл, гейн возвращается к единице —
+     иначе следующая комната заиграет приглушённой.                   */
+  NEAR: null, nearGain: 1,
+  setNearGain(v) {
+    v = Math.max(0, Math.min(1, v));
+    if (Math.abs(v - this.nearGain) < 0.01) return;
+    this.nearGain = v;
+    if (!this.master || !Audio.ctx) return;
+    const t = Audio.ctx.currentTime;
+    try { this.master.gain.cancelScheduledValues(t);
+          this.master.gain.setValueAtTime(this.master.gain.value, t);
+          this.master.gain.linearRampToValueAtTime(Math.max(0.0001, v), t + 0.35); } catch(e){}
+  },
+  updateNear(room, px, py) {
+    const src = room && room.nearMusic;
+    if (!src) {
+      if (this.NEAR) { this.NEAR = null; this.setNearGain(1); this.forRoom(room ? (room.music || 'home') : 'home'); }
+      else this.setNearGain(1);
+      return;
+    }
+    /* В трауре вся музыка подменяется «Печалью». Вести её громкость по
+       расстоянию до чужой двери нельзя: получится, что горе то громче,
+       то тише, смотря где стоит игрок. */
+    if (this.mourning()) {
+      if (this.NEAR) { this.NEAR = null; this.setNearGain(1); this.forRoom(room.music || 'home'); }
+      else this.setNearGain(1);
+      return;
+    }
+    const d = Math.hypot(px - src.x, py - src.y);
+    const inside = this.NEAR ? d < src.r * 1.25 : d < src.r;
+    if (inside) {
+      if (this.NEAR !== src) { this.NEAR = src; this.play(src.track, this.layerFor(src.track)); }
+      /* Вплотную к двери — в полную громкость, на краю радиуса — еле
+         слышно; ближе половины радиуса уже не прибавляем. */
+      const k = 1 - Math.max(0, Math.min(1, (d - src.r * 0.35) / (src.r * 0.9)));
+      this.setNearGain(0.12 + k * 0.88);
+    } else if (this.NEAR) {
+      this.NEAR = null; this.setNearGain(1); this.forRoom(room.music || 'home');
+    }
+  },
   /* Точка входа для комнат: тема берётся из комнаты, вариант — из погоды,
      уровень — из сюжета. */
   forRoom(theme) {
@@ -7891,6 +7944,46 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillStyle = '#c9a05a'; g.fillRect(6, 22, 42, 1);        // латунный кант
     g.fillStyle = '#241f28';                                   // три ножки
     g.fillRect(6, 32, 3, 4); g.fillRect(26, 32, 3, 4); g.fillRect(45, 32, 3, 4);
+  });
+  /* ---- музыкальный зал: то, на чём и с чего играют ---- */
+  D('music_stand', {w:14,h:26,ax:7,ay:25,foot:{x:-5,y:-6,w:10,h:7}}, g => {
+    shadowEllipse(g, 7, 25, 5, 2, .22);
+    g.fillStyle = '#3a3a42'; g.fillRect(6, 9, 2, 14);            // штанга
+    g.fillStyle = '#2e2e36';                                      // тренога
+    g.fillRect(2, 22, 4, 2); g.fillRect(8, 22, 4, 2); g.fillRect(6, 23, 2, 2);
+    g.fillStyle = '#43434e';                                      // пюпитр наклонён к музыканту
+    g.beginPath(); g.moveTo(1, 4); g.lineTo(13, 2); g.lineTo(13, 9); g.lineTo(1, 11); g.closePath(); g.fill();
+    g.fillStyle = '#e6e0cc';                                      // ноты на нём
+    g.beginPath(); g.moveTo(3, 5); g.lineTo(11, 3.6); g.lineTo(11, 8); g.lineTo(3, 9.4); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(60,56,50,.55)';
+    for (let i=0;i<4;i++) g.fillRect(4, 5.6+i*1.1, 6, 0.5);
+  });
+  D('double_bass', {w:20,h:46,ax:10,ay:44,foot:{x:-8,y:-8,w:16,h:9}}, g => {
+    shadowEllipse(g, 10, 44, 8, 3, .26);
+    g.fillStyle = '#6b3f22';                                      // корпус: две доли
+    g.beginPath(); g.ellipse(10, 34, 9, 10, 0, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.ellipse(10, 24, 7, 8, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#7d4d2c';
+    g.beginPath(); g.ellipse(9, 33, 6, 7, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#3a2416'; g.fillRect(9, 6, 2, 16);             // гриф
+    g.fillStyle = '#2c1a10'; g.fillRect(7, 2, 6, 6);              // завиток
+    g.fillStyle = '#c9a05a'; g.fillRect(8, 3, 1, 1); g.fillRect(11, 4, 1, 1);
+    g.fillStyle = '#d8ccb0';                                      // струны
+    for (let i=0;i<4;i++) g.fillRect(8+i, 8, 0.4, 30);
+    g.fillStyle = '#2a1a12'; g.fillRect(6, 30, 8, 1.5);           // подставка
+    g.fillStyle = '#3a3a42'; g.fillRect(9, 42, 2, 4);             // шпиль
+  });
+  D('timpani', {w:26,h:24,ax:13,ay:22,foot:{x:-12,y:-9,w:24,h:11}}, g => {
+    shadowEllipse(g, 13, 22, 11, 3, .28);
+    g.fillStyle = '#8a6a30';                                      // медный котёл
+    g.beginPath(); g.moveTo(3, 8); g.lineTo(23, 8); g.lineTo(19, 19); g.lineTo(7, 19); g.closePath(); g.fill();
+    g.fillStyle = '#a07e3c';
+    g.beginPath(); g.moveTo(4, 9); g.lineTo(12, 9); g.lineTo(10, 18); g.lineTo(6, 18); g.closePath(); g.fill();
+    g.fillStyle = '#ddd2bc'; g.beginPath(); g.ellipse(13, 8, 10, 3.4, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#c8bda6'; g.beginPath(); g.ellipse(13, 7.4, 9, 2.8, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#5a4a28'; g.fillRect(2, 7, 22, 1.5);           // обруч
+    g.fillStyle = '#3a3a42';                                      // ноги
+    g.fillRect(5, 19, 2, 4); g.fillRect(19, 19, 2, 4); g.fillRect(12, 20, 2, 3);
   });
   D('mask_pair', {w:24,h:18,ax:12,ay:9,foot:null, wall:true}, g => {
     g.fillStyle = '#d8cfae'; g.beginPath(); g.ellipse(7, 9, 6, 8, 0, 0, Math.PI*2); g.fill();
@@ -16124,6 +16217,11 @@ uniWestHall: {
    расписания, и тихо так, как в театральном не бывает никогда.      */
 uniEastHall: {
   name:"Университет. Восточное крыло", music:'uni', w:260, h:740,
+  /* За дверью «МУЗЫКАЛЬНАЯ» репетируют, и это слышно с середины
+     коридора: тема зала подменяет тему крыла и растёт по мере
+     приближения. Единственный источник звука в игре, у которого есть
+     точка, а не комната. */
+  nearMusic:{ x:172, y:UNI_E1_RIGHT.mid('music'), r:170, track:'uniMusic' },
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.05, wind:0 },
   light:{ tint:'#1d150f', dark:.24 },
   lights:[
@@ -17135,58 +17233,153 @@ uniAud14: {
   npcs: [],
 },
 
-/* ---------------------------------------------------------------- */
-/* МУЗЫКАЛЬНАЯ АУДИТОРИЯ. Сюжету не нужна — нужна зданию.            */
+/* МУЗЫКАЛЬНЫЙ ЗАЛ. Единственное место в игре, где музыку играют люди.
+
+   Раньше здесь стояли рояль и три стула — «аудитория, которая нужна не
+   сюжету, а зданию». Но это творческий вуз, и главное доказательство
+   этому должно быть слышно и видно: квинтет репетирует к концерту,
+   вокруг занимаются свои, а тему зала слышно ещё из коридора — тем
+   лучше, чем ближе подойти (см. nearMusic в восточном крыле).        */
 uniMusicRoom: {
-  name:"Университет. Музыкальная аудитория", music:'uni', w:240, h:220,
+  name:"Университет. Музыкальный зал", music:'uniMusic', w:360, h:280,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
-  light:{ tint:'#1c1a20', dark:.26 },
-  lights:[{x:120,y:96,r:58,c:'#ffdca0',i:.42}],
+  light:{ tint:'#1c1a20', dark:.22 },
+  lights:[
+    {x:120,y:104,r:66,c:'#ffdca0',i:.42},{x:256,y:104,r:62,c:'#ffdca0',i:.38},
+    {x:186,y:212,r:54,c:'#ffd898',i:.28},
+  ],
   bgPaint(ctx) {
-    paintRoom(ctx, 240, 220, {
-      autoWindows:true, count:2,
+    paintRoom(ctx, 360, 280, {
+      autoWindows:true, count:3,
       uniAtmosphere:true,
-      wall:'#544a48', wall2:'#463d3c', floor:'#7f6a52', floor2:'#6d5943', wallH:54,
-      left:{ door:[100, 46] }, label:'МУЗЫКАЛЬНАЯ', labelAt:[64, 212],
+      wall:'#544a48', wall2:'#463d3c', floor:'#7f6a52', floor2:'#6d5943', wallH:58,
+      left:{ door:[104, 46] }, label:'МУЗЫКАЛЬНЫЙ ЗАЛ', labelAt:[74, 272],
     });
-    /* Нотный стан на стене — строго в простенке между окнами (они стоят
-       на 20..84 и 156..220). Раньше он шёл от 96 до 212 и последние две
-       ноты висели прямо на стекле правого окна. */
+    /* Нотный стан на стене — строго в простенке между окнами. */
     ctx.fillStyle = 'rgba(210,190,150,.16)';
-    for (let i = 0; i < 5; i++) ctx.fillRect(90, 13 + i * 5, 60, 1);
+    for (let i = 0; i < 5; i++) ctx.fillRect(132, 14 + i * 5, 72, 1);
     ctx.fillStyle = 'rgba(230,214,180,.42)';
-    [[100,18],[114,28],[128,23],[142,33]].forEach(([x,y]) => {
+    [[142,19],[158,30],[174,24],[192,35]].forEach(([x,y]) => {
       ctx.beginPath(); ctx.ellipse(x, y, 2.6, 2, -0.3, 0, 6.3); ctx.fill();
       ctx.fillRect(x + 2, y - 8, 1, 8);
     });
+    /* Паркет у сцены протёрт: здесь стоят каждый день. */
+    ctx.fillStyle = 'rgba(120,98,70,.20)';
+    ctx.beginPath(); ctx.ellipse(196, 150, 84, 40, 0, 0, Math.PI*2); ctx.fill();
   },
   objects: [
-    { t:'piano', x:70, y:110 },
-    { t:'chair_wood', x:130, y:130 }, { t:'chair_wood', x:158, y:134 },
-    { t:'chair_wood', x:186, y:130 },
-    { t:'stool', x:70, y:140 },
-    { t:'bookshelf', x:206, y:98 },
-    { t:'bin', x:216, y:196 }, { t:'plant_pot', x:40, y:196 },
+    { t:'piano', x:78, y:132 }, { t:'stool', x:78, y:160 },
+    /* Полукруг квинтета — только пюпитры: медные духовые играют стоя,
+       и стул под каждым всё равно скрывался за спиной музыканта. */
+    { t:'music_stand', x:150, y:166 },
+    { t:'music_stand', x:186, y:158 },
+    { t:'music_stand', x:222, y:158 },
+    { t:'music_stand', x:254, y:170 },
+    { t:'music_stand', x:200, y:200 },
+    /* Ряд для тех, кто ждёт своей очереди. */
+    { t:'chair_wood', x:66, y:238 }, { t:'chair_wood', x:96, y:238 },
+    { t:'chair_wood', x:126, y:238 }, { t:'chair_wood', x:156, y:238 },
+    { t:'double_bass', x:318, y:126 }, { t:'timpani', x:306, y:196 },
+    { t:'bookshelf', x:288, y:74 }, { t:'radiator', x:40, y:74 },
+    { t:'bin', x:336, y:252 }, { t:'plant_pot', x:40, y:252 },
+    { t:'book_stack', x:110, y:196 },
   ],
   walls: [
-    {x:0,y:0,w:240,h:54},{x:0,y:54,w:22,h:46},{x:0,y:146,w:22,h:74},
-    {x:218,y:0,w:22,h:220},{x:0,y:214,w:240,h:6},
+    {x:0,y:0,w:360,h:58},{x:0,y:58,w:22,h:44},{x:0,y:150,w:22,h:130},
+    {x:338,y:0,w:22,h:280},{x:0,y:274,w:360,h:6},
   ],
   interactables: [
-    { x:6,y:102,w:44,h:44, name:'exit', prompt:'В коридор',
+    { x:6,y:104,w:44,h:46, name:'exit', prompt:'В коридор',
       action: async ()=> await changeRoom('uniEastHall', 142, UNI_E1_RIGHT.mid('music') + 6) },
-    { x:48,y:86,w:48,h:38, name:'grandPiano', prompt:'Рояль', action(){
+    { x:52,y:108,w:52,h:40, name:'grandPiano', prompt:'Рояль', action(){
         Audio.beep(523,.35,'sine',.10); setTimeout(()=>Audio.beep(392,.45,'sine',.08),240);
         Dialogue.start([
           {who:'naya',expr:'normal',text:'Рояль. Крышка поднята, на пюпитре чьи-то ноты с карандашными пометками.'},
           {who:'naya',expr:'smile',text:'(Я нажимаю одну клавишу. Звук держится дольше, чем я ожидала.)'},
         ]);
       }},
-    { x:126,y:108,w:80,h:34, name:'musicChairs', prompt:'Стулья и пюпитры', action(){
-        Dialogue.start([{who:'naya',expr:'normal',text:'Полукруг стульев и три пюпитра. На одном забыли футляр от кларнета — пустой.'}]);
+    { x:140,y:130,w:130,h:60, name:'musicChairs', prompt:'Пюпитры', action(){
+        if (C('uniDay') >= 3) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'На пюпитрах одни и те же ноты, исчёрканные карандашом до серого.'},
+          {who:'naya',expr:'sad',text:'(Концерт в субботу. У них в жизни есть суббота, к которой они готовятся.)'},
+        ]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Пять пюпитров полукругом. На верхнем листе крупно: «СТ. ЛУИС — с цифры 2».'},
+        ]);
+      }},
+    { x:302,y:96,w:36,h:44, name:'bass', prompt:'Контрабас', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Контрабас прислонён к стене и накрыт чехлом до половины.'},
+          {who:'naya',expr:'smile',text:'(Он выше меня. Интересно, его носят вдвоём или это отдельный талант.)'},
+        ]);
+      }},
+    { x:290,y:168,w:40,h:40, name:'timp', prompt:'Литавра', action(){
+        Audio.beep(98,.30,'sine',.12);
+        Dialogue.start([{who:'naya',expr:'normal',text:'Литавра. Я задеваю её локтем, и весь зал на секунду оборачивается.'}]);
+      }},
+    { x:270,y:52,w:44,h:34, name:'scores', prompt:'Шкаф с нотами', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Партитуры по папкам, на корешках фамилии. Половина — рукописные.'},
+          {who:'naya',expr:'normal',text:'(Кто-то здесь пишет музыку сам. Просто так, между парами.)'},
+        ]);
       }},
   ],
-  npcs: [],
+  /* Квинтет репетирует St. Louis Blues — ту самую тему, которая в этом
+     зале и играет. Состав ровно тот, что в партитуре: две трубы,
+     валторна, тромбон и туба. */
+  npcs: [
+    { x:168, y:100, sprite:'professor', name:'Руководитель',
+      dialogue:()=> {
+        const day = Math.max(1, C('uniDay'));
+        if (day >= 4) return Dialogue.start([
+          {who:'professor',expr:'normal',name:'Руководитель',text:'Всё, больше не репетируем. Что не выучили — сыграем как получится, зато вместе.'},
+        ]);
+        if (day === 3) return Dialogue.start([
+          {who:'professor',expr:'normal',name:'Руководитель',text:'Труба, ты опять спешишь на четвёртой. Не спеши. Блюз не догоняют, в нём идут.'},
+          {who:'naya',expr:'normal',text:'(Он говорит это в пятый раз и в пятый раз без раздражения.)'},
+        ]);
+        return Dialogue.start([
+          {who:'professor',expr:'normal',name:'Руководитель',text:'Мы готовим концерт. Если хотите послушать — садитесь, только с краю.'},
+          {who:'naya',expr:'normal',text:'Я на минуту.'},
+          {who:'professor',expr:'normal',name:'Руководитель',text:'Все так говорят. Половина остаётся до конца.'},
+        ]);
+      }},
+    { x:150, y:132, sprite:'studentB', name:'Трубач',
+      dialogue:()=> Dialogue.start([
+        {who:'studentB',expr:'normal',name:'Трубач',text:'Первая труба. Это значит, что если я ошибусь, ошибку услышат все.'},
+        {who:'studentB',expr:'normal',name:'Трубач',text:'Зато если не ошибусь — тоже.'},
+      ]) },
+    { x:186, y:124, sprite:'studentC', name:'Вторая труба',
+      dialogue:()=> Dialogue.start([
+        {who:'studentC',expr:'normal',name:'Вторая труба',text:'Я играю то, что под мелодией. Без этого она висит в воздухе.'},
+      ]) },
+    { x:222, y:124, sprite:'studentD', name:'Валторнистка',
+      dialogue:()=> Dialogue.start([
+        {who:'studentD',expr:'normal',name:'Валторнистка',text:'Валторна. Рука внутри раструба, и от того, как её держишь, зависит нота.'},
+        {who:'naya',expr:'smile',text:'(Инструмент, в который надо засунуть руку, чтобы он зазвучал. Мне это откуда-то знакомо.)'},
+      ]) },
+    { x:254, y:136, sprite:'student', name:'Тромбонист',
+      dialogue:()=> Dialogue.start([
+        {who:'student',expr:'normal',name:'Тромбонист',text:'Кулиса. Никаких клапанов — ухо и рука, больше ничего.'},
+      ]) },
+    { x:200, y:168, sprite:'techie', name:'Тубист',
+      dialogue:()=> Dialogue.start([
+        {who:'techie',expr:'normal',name:'Тубист',text:'Меня не слышно, пока я есть. Слышно, когда меня нет.'},
+        {who:'naya',expr:'empty',text:'(...)'},
+      ]) },
+    /* Занимаются сами по себе — вуз не сводится к одному ансамблю. */
+    /* Ходит по свободному правому углу: в ряду стульев её то и дело
+       закрывало спинкой. */
+    { x:250, y:232, sprite:'customer', name:'Студентка с папкой', speed:0.3,
+      path:[[250,232],[290,232],[290,254],[250,254]],
+      dialogue:()=> Dialogue.start([
+        {who:'customer',expr:'normal',name:'Студентка',text:'Сольфеджио. Я хожу и пою про себя, иначе не запоминается.'},
+      ]) },
+    { x:62, y:196, sprite:'neighbor', name:'Студент у стены',
+      dialogue:()=> Dialogue.start([
+        {who:'neighbor',expr:'normal',name:'Студент',text:'Жду рояль. Он тут один на весь этаж, и очередь расписана до вечера.'},
+      ]) },
+  ],
 },
 
 /* ---------------------------------------------------------------- */
@@ -25168,6 +25361,7 @@ function tick(t) {
     FX.update(dt);
     const room = Rooms[gameState.currentRoom];
     if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true); Cam.update(dt);
+                 Music.updateNear(room, Player.x, Player.y);
                  Prologue.updateSwing(dt); Prologue.updateLegend(dt); }
     drawRoom();
   }
