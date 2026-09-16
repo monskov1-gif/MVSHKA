@@ -105,6 +105,9 @@ const snap = page => page.evaluate(() => ({
 }));
 
 async function step(page, kind, name, picks, tag) {
+  /* STEPLOG=1 печатает каждый шаг: когда прогон встаёт, из лога должно
+     быть видно, на чём именно, а не только то, что он встал. */
+  if (process.env.STEPLOG) process.stdout.write(`    · ${tag}:${name}\n`);
   const r = kind === 'obj' ? await useObj(page, name) : await useNpc(page, name);
   if (r !== 'ok') throw new Error(`${tag}: ${r}`);
   await page.waitForTimeout(120);
