@@ -171,26 +171,34 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   if (await p.evaluate(() => !!Music.timer || !!Music.cur)) bad.push('стоп не сбрасывает');
   await p.keyboard.press('Escape'); await p.waitForTimeout(250);
 
-  /* 2b. Погодные варианты зоны: улица под дождём — другая тема. */
+  /* 2b. Варианты зоны. Улицу переключает погода, университет — день
+     расследования: со второго вместо прелюдии звучит «Кампанелла».
+     Общее правило одно — вариант обязан отдавать существующую тему и
+     обязан на что-то реагировать, иначе он просто мёртвый код. */
   const vari = await p.evaluate(() => {
-    const out = {};
-    for (const zone of Object.keys(Music.VARIANT)) {
-      Weather.cur.rain = 0.15; const dry = Music.VARIANT[zone]();
-      Weather.cur.rain = 0.80; const wet = Music.VARIANT[zone]();
-      out[zone] = [dry, wet];
-    }
+    const out = { zones:{}, all:[] };
+    Weather.cur.rain = 0.15; const C0 = gameState.counters.uniDay; gameState.counters.uniDay = 1;
+    out.zones.streetDry = Music.VARIANT.street();
+    out.zones.uniDay1   = Music.VARIANT.uni();
+    Weather.cur.rain = 0.80;
+    out.zones.streetWet = Music.VARIANT.street();
+    gameState.counters.uniDay = 2;
+    out.zones.uniDay2   = Music.VARIANT.uni();
+    gameState.counters.uniDay = C0;
+    out.all = Object.values(out.zones);
     Music.cur = null; Weather.cur.rain = 0.80; Music.forRoom('street');
     out.play = Music.cur;
     return out;
   });
-  console.log('варианты по погоде:', JSON.stringify(vari));
-  for (const zone of Object.keys(vari)) {
-    if (zone === 'play') continue;
-    const [dry, wet] = vari[zone];
-    if (dry === wet) bad.push('зона ' + zone + ': дождь ничего не меняет (' + dry + ')');
-    for (const k of [dry, wet])
-      if (!tracks.some(t => t.key === k)) bad.push('вариант ' + k + ' зоны ' + zone + ' — не тема');
-  }
+  console.log('варианты зон:', JSON.stringify(vari.zones), '· forRoom в дождь:', vari.play);
+  if (vari.zones.streetDry === vari.zones.streetWet)
+    bad.push('улица: дождь ничего не меняет (' + vari.zones.streetDry + ')');
+  if (vari.zones.uniDay1 === vari.zones.uniDay2)
+    bad.push('университет: второй день ничего не меняет (' + vari.zones.uniDay1 + ')');
+  if (vari.zones.uniDay2 !== 'uniBell')
+    bad.push('со второго дня ждали uniBell, а не ' + vari.zones.uniDay2);
+  for (const k of vari.all)
+    if (!tracks.some(t => t.key === k)) bad.push('вариант ' + k + ' — не тема');
   if (vari.play !== 'streetRain')
     bad.push('forRoom в дождь включил ' + vari.play + ', а не streetRain');
   await p.evaluate(() => { Music.stop(); });
