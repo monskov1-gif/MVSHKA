@@ -8326,30 +8326,41 @@ const Lighting = {
     const t = Date.now() / 2600;
     const tilt = p.tilt || .2;
     const x = p.x - camX + Math.sin(t) * 5, y = p.y - camY;
-    const half = p.w / 2, spread = Math.max(2, half + p.len * Math.abs(tilt));
+    /* Солнце далеко, поэтому пучок из окна ПАРАЛЛЕЛЬНЫЙ: наклон уводит
+       пятно вбок, но не делает его шире. Раньше наклон прибавлялся к
+       полуширине, и окно в 34 пикселя давало на полу пятно под двести —
+       комната выглядела так, будто в окно светят прожектором.
+       Небольшое расширение оставлено: это полутень от края откоса. */
+    const half = p.w / 2;
+    const halfEnd = half * 1.18 + 1;
+    const dx = p.len * tilt;                       // смещение низа вбок
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const grad = ctx.createLinearGradient(x, y, x + p.len * tilt * .5, y + p.len);
-    grad.addColorStop(0, `rgba(255,238,196,${(a*1.25).toFixed(3)})`);
-    grad.addColorStop(.55, `rgba(255,226,170,${(a*.5).toFixed(3)})`);
+    const grad = ctx.createLinearGradient(x, y, x + dx, y + p.len);
+    /* Клин стал уже, поэтому у самого проёма он ярче: света столько же,
+       просто он больше не размазан по половине комнаты. */
+    grad.addColorStop(0, `rgba(255,238,196,${(a*1.70).toFixed(3)})`);
+    grad.addColorStop(.55, `rgba(255,226,170,${(a*.68).toFixed(3)})`);
     grad.addColorStop(1, 'rgba(255,220,160,0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(x - half, y); ctx.lineTo(x + half, y);
-    ctx.lineTo(x + spread, y + p.len); ctx.lineTo(x - spread + p.len*tilt, y + p.len);
+    ctx.lineTo(x + dx + halfEnd, y + p.len); ctx.lineTo(x + dx - halfEnd, y + p.len);
     ctx.closePath(); ctx.fill();
-    const px = x + p.len * tilt * .5, py = y + p.len;
-    const pool = ctx.createRadialGradient(px, py, 0, px, py, spread);
-    pool.addColorStop(0, `rgba(255,232,180,${(a*.7).toFixed(3)})`);
+    const px = x + dx, py = y + p.len;
+    const pool = ctx.createRadialGradient(px, py, 0, px, py, halfEnd);
+    pool.addColorStop(0, `rgba(255,232,180,${(a*.95).toFixed(3)})`);
     pool.addColorStop(1, 'rgba(255,232,180,0)');
     ctx.fillStyle = pool;
-    ctx.beginPath(); ctx.ellipse(px, py, spread, spread*.28, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(px, py, halfEnd, halfEnd*.34, 0, 0, Math.PI*2); ctx.fill();
+    /* Пылинки летят внутри пучка, поэтому и сносятся вместе с ним. */
     for (let i = 0; i < 9; i++) {
       const ph = t * 2 + i * 1.7;
       const dy = (ph * 14) % p.len;
-      const dx = Math.sin(ph) * (half * .8);
-      ctx.fillStyle = `rgba(255,244,214,${(a * 2.2 * (1 - dy/p.len)).toFixed(3)})`;
-      ctx.fillRect(Math.round(x + dx), Math.round(y + dy), 1, 1);
+      const k = dy / p.len;
+      const jx = Math.sin(ph) * (half * .8);
+      ctx.fillStyle = `rgba(255,244,214,${(a * 2.2 * (1 - k)).toFixed(3)})`;
+      ctx.fillRect(Math.round(x + jx + dx * k), Math.round(y + dy), 1, 1);
     }
     ctx.restore();
   },
@@ -10885,7 +10896,7 @@ nayaRoom: {
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 },
   light:{ tint:'#1a1420', dark:.22 },
   lights:[{x:120,y:40,r:70,c:'#9fc0e0',i:.34},{x:214,y:214,r:44,c:'#ffcf7a',i:.5}],
-  sun:{ x:120, y:30, w:74, len:150, tilt:.22, a:.10 },
+  sun:{ x:120, y:30, w:36, len:150, tilt:.22, a:.10 },
   bgPaint(ctx) {
     const dark = FX.corruption > .5;
     paintInterior(ctx, 240, 300, {
@@ -11467,7 +11478,7 @@ cafe: {
     {x:60,y:22,r:52,c:'#ffcf7a',i:.7},{x:150,y:22,r:52,c:'#ffcf7a',i:.7},{x:240,y:22,r:52,c:'#ffcf7a',i:.7},
     {x:266,y:52,r:48,c:'#9fc0e0',i:.3},
   ],
-  sun:{ x:266, y:54, w:40, len:130, tilt:-.3, a:.12 },
+  sun:{ x:266, y:54, w:36, len:130, tilt:-.3, a:.12 },
   bgPaint(ctx) {
     const W = 300, H = 300;
     paintInterior(ctx, W, H, { wall:'#5e4636', wall2:'#4c382b', floor:'#7a6248', floor2:'#6a5238', wallH:52, tiles:true });
@@ -12463,7 +12474,7 @@ witch2House: {
     {x:70,y:150,r:52,c:'#ffbe74',i:.44},{x:230,y:130,r:44,c:'#ffd8a0',i:.30},
     {x:96,y:292,r:42,c:'#ffd0a0',i:.28},{x:258,y:296,r:36,c:'#d8dce8',i:.18},
   ],
-  sun:{ x:150, y:48, w:34, len:96, tilt:.2, a:.10 },
+  sun:{ x:120, y:48, w:36, len:96, tilt:.2, a:.10 },
   bgPaint(ctx) {
     paintHousePlan(ctx, 320, 340, {
       wall:'#5e4a3c', wall2:'#503e33', floor:'#7f6a52', floor2:'#6f5b45', wallH:52,
@@ -13602,7 +13613,7 @@ kitchen: {
   name:"Кухня", music:'home', w:210, h:230,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.04, wind:0 }, light:{ tint:'#1c1820', dark:.22 },
   lights:[{x:104,y:130,r:54,c:'#ffdca0',i:.4},{x:186,y:60,r:32,c:'#9ab4cc',i:.2}],
-  sun:{ x:186, y:48, w:30, len:92, tilt:-.24, a:.10 },
+  sun:{ x:185, y:48, w:36, len:92, tilt:-.24, a:.10 },
   bgPaint(ctx) {
     paintInterior(ctx, 210, 230, { wall:'#4c4048', wall2:'#413740', floor:'#7d7a76', floor2:'#6e6b68', wallH:50, tiles:true });
     // фартук над рабочей поверхностью
@@ -13774,39 +13785,215 @@ balcony: {
   name:"Балкон", music:'none', w:280, h:240, wet:true, wetFrom:130,
   zone:'street', weather:{ rain:.30, fog:.20, wind:.45, leaves:.35 }, light:{ tint:'#141a28', dark:.34 },
   lights:[{x:250,y:60,r:30,c:'#e8e8d0',i:.2}],
+  /* ГОРОД С БАЛКОНА.
+
+     Раньше здесь стояли два ряда крашеных прямоугольников с десятком
+     жёлтых точек. Теперь город собирается из трёх планов, и главное в
+     нём — окна: дом читается не силуэтом, а тем, сколько окон в нём
+     ещё горит. Дальний план в дымке и почти без света, ближний тёмный
+     и подробный — трубы, антенны, парапеты, вывеска.
+
+     Набор домов детерминированный: фон пишется в кэш и перерисовывается
+     при смене флага, поэтому город обязан собираться одинаково — иначе
+     он будет каждый раз другим.                                      */
   bgPaint(ctx) {
-    const W = 280, night = F('thirdHouseOpen') || F('sueDead');
-    const sky = ctx.createLinearGradient(0,0,0,124);
-    sky.addColorStop(0, night ? '#0b0818' : '#1c2748');
-    sky.addColorStop(1, night ? '#1d1830' : '#3c4462');
-    ctx.fillStyle = sky; ctx.fillRect(0,0,W,124);
-    ctx.fillStyle = '#e0e0ff';
-    for (let i=0;i<34;i++) ctx.fillRect((i*53)%W, (i*29)%112, 1, 1);
-    ctx.fillStyle = night ? '#e8e8d0' : '#f0e8c0';
-    ctx.beginPath(); ctx.arc(232,36,11,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(232,232,208,.08)';
-    ctx.beginPath(); ctx.arc(232,36,26,0,Math.PI*2); ctx.fill();
-    // крыши города в два плана
-    ctx.fillStyle = '#101622';
-    for (let i=0;i<11;i++) { const h = 26 + ((i*41)%40); ctx.fillRect(i*27, 124-h, 24, h); }
-    ctx.fillStyle = '#171e2c';
-    for (let i=0;i<8;i++) { const h = 18 + ((i*23)%24); ctx.fillRect(10+i*36, 124-h, 20, h); }
-    ctx.fillStyle = '#c8a850';
-    for (let i=0;i<20;i++) { if ((i*7)%3) ctx.fillRect(6+i*14, 106-((i*11)%26), 3, 4); }
-    // пол балкона: доски + плитка у порога
-    ctx.fillStyle = '#4a3f38'; ctx.fillRect(0,124,W,116);
-    ctx.fillStyle = '#564940'; for (let y=128;y<240;y+=11) ctx.fillRect(0,y,W,9);
-    ctx.fillStyle = '#3a312c'; for (let y=128;y<240;y+=11) ctx.fillRect(0,y+9,W,2);
-    ctx.fillStyle = 'rgba(120,150,180,.10)';
+    const W = 280, HOR = 124, night = F('thirdHouseOpen') || F('sueDead');
+    let seed = 20516;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const lit = [];                       // светящиеся окна — для ореолов и мерцания
+
+    /* НЕБО. К горизонту теплее: город подсвечивает его снизу. */
+    const sky = ctx.createLinearGradient(0, 0, 0, HOR);
+    if (night) { sky.addColorStop(0,'#06050e'); sky.addColorStop(.55,'#100c1e'); sky.addColorStop(1,'#2b1a24'); }
+    else       { sky.addColorStop(0,'#131b36'); sky.addColorStop(.55,'#232a4c'); sky.addColorStop(1,'#483b4e'); }
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,HOR);
+
+    /* Звёзды: у горизонта их съедает засветка. */
+    for (let i=0;i<96;i++) {
+      const x = rnd()*W, y = rnd()*(HOR-14);
+      const k = 1 - y/(HOR-14);
+      const a = (.18 + rnd()*.62) * (0.18 + k*0.82);
+      ctx.fillStyle = `rgba(226,232,255,${a.toFixed(2)})`;
+      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+
+    /* Облака — тонкие полосы, подсвеченные городом снизу. */
+    for (let i=0;i<5;i++) {
+      const cy = 14 + i*17 + rnd()*5, cw = 44 + rnd()*74, cx = rnd()*W;
+      ctx.fillStyle = `rgba(96,84,112,${(0.09 + rnd()*0.09).toFixed(2)})`;
+      ctx.beginPath(); ctx.ellipse(cx, cy, cw/2, 2.5 + rnd()*2, 0, 0, Math.PI*2); ctx.fill();
+    }
+
+    /* Луна: ореол, диск, три пятна. */
+    const mx = 232, my = 34;
+    const halo = ctx.createRadialGradient(mx,my,3,mx,my,32);
+    halo.addColorStop(0,'rgba(238,238,216,.20)'); halo.addColorStop(1,'rgba(238,238,216,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx,my,32,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = night ? '#e8e8d0' : '#f2ecc6';
+    ctx.beginPath(); ctx.arc(mx,my,11,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(150,150,130,.30)';
+    ctx.beginPath(); ctx.arc(mx-3.5,my-2,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx+4,my+3.5,2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx+1,my-5.5,1.4,0,Math.PI*2); ctx.fill();
+
+    /* Зарево над кварталом — поверх неба, под домами. */
+    const glow = ctx.createRadialGradient(146, HOR+6, 0, 146, HOR+6, 152);
+    glow.addColorStop(0, night ? 'rgba(214,122,58,.20)' : 'rgba(232,152,92,.15)');
+    glow.addColorStop(1, 'rgba(232,152,92,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0,0,W,HOR);
+
+    /* ОДИН ПЛАН ГОРОДА.
+       o.win — доля горящих окон, o.detail — крыши с трубами и антеннами. */
+    const skyline = (o) => {
+      let x = -8;
+      while (x < W + 8) {
+        const bw = o.wMin + Math.round(rnd() * (o.wMax - o.wMin));
+        const bh = o.hMin + Math.round(rnd() * (o.hMax - o.hMin));
+        const top = HOR - bh;
+        ctx.fillStyle = o.body; ctx.fillRect(x, top, bw, bh);
+        ctx.fillStyle = o.edge; ctx.fillRect(x, top, 1, bh);          // рёбра дают объём
+        ctx.fillRect(x + bw - 1, top, 1, bh);
+
+        const roof = rnd();
+        if (o.detail && roof < .30) {                                  // скат
+          ctx.fillStyle = o.body;
+          ctx.beginPath(); ctx.moveTo(x-1, top); ctx.lineTo(x + bw/2, top - 7);
+          ctx.lineTo(x + bw + 1, top); ctx.closePath(); ctx.fill();
+        } else if (roof < .62) {                                       // парапет
+          ctx.fillStyle = o.edge; ctx.fillRect(x - 1, top - 2, bw + 2, 2);
+        }
+        if (o.detail) {
+          if (rnd() < .45) { ctx.fillStyle = o.edge;                   // труба
+            const cx = x + 3 + Math.round(rnd()*(bw-7));
+            ctx.fillRect(cx, top - 6, 3, 6); ctx.fillRect(cx-1, top-7, 5, 2); }
+          if (rnd() < .30) { ctx.fillStyle = o.edge;                   // антенна
+            const ax = x + 2 + Math.round(rnd()*(bw-4));
+            ctx.fillRect(ax, top - 9, 1, 9); ctx.fillRect(ax-2, top-7, 5, 1); }
+        }
+
+        /* ОКНА. Ряды и столбцы, часть горит. */
+        const sx = o.step, sy = o.step + 1;
+        for (let wy = top + 4; wy < HOR - 3; wy += sy) {
+          for (let wx = x + 3; wx < x + bw - 3; wx += sx) {
+            const on = rnd() < o.win;
+            if (on) {
+              const warmK = rnd();
+              const col = warmK < .18 ? '#cfe0ff' : warmK < .70 ? '#ffd68a' : '#ffb257';
+              ctx.fillStyle = col;
+              ctx.fillRect(Math.round(wx), Math.round(wy), 2, 2);
+              if (o.halo) lit.push({ x:Math.round(wx)+1, y:Math.round(wy)+1, c:col });
+            } else {
+              ctx.fillStyle = o.dark;
+              ctx.fillRect(Math.round(wx), Math.round(wy), 2, 2);
+            }
+          }
+        }
+        x += bw + 1 + Math.round(rnd()*3);
+      }
+    };
+
+    skyline({ body:'#1b2133', edge:'#232a3e', dark:'#182032', win:.10, step:5, wMin:14, wMax:26, hMin:30, hMax:62 });
+    ctx.fillStyle = night ? 'rgba(20,16,30,.42)' : 'rgba(40,44,70,.36)';   // дымка между планами
+    ctx.fillRect(0, 44, W, HOR-44);
+    skyline({ body:'#141826', edge:'#1c2234', dark:'#111626', win:.26, step:5, wMin:16, wMax:30, hMin:24, hMax:52, halo:true });
+    ctx.fillStyle = night ? 'rgba(14,10,22,.30)' : 'rgba(28,30,52,.24)';
+    ctx.fillRect(0, 64, W, HOR-64);
+    skyline({ body:'#0c0f19', edge:'#151a28', dark:'#0a0d16', win:.34, step:6, wMin:20, wMax:36, hMin:16, hMax:38,
+              halo:true, detail:true });
+
+    /* Фонари вдоль улицы под домами: без них город висит в воздухе. */
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let x = 6; x < W; x += 21 + Math.round(rnd()*9)) {
+      const y = HOR - 3 - Math.round(rnd()*3);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 9);
+      g.addColorStop(0,'rgba(255,196,120,.40)'); g.addColorStop(1,'rgba(255,196,120,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffd89a'; ctx.fillRect(x, y, 1, 1);
+    }
+    ctx.restore();
+
+    /* Ореолы вокруг горящих окон — из-за них город и «светится». */
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const L of lit) {
+      const g = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, 4.5);
+      g.addColorStop(0, L.c === '#cfe0ff' ? 'rgba(150,180,255,.30)' : 'rgba(255,190,110,.34)');
+      g.addColorStop(1, 'rgba(255,190,110,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(L.x, L.y, 4.5, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+    this._lit = lit.filter((_, i) => i % 7 === 0).slice(0, 16);   // кто будет мигать
+
+    /* Вывеска на ближнем доме — единственная надпись в кадре. */
+    ctx.fillStyle = '#2a1018'; ctx.fillRect(48, 96, 26, 9);
+    ctx.fillStyle = '#ff6a7a'; ctx.fillRect(50, 98, 22, 5);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const sg = ctx.createRadialGradient(61, 100, 0, 61, 100, 16);
+    sg.addColorStop(0,'rgba(255,90,110,.28)'); sg.addColorStop(1,'rgba(255,90,110,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(61,100,16,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    /* ПОЛ. Доски вдоль балкона, стыки, потёртая дорожка к двери. */
+    ctx.fillStyle = '#4a3f38'; ctx.fillRect(0,HOR,W,240-HOR);
+    for (let y=128;y<240;y+=11) {
+      ctx.fillStyle = '#564940'; ctx.fillRect(0,y,W,9);
+      ctx.fillStyle = '#3a312c'; ctx.fillRect(0,y+9,W,2);
+      for (let k=0;k<3;k++) {                                       // прожилки
+        const gx = Math.round(rnd()*W), gw = 8 + Math.round(rnd()*22);
+        ctx.fillStyle = 'rgba(58,49,44,.5)'; ctx.fillRect(gx, y+2+Math.round(rnd()*5), gw, 1);
+      }
+    }
+    ctx.fillStyle = 'rgba(116,100,88,.16)';                          // вытоптано к двери
+    ctx.beginPath(); ctx.ellipse(145, 208, 44, 26, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(120,150,180,.12)';                         // лужа
     ctx.beginPath(); ctx.ellipse(150,190,60,20,0,0,Math.PI*2); ctx.fill();
-    // перила
-    ctx.fillStyle = '#2a2028'; ctx.fillRect(0,120,W,6);
-    ctx.strokeStyle = '#6a5a60'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0,118); ctx.lineTo(W,118); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,140); ctx.lineTo(W,140); ctx.stroke();
-    for (let x=10;x<W;x+=16) { ctx.beginPath(); ctx.moveTo(x,118); ctx.lineTo(x,152); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,200,130,.07)';                         // в ней — отсвет города
+    ctx.beginPath(); ctx.ellipse(150,188,44,11,0,0,Math.PI*2); ctx.fill();
+    /* Свет с улицы ложится на доски у перил. */
+    const fl = ctx.createLinearGradient(0, HOR, 0, HOR+40);
+    fl.addColorStop(0,'rgba(255,186,110,.12)'); fl.addColorStop(1,'rgba(255,186,110,0)');
+    ctx.fillStyle = fl; ctx.fillRect(0, HOR, W, 40);
+
+    /* ПЕРИЛА: бетонный парапет, кованые стойки с завитком, поручень. */
+    ctx.fillStyle = '#241b22'; ctx.fillRect(0,118,W,10);
+    ctx.fillStyle = '#31262e'; ctx.fillRect(0,118,W,2);
+    ctx.fillStyle = '#1a1319'; ctx.fillRect(0,126,W,2);
+    /* Ковка светлее пола: иначе решётка сливается с досками и балкон
+       снова выглядит просто тёмной полосой. */
+    ctx.strokeStyle = '#1d161c'; ctx.lineWidth = 3;                  // тень решётки на полу
+    for (let x=8;x<W;x+=18) { ctx.beginPath(); ctx.moveTo(x+1,129); ctx.lineTo(x+1,153); ctx.stroke(); }
+    ctx.strokeStyle = '#8a7580'; ctx.lineWidth = 2;
+    for (let x=8;x<W;x+=18) {
+      ctx.beginPath(); ctx.moveTo(x,128); ctx.lineTo(x,152); ctx.stroke();
+      /* Кольцо между стойками: незамкнутая дуга читалась как буква «C». */
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x+9, 140, 5.5, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+9, 128); ctx.lineTo(x+9, 134.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+9, 145.5); ctx.lineTo(x+9, 152); ctx.stroke();
+      ctx.lineWidth = 2;
+    }
+    ctx.beginPath(); ctx.moveTo(0,152); ctx.lineTo(W,152); ctx.stroke();
+    ctx.strokeStyle = '#9d8792'; ctx.beginPath(); ctx.moveTo(0,130); ctx.lineTo(W,130); ctx.stroke();
+    ctx.strokeStyle = 'rgba(226,206,216,.55)'; ctx.lineWidth = 1;    // блик на поручне
+    ctx.beginPath(); ctx.moveTo(0,128); ctx.lineTo(W,128); ctx.stroke();
     ctx.lineWidth = 1;
     paintDoor(ctx, 130, 225, 30, 15);
+  },
+  /* Пара окон в городе гаснет и загорается — в остальном кадр статичен,
+     и именно это движение делает город живым. */
+  overPaint(ctx, camX, camY) {
+    const lit = this._lit; if (!lit || !FX.on()) return;
+    const t = Date.now() / 1000;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < lit.length; i++) {
+      const L = lit[i];
+      const ph = Math.sin(t * 0.7 + i * 2.3);
+      if (ph < 0.86) continue;                       // мигает редко, а не постоянно
+      const a = (ph - 0.86) / 0.14;
+      ctx.fillStyle = `rgba(255,214,138,${(a*0.55).toFixed(3)})`;
+      ctx.fillRect(L.x - 1 - camX, L.y - 1 - camY, 2, 2);
+    }
+    ctx.restore();
   },
   ambient() { if (Math.random() < 0.05) FX.spawn(Math.random()*280, 126, 1, {color:'#2a3448', rise:-0.15, life:90}); },
   objects: [
@@ -13860,7 +14047,7 @@ stairwell: {
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.03, wind:0 },
   light:{ tint:'#20191c', dark:.18 },
   lights:[{x:56,y:66,r:56,c:'#e8d0a0',i:.45},{x:196,y:52,r:44,c:'#9fc0e0',i:.32}],
-  sun:{ x:196, y:56, w:46, len:120, tilt:-.25, a:.13 },
+  sun:{ x:196, y:56, w:36, len:120, tilt:-.25, a:.13 },
   bgPaint(ctx) {
     // the girls rent the top of a house — this is the landing at the foot of
     // their own stairs, not a communal block entrance
@@ -14121,7 +14308,7 @@ oldHouse: {
   lights:[{x:200,y:170,r:60,c:'#e8dcc0',i:.34},{x:266,y:48,r:44,c:'#9fc0e0',i:.24}],
   /* телевизор шипит: тихо, но постоянно — это и есть фон всего разговора */
   ambient() { if (Math.random() < 0.05) Audio.beep(90 + Math.random() * 60, .09, 'sawtooth', .012); },
-  sun:{ x:262, y:62, w:40, len:130, tilt:-.28, a:.10 },
+  sun:{ x:266, y:62, w:36, len:130, tilt:-.28, a:.10 },
   bgPaint(ctx) {
     const W = 320, H = 300;
     paintInterior(ctx, W, H, { wall:'#5f5a68', wall2:'#4e4a58', floor:'#8a7454', floor2:'#77603f', wallH:60 });
