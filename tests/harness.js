@@ -336,4 +336,52 @@ async function run(name, fn) {
   finally { await browser.close(); }
   return out;
 }
-module.exports = { run, newGame, opening, university, toUni, amuletArc, step, pump, snap, useObj, useNpc, errors };
+/* ПОГОНЯ.
+
+   Харнесс играет как игрок: читает с экрана, где сейчас препятствия, и
+   жмёт стрелки. Ничего не телепортирует и не двигает напрямую — иначе
+   прогон перестаёт проверять саму мини-игру.
+
+   Правило бота простое: смотреть на ближайшее препятствие в каждой
+   полосе и уходить туда, где до него дальше всего. */
+async function chase(page, tag) {
+  await page.waitForSelector('#chaseScreen.show', { timeout:20000 });
+  await page.evaluate(() => { const h = document.getElementById('chaseHelp');
+                              if (h && h.classList.contains('show')) ChaseRun.help(false); });
+  let guard = 0;
+  while (guard++ < 400) {
+    const st = await page.evaluate(() => {
+      if (!ChaseRun.resolve) return null;
+      return { lane:ChaseRun.lane, t:ChaseRun.t, gap:ChaseRun.gap, hits:ChaseRun.hits,
+               lanes:ChaseRun.LANES, runX:ChaseRun.RUN_X,
+               obs:ChaseRun.obs.map(o => ({ lane:o.lane, x:o.x, w:o.w })) };
+    });
+    if (!st) break;
+    /* насколько свободна каждая полоса: дистанция до ближайшего
+       препятствия перед Наей */
+    const free = [];
+    for (let i = 0; i < st.lanes; i++) {
+      let d = 9999;
+      for (const o of st.obs) {
+        if (o.lane !== i) continue;
+        const gap = o.x - st.runX;
+        if (gap > -12 && gap < d) d = gap;
+      }
+      free.push(d);
+    }
+    let best = st.lane;
+    for (let i = 0; i < st.lanes; i++)
+      if (free[i] > free[best] + 14) best = i;
+    if (best < st.lane)      await page.keyboard.press('ArrowUp');
+    else if (best > st.lane) await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(90);
+  }
+  await page.waitForTimeout(400);
+  const out = await page.evaluate(() => ({
+    shown: document.getElementById('chaseScreen').classList.contains('show'),
+    escaped: F('lonerEscaped'), mode: Game.mode }));
+  if (out.shown) throw new Error(tag + ': экран погони не закрылся');
+  return out;
+}
+
+module.exports = { run, newGame, opening, university, toUni, amuletArc, step, pump, snap, useObj, useNpc, chase, errors };

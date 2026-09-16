@@ -114,9 +114,10 @@ async function endingI() {
     const chase = await page.evaluate(()=>({active: !!(Game.chase&&Game.chase.active), room:gameState.currentRoom}));
     console.log('  I: chase =', JSON.stringify(chase));
     if (!chase.active) throw new Error('I: chase did not start');
-    // погоня стартует в парке: парк -> Мейпл-стрит -> дом
-    await H.step(page,'obj','toStreet',[],'I');
-    await H.step(page,'obj','toHome',[],'I');      // escape -> caught scene -> ending I
+    /* Погоня — мини-игра: харнесс играет её стрелками, как игрок. */
+    const ran = await H.chase(page, 'I');
+    console.log('  I: погоня пройдена, ушла =', ran.escaped);
+    await H.pump(page, [], 'I:caught');            // сцена после погони -> ending I
     s = await H.snap(page);
     return { card: await card(page), caught: s.flags.includes('lonerCaught'),
              crystal: s.flags.includes('crystalTaken'), escaped: s.flags.includes('lonerEscaped'), stats: s.stats };
