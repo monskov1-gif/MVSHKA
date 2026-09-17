@@ -20662,13 +20662,24 @@ Object.assign(ChaseRun, {
    Chase.start(), а мир — Chase.stop(). Изменилось только то, что
    происходит между ними. */
 const Chase = {
-  async start() {
+  /* НЕ async, и это принципиально.
+
+     Движок сцен исполняет шаг как `await cmd()`. Если start() вернёт
+     промис погони, сцена будет ждать все тридцать секунд, оставаясь
+     активной, — а внутри неё вызовется Scene.play('lonerCaughtScene'),
+     то есть сцена изнутри сцены. Прогон ветки одиночки на этом вставал
+     намертво: pump крутился, пока не упирался в предохранитель.
+
+     Поэтому мини-игра запускается и отпускается: сцена завершается
+     сразу, а продолжение цепляется к промису и играет уже на чистом
+     состоянии. */
+  start() {
     Game.chase = { active:true, resolved:false };
     setFlag('lonerChase');
-    const escaped = await ChaseRun.run();
-    Game.chase.active = false; Game.chase.resolved = true;
-    Scene.play('lonerCaughtScene');
-    return escaped;
+    ChaseRun.run().then(() => {
+      Game.chase.active = false; Game.chase.resolved = true;
+      Scene.play('lonerCaughtScene');
+    });
   },
   /* Погоня больше не тикает вместе с миром: у неё свой цикл. Метод
      оставлен, потому что его зовёт главный tick. */
