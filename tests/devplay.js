@@ -1,0 +1,69 @@
+/* ОТ ТОЧКИ МЕНЮ — ДО КОНЦОВКИ.
+
+   Проверка связности флагов (tests/devpoints.js) говорит только то, что
+   состояние непротиворечиво. Здесь проверяется главное: что из него
+   действительно можно доиграть. Старт — кнопка меню разработчика, а не
+   расставленные вручную флаги, дальше обычные шаги игрока до карточки. */
+const H = require('./harness.js');
+
+const jump = async (page, id) => {
+  const ok = await page.evaluate(async id => {
+    const point = DevTools.storyPoints.find(x => x.id === id);
+    if (!point) return 'НЕТ ТОЧКИ ' + id;
+    localStorage.clear();
+    await DevTools.applyPoint(point);
+    return 'ok';
+  }, id);
+  if (ok !== 'ok') throw new Error(ok);
+  await page.waitForTimeout(600);
+  await H.pump(page, [], 'jump:' + id);
+};
+
+const card = async page => {
+  await page.waitForSelector('#endingScreen.show', { timeout:20000 });
+  return page.evaluate(() => ({
+    roman: document.getElementById('endingRoman').textContent,
+    name:  document.getElementById('endingName').textContent,
+  }));
+};
+
+(async () => {
+  const bad = [];
+
+  /* Ветка «злая Ная»: точка «Сью оставлена мёртвой» -> концовка II. */
+  const evil = await H.run('DEVPLAY-evil', async page => {
+    await H.newGame(page);
+    await jump(page, 'sue_left_dead');
+    let s = await H.snap(page);
+    console.log('старт: комната=%s цель=%s', s.room, s.goal);
+    await H.step(page,'obj','door',[],'EVIL');
+    await H.step(page,'obj','stone',[],'EVIL');
+    await H.step(page,'obj','onward',[],'EVIL');
+    await H.step(page,'obj','inside',[],'EVIL');
+    await H.step(page,'npc','Старшая',[],'EVIL');
+    await H.step(page,'obj','toTrial',[],'EVIL');
+    await H.step(page,'obj','altar',[1],'EVIL');
+    await H.step(page,'obj','exit',[],'EVIL');
+    await H.step(page,'npc','Старшая',[],'EVIL');
+    await H.step(page,'npc','Житель',[],'EVIL');
+    await H.step(page,'obj','greatPortal',[],'EVIL');
+    return card(page);
+  });
+  console.log('злая ветка ->', evil.roman, evil.name);
+  if (!/II$/.test(evil.roman)) bad.push('из точки sue_left_dead пришли не в концовку II: ' + evil.roman);
+
+  /* Ветка «одиночка»: точка «Одна в городе» -> концовка I. */
+  const loner = await H.run('DEVPLAY-loner', async page => {
+    await H.newGame(page);
+    await jump(page, 'loner_town');
+    const s = await H.snap(page);
+    console.log('старт: комната=%s цель=%s', s.room, s.goal);
+    return { room:s.room, flags:s.flags.filter(f => f.startsWith('loner')) };
+  });
+  console.log('ветка одиночки: комната=%s флаги=%s', loner.room, loner.flags.join(','));
+  if (!loner.flags.length) bad.push('точка loner_town не выставила ни одного флага ветки');
+
+  H.errors.forEach(e => bad.push(e));
+  if (bad.length) { console.log('\nПРОБЛЕМЫ:'); [...new Set(bad)].forEach(x => console.log('  ' + x)); process.exit(1); }
+  console.log('\nOK: из точки меню игра доигрывается до карточки концовки');
+})();

@@ -26241,6 +26241,45 @@ const DevTools = {
     }
   },
 
+  /* МАГИСТРАЛЬ СЮЖЕТА.
+
+     Флаги перечислены в том порядке, в каком их получает игрок за одно
+     прохождение. Правило одно: если стоит хоть один, все предыдущие
+     обязаны стоять тоже. Состояния «уже позвали в коммуну, но с
+     Женевьевой ещё не знакомы» в игре не бывает — а в меню
+     разработчика оно получалось на каждом прыжке в позднюю главу, и
+     Женевьева дома встречала словами «найди меня в университете».
+
+     Раньше связи дописывались по одной, вручную, и каждая новая точка
+     меню приносила свою дыру. Список честнее: чтобы добавить веху,
+     достаточно поставить её на своё место.
+
+     Развилки сюда не входят — sueAgreed/sueRefused,
+     sueRevived/sueLeftDead и путь через дом Клары взаимоисключающие,
+     они разбираются отдельными правилами ниже.                      */
+  MAINLINE: [
+    'prologueComplete', 'prologBackstoryStarted', 'backstoryDone',
+    'mainStoryStarted', 'metSue', 'cafeSceneComplete',
+    /* университет, дни 1–2 */
+    'uniArrived', 'uniHallStands', 'uniTeacherList', 'sawRehearsal',
+    'metGenevieveUni', 'crystalReacted', 'symbolPhoto', 'libAsked',
+    'libPeriods', 'propsSymbol', 'propsMorel', 'morelKnowsName',
+    'investigatedUniversity',
+    /* университет, дни 3–4 */
+    'basementFound', 'archiveMedeaFound', 'learnedMedea',
+    'archiveMorelFound', 'roofPromise', 'morelPhotoSeen', 'libMissing',
+    'universityBanned', 'backWindowUsed', 'knowsServiceRoute', 'oldWingOpen',
+    'archiveFolderFound', 'premiereDone', 'morelTruth',
+    /* правда на крыше — там же Женевьева зовёт в коммуну */
+    'learnedWitches', 'foundGenevieve', 'communeInvite',
+    /* дом, портал, ад */
+    'homeTalkDone', 'portalOpened', 'metCharlotte', 'metLilith',
+    'returnedFromHell1', 'toldSueWitch',
+    /* коммуна и амулеты */
+    'communeIntro', 'persuasionDone', 'firstAmulet',
+    'secondAmulet', 'communeWarded', 'thirdHouseOpen', 'thirdAmulet',
+  ],
+
   /* Сюжетные флаги связаны между собой, и выставить один без другого —
      значит получить состояние, которого в игре не бывает. Так точки
      четвёртого дня ставили backWindowUsed без oldWingOpen, и цель
@@ -26248,6 +26287,41 @@ const DevTools = {
      этот путь нашла. Здесь состояние доводится до непротиворечивого. */
   normalize() {
     const f = gameState.flags;
+
+    /* Сначала развилки сводятся к своим предпосылкам: с них магистраль
+       и должна начинать считать, иначе поздняя ветка не подтянет
+       середину игры. Порядок здесь важен — от самой поздней ветки к
+       самой ранней развилке, иначе ветка одиночки успеет получить и
+       отказ Сью, и её согласие разом. */
+    const any = pre => Object.keys(f).some(k => k.startsWith(pre) && f[k]);
+    if (any('evil'))                              f.sueLeftDead = true;
+    if (any('loner'))                             f.sueRefused = true;
+    if (f.pathChosen || f.chosenWitchPath || f.chosenEarthPath) f.sueRevived = true;
+    if (f.sueRevived || f.sueLeftDead)            f.reviveChoiceMade = true;
+    if (f.reviveChoiceMade)                       f.sueDead = true;
+    if (f.sueDead)                                f.thirdAmulet = true;
+    /* Мадлен умирает в любом прохождении, и коммуна на это реагирует. */
+    if (f.firstAmulet)                          { f.firstWitchDead = true; f.communePanic = true; }
+    if (f.hiddenAmulet)                           f.claraHint = true;
+    /* Разговор со Сью состоялся, чем бы он ни кончился; если исход не
+       задан явно, это основная линия — она согласилась. */
+    if (f.firstAmulet || f.sueAgreed || f.sueRefused) f.persuasionDone = true;
+    if (f.persuasionDone && !f.sueRefused)        f.sueAgreed = true;
+
+    /* Развилка — это выбор, а не набор. Нормализация обязана не только
+       дописывать недостающее, но и снимать несовместимое: база поздних
+       глав ставит согласие Сью, и ветка одиночки поверх неё получала
+       сразу и отказ, и согласие. Побеждает та сторона, которую точка
+       выбрала явно. */
+    if (f.sueRefused)        f.sueAgreed = false;
+    if (f.sueLeftDead)       f.sueRevived = false;
+    if (f.chosenEarthPath)   f.chosenWitchPath = false;
+
+    /* Магистраль: всё до самой поздней достигнутой вехи. */
+    let last = -1;
+    this.MAINLINE.forEach((k, i) => { if (f[k]) last = i; });
+    for (let i = 0; i <= last; i++) f[this.MAINLINE[i]] = true;
+
     if (f.backWindowUsed)      { f.oldWingOpen = true; f.knowsServiceRoute = true; }
     if (f.universityBanned)    { f.universityAccessRestricted = true; f.universityWindowRouteUnlocked = true; }
     if (f.premiereDone)          f.archiveFolderFound = true;
