@@ -12,11 +12,17 @@ async function pump(page, picks, tag) {
       dlg: Dialogue.active, choice: Dialogue.awaitingChoice, scene: Scene.active,
       mode: Game.mode, ending: Game.endingShown, montage: Game.montage,
       shift: document.getElementById('shiftScreen').classList.contains('show'),
+      chase: document.getElementById('chaseScreen').classList.contains('show'),
       hint: document.getElementById('titleHint').classList.contains('show'),
       n: document.querySelectorAll('#choiceOptions .choiceOpt').length,
       texts: [...document.querySelectorAll('#choiceOptions .choiceOpt')].map(b => b.textContent.slice(0, 46)),
     }));
     if (st.ending) return 'ending';
+    /* Погоня — отдельная мини-игра со своим управлением, и играет её
+       H.chase. Здесь важно только не крутиться впустую: pump считает шаг
+       законченным лишь в режиме explore, а погоня держит режим chase —
+       на этом прогон ветки одиночки и вставал. */
+    if (st.chase) return { state:'chase', consumed:ci };
     // карточка, которая ждёт игрока (цитата после сказа о Мидее)
     if (st.hint) {
       await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerdown')));
