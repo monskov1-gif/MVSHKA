@@ -19,6 +19,10 @@ const jump = async (page, id) => {
   await H.pump(page, [], 'jump:' + id);
 };
 
+/* H.snap цели не отдаёт, а в логе она нужнее комнаты: по ней видно,
+   осмысленно ли состояние, в которое прыгнула кнопка меню. */
+const goalOf = page => page.evaluate(() => { const g = Quests.goal(); return g ? g.t : '(нет)'; });
+
 const card = async page => {
   await page.waitForSelector('#endingScreen.show', { timeout:20000 });
   return page.evaluate(() => ({
@@ -35,7 +39,7 @@ const card = async page => {
     await H.newGame(page);
     await jump(page, 'sue_left_dead');
     let s = await H.snap(page);
-    console.log('старт: комната=%s цель=%s', s.room, s.goal);
+    console.log('старт: комната=%s цель=%s', s.room, await goalOf(page));
     await H.step(page,'obj','door',[],'EVIL');
     await H.step(page,'obj','stone',[],'EVIL');
     await H.step(page,'obj','onward',[],'EVIL');
@@ -57,7 +61,7 @@ const card = async page => {
     await H.newGame(page);
     await jump(page, 'loner_town');
     const s = await H.snap(page);
-    console.log('старт: комната=%s цель=%s', s.room, s.goal);
+    console.log('старт: комната=%s цель=%s', s.room, await goalOf(page));
     return { room:s.room, flags:s.flags.filter(f => f.startsWith('loner')) };
   });
   console.log('ветка одиночки: комната=%s флаги=%s', loner.room, loner.flags.join(','));
