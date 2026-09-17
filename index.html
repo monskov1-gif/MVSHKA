@@ -26087,11 +26087,19 @@ const DevTools = {
       apply(){ this.baseDead(); Object.assign(gameState.flags,{
         reviveChoiceMade:true, sueLeftDead:true, evilHome:true, evilHomeDone:true });
         gameState.stats.humanity = 10; gameState.stats.witchAmbition = 80; } },
+    /* Ветка одиночки начинается со сцены sueRefuses — Сью сказала «нет»,
+       и Ная идёт за именами одна. Точка стояла на baseDead(): мёртвая
+       Сью, три амулета и флаги злой ветки, то есть на состоянии из
+       десятой главы. Цель поэтому читалась «Идти в коммуну. Одной.» —
+       из совсем другой ветки, а до концовки «Одиночка» отсюда было не
+       добраться. */
     { id:'loner_town', ch:'7solo', title:'Одна в городе',
-      desc:'ветка одиночки, до погони', room:'oldTown',
-      apply(){ this.baseDead(); Object.assign(gameState.flags,{
-        reviveChoiceMade:true, sueLeftDead:true, evilHome:true, evilHomeDone:true,
-        evilStreetSeen:true, lonerStart:true }); gameState.stats.humanity = 10; } },
+      desc:'Сью отказалась, до погони', room:'street',
+      apply(){ this.baseStory(); Object.assign(gameState.flags,{
+        portalOpened:true, metCharlotte:true, metLilith:true, returnedFromHell1:true,
+        toldSueWitch:true, communeIntro:true,
+        persuasionDone:true, sueRefused:true, lonerStart:true });
+        gameState.stats = { trustSue:34, witchAmbition:58, humanity:40, hellAffinity:12 }; } },
     { id:'evil_recognised', ch:'12evil', title:'Адская ведьма',
       desc:'Лиллит признала Наю', room:'lilithHall',
       apply(){ this.baseDead(); Object.assign(gameState.flags,{
@@ -26316,6 +26324,14 @@ const DevTools = {
     if (f.sueRefused)        f.sueAgreed = false;
     if (f.sueLeftDead)       f.sueRevived = false;
     if (f.chosenEarthPath)   f.chosenWitchPath = false;
+    /* Отказ Сью и её смерть в ритуале несовместимы: если она не пошла,
+       то и над алтарём не стояла. Ветка одиночки идёт целиком до
+       амулетов, и тащить за собой ритуал ей нечем. */
+    if (f.sueRefused) {
+      f.sueDead = f.sueLeftDead = f.sueRevived = f.reviveChoiceMade = false;
+      f.firstAmulet = f.secondAmulet = f.thirdAmulet = false;
+      f.firstWitchDead = f.communePanic = f.communeWarded = f.thirdHouseOpen = false;
+    }
 
     /* Магистраль: всё до самой поздней достигнутой вехи. */
     let last = -1;

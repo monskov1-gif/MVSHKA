@@ -56,16 +56,32 @@ const card = async page => {
   console.log('злая ветка ->', evil.roman, evil.name);
   if (!/II$/.test(evil.roman)) bad.push('из точки sue_left_dead пришли не в концовку II: ' + evil.roman);
 
-  /* Ветка «одиночка»: точка «Одна в городе» -> концовка I. */
+  /* Ветка «одиночка»: точка «Одна в городе» -> погоня -> концовка I.
+     Точка стартует на Мейпл-стрит сразу после отказа Сью. */
   const loner = await H.run('DEVPLAY-loner', async page => {
     await H.newGame(page);
     await jump(page, 'loner_town');
-    const s = await H.snap(page);
-    console.log('старт: комната=%s цель=%s', s.room, await goalOf(page));
-    return { room:s.room, flags:s.flags.filter(f => f.startsWith('loner')) };
+    const s0 = await H.snap(page);
+    console.log('старт: комната=%s цель=%s', s0.room, await goalOf(page));
+    await H.step(page,'obj','toRightHouse',[],'LONER');
+    await H.step(page,'obj','toLiving',[],'LONER');
+    await H.step(page,'npc','Женевьева',[],'LONER');    // lonerGenevieve
+    await H.step(page,'obj','toHallway',[],'LONER');
+    await H.step(page,'obj','exit',[],'LONER');
+    await H.step(page,'obj','toLeftHouse',[],'LONER');  // lonerDoor
+    await H.step(page,'obj','toAlley',[],'LONER');
+    await H.step(page,'obj','window',[],'LONER');       // взлом
+    await H.step(page,'obj','exit',[],'LONER');
+    await H.step(page,'obj','toRightHouse',[],'LONER');
+    await H.step(page,'obj','toLiving',[],'LONER');
+    await H.step(page,'obj','toCommune',[],'LONER');    // обнаружили -> погоня
+    const ran = await H.chase(page, 'LONER');
+    console.log('погоня пройдена, ушла =', ran.escaped);
+    await H.pump(page, [], 'LONER:caught');
+    return card(page);
   });
-  console.log('ветка одиночки: комната=%s флаги=%s', loner.room, loner.flags.join(','));
-  if (!loner.flags.length) bad.push('точка loner_town не выставила ни одного флага ветки');
+  console.log('ветка одиночки ->', loner.roman, loner.name);
+  if (!/ I$/.test(loner.roman)) bad.push('из точки loner_town пришли не в концовку I: ' + loner.roman);
 
   H.errors.forEach(e => bad.push(e));
   if (bad.length) { console.log('\nПРОБЛЕМЫ:'); [...new Set(bad)].forEach(x => console.log('  ' + x)); process.exit(1); }

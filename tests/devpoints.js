@@ -54,17 +54,30 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
         goal: goal ? goal.t : null,
         found: !!f.foundGenevieve, invited: !!f.communeInvite,
         uniDay: gameState.counters.uniDay,
+        dead: !!f.sueDead,
+        branch: Object.keys(f).some(k => k.startsWith('loner') && f[k]) ? 'loner'
+              : Object.keys(f).some(k => k.startsWith('evil')  && f[k]) ? 'evil' : '',
       };
     }, pt.id);
     await p.waitForTimeout(90);
 
     const tag = `${pt.ch.padEnd(8)} ${pt.id.padEnd(20)}`;
-    console.log(`${tag} ${String(r.room).padEnd(14)} веха=${r.lastMile}`);
+    console.log(`${tag} ${String(r.room).padEnd(14)} веха=${String(r.lastMile).padEnd(16)} цель=${r.goal}`);
     if (r.holes.length) bad.push(`${pt.id}: дыры в магистрали — ${r.holes.join(', ')}`);
     if (r.both.length)  bad.push(`${pt.id}: обе стороны развилки — ${r.both.join(', ')}`);
     if (!r.goal)        bad.push(`${pt.id}: нет текущей цели`);
     if (r.invited && !r.found)
       bad.push(`${pt.id}: позвали в коммуну, но Женевьева не знакома`);
+    /* Цель обязана принадлежать той же ветке, что и точка. Точка
+       одиночки стояла на состоянии десятой главы, и цель читалась
+       «Идти в коммуну. Одной.» — из ветки злой Наи. */
+    if (r.branch === 'loner') {
+      if (r.dead)  bad.push(`${pt.id}: ветка одиночки, а Сью мертва`);
+      if (/коммуну\. Одной/.test(r.goal || ''))
+        bad.push(`${pt.id}: цель из чужой ветки — «${r.goal}»`);
+    }
+    if (r.branch === 'evil' && !r.dead)
+      bad.push(`${pt.id}: ветка злой Наи, а Сью жива`);
   }
 
   /* Женевьева не должна отправлять в университет того, кто его прошёл. */
