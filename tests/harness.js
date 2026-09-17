@@ -78,7 +78,16 @@ async function pump(page, picks, tag) {
     if (st2.dlg || st2.scene || st2.mode !== 'explore') continue;
     return { state: 'idle', consumed: ci };
   }
-  throw new Error('pump guard tripped at ' + tag);
+  /* Предохранитель должен называть, на чём именно повис прогон:
+     «встал где-то» — бесполезная диагностика. */
+  const st = await page.evaluate(() => ({
+    dlg:Dialogue.active, choice:Dialogue.awaitingChoice, scene:Scene.active,
+    mode:Game.mode, room:gameState && gameState.currentRoom, ending:Game.endingShown,
+    shift:document.getElementById('shiftScreen').classList.contains('show'),
+    chase:document.getElementById('chaseScreen').classList.contains('show'),
+    opts:[...document.querySelectorAll('#choiceOptions .choiceOpt')].map(b=>b.textContent.slice(0,40)),
+  }));
+  throw new Error('pump guard tripped at ' + tag + ' · ' + JSON.stringify(st));
 }
 
 const useObj = (page, n) => page.evaluate(n => {
