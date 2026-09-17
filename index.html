@@ -26476,13 +26476,25 @@ const DevTools = {
     sg.innerHTML = '';
     rg.innerHTML = '';
 
-    /* Сюжетные точки — по главам, в порядке прохождения. */
+    /* Сюжетные точки — по главам, главы по возрастанию номера.
+
+       Раньше порядок брался из порядка массива storyPoints, а он начат
+       с университета: меню открывалось третьей главой, потом шла пятая,
+       и только затем первая. Теперь номер вынимается из ключа главы —
+       он же бывает составным ('7solo', '11evil', '13earth'), — и главы
+       с одним номером идут так, как записаны в массиве. Точки без главы
+       уходят в конец, а не всплывают посреди списка. */
     const order = [], byCh = {};
     this.storyPoints.forEach(p => {
       const ch = p.ch === undefined ? '?' : p.ch;
       if (!byCh[ch]) { byCh[ch] = []; order.push(ch); }
       byCh[ch].push(p);
     });
+    const chNum = ch => { const n = parseInt(ch, 10); return isFinite(n) ? n : Infinity; };
+    /* Позиции запоминаются ДО сортировки: indexOf по сортируемому массиву
+       возвращал бы уже переставленные места. */
+    const seen = new Map(order.map((ch, i) => [ch, i]));
+    order.sort((a, b) => (chNum(a) - chNum(b)) || (seen.get(a) - seen.get(b)));
     order.forEach(ch => {
       const d = Chapters.DEFS[ch];
       const title = d ? d[0] + ' — «' + d[1] + '»' : 'ВНЕ ГЛАВ';
