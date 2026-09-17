@@ -7986,6 +7986,19 @@ function woodGrain(g, x, y, w, h, col) {
     g.fillRect(6, 32, 3, 4); g.fillRect(26, 32, 3, 4); g.fillRect(45, 32, 3, 4);
   });
   /* ---- музыкальный зал: то, на чём и с чего играют ---- */
+  D('globe_stand', {w:18,h:26,ax:9,ay:24,foot:{x:-7,y:-7,w:14,h:8}}, g => {
+    shadowEllipse(g, 9, 24, 7, 2.5, .24);
+    g.fillStyle = '#4a3726'; g.fillRect(8, 16, 2, 8);            // ножка
+    g.fillRect(5, 23, 8, 2);
+    g.fillStyle = '#8a6a3c';                                      // меридиан
+    g.beginPath(); g.arc(9, 9, 8, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#3a6a7a';                                      // океан
+    g.beginPath(); g.arc(9, 9, 6.5, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#5a7a4a';                                      // суша
+    g.beginPath(); g.ellipse(7, 7, 3, 2.4, .4, 0, Math.PI*2); g.fill();
+    g.beginPath(); g.ellipse(11.5, 11, 2.2, 3, -.3, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#c9a05a'; g.fillRect(1, 8, 16, 1);
+  });
   D('music_stand', {w:14,h:26,ax:7,ay:25,foot:{x:-5,y:-6,w:10,h:7}}, g => {
     shadowEllipse(g, 7, 25, 5, 2, .22);
     g.fillStyle = '#3a3a42'; g.fillRect(6, 9, 2, 14);            // штанга
@@ -11286,7 +11299,11 @@ const Quests = {
     const el = document.getElementById('questPanel');
     if (!el) return;
     const shown = (Game.mode === 'explore' || Game.mode === 'dialogue');
-    if (!shown || g.t === '...') { el.classList.remove('show'); return; }
+    /* Во время проникновения цель показывает сам HUD кражи — сюжетная
+       плашка тут только налезала бы на него. */
+    if (!shown || g.t === '...' || (typeof Stealth !== 'undefined' && Stealth.on)) {
+      el.classList.remove('show'); return;
+    }
     el.textContent = 'ЦЕЛЬ: ' + g.t;
     el.classList.add('show');
     if (changed && announce) { UI.toast('Новая цель: ' + g.t, 2600); Audio.beep(660, .10, 'sine', .04); }
@@ -13322,6 +13339,252 @@ witch1House: {
 },
 
 /* ---------------------------------------------------------------- */
+/* ====================================================================
+   ДОМ МАДЛЕН — три этажа по плану.
+
+   Каждый этаж это ОДНА комната: цельное пространство, разделённое
+   стенами, мебелью и проходами, а не набор экранов. Планировка взята с
+   чертежа: первый этаж — прихожая, гостиная с камином, столовая и
+   кухня; второй — ванная, спальня, библиотека и гостевая; третий —
+   кладовая, ритуальная комната и кабинет.
+
+   Мебель тут работает дважды. Она обставляет жильё пожилой женщины — и
+   она же решает, откуда Наю видно. Диван и стеллажи режут линии обзора,
+   стол в столовой заставляет обходить, шкафы годятся, чтобы переждать.  */
+
+madFloor1: {
+  name:"Дом Мадлен. Первый этаж", music:'sad', w:360, h:400,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
+  light:{ tint:'#191520', dark:.40 },
+  lights:[
+    {x:120,y:150,r:56,c:'#ffd8a0',i:.34},{x:292,y:196,r:44,c:'#ffcf90',i:.26},
+    {x:96,y:320,r:52,c:'#ffd0a8',i:.30},{x:280,y:330,r:44,c:'#e8dcc0',i:.22},
+  ],
+  bgPaint(ctx) {
+    paintHousePlan(ctx, 360, 400, {
+      wall:'#5b4a52', wall2:'#4e3f47', floor:'#7d6a58', floor2:'#6d5b4a', wallH:52,
+      zones:[
+        { x:8,   y:52,  w:344, h:64,  name:'ПРИХОЖАЯ', floor:'#6d5a48', floor2:'#5f4d3d' },
+        { x:8,   y:124, w:232, h:134, name:'ГОСТИНАЯ', floor:'#7f6c58', floor2:'#6e5c49' },
+        { x:248, y:124, w:104, h:134, name:'ХОЛЛ',     floor:'#75604f', floor2:'#665342' },
+        { x:8,   y:266, w:196, h:126, name:'СТОЛОВАЯ', floor:'#7a6650', floor2:'#6a5743' },
+        { x:212, y:266, w:140, h:126, name:'КУХНЯ',    floor:'#8a8478', floor2:'#797369', tiles:true },
+      ],
+      parts:[
+        { x:8,   y:116, w:96,  h:8 }, { x:150, y:116, w:202, h:8 },   // прихожая / гостиная
+        { x:240, y:124, w:8,   h:64 }, { x:240, y:216, w:8, h:42 },    // гостиная / холл
+        { x:8,   y:258, w:130, h:8 }, { x:182, y:258, w:170, h:8 },    // низ
+        { x:204, y:266, w:8,   h:60 }, { x:204, y:356, w:8, h:36 },    // столовая / кухня
+      ],
+    });
+    paintDoor(ctx, 118, 58, 32, 12);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('ПАРАДНАЯ', 100, 50);
+    ctx.fillText('ОКНО', 320, 50);
+  },
+  objects: [
+    // прихожая: вешалка, зеркало, окно, через которое Ная и влезла
+    { t:'coat_rack', x:64, y:108 }, { t:'mirror_tall', x:186, y:104 },
+    { t:'window_in', x:318, y:34 }, { t:'crate_stack', x:300, y:106 },
+    // гостиная: диван режет обзор от лестницы, камин у правой стены
+    { t:'sofa_old', x:64, y:176 }, { t:'table_round', x:130, y:190 },
+    { t:'armchair', x:196, y:170 }, { t:'rug_red', x:120, y:206 },
+    { t:'fireplace', x:224, y:150 }, { t:'lamp_floor', x:30, y:142 },
+    { t:'bookshelf', x:38, y:238 }, { t:'painting', x:96, y:126 },
+    { t:'birdcage', x:172, y:236 },
+    // холл и лестница наверх
+    { t:'stairs_up', x:326, y:250 }, { t:'cabinet', x:262, y:146 },
+    { t:'clock', x:274, y:130 },
+    // столовая
+    { t:'table_wood', x:100, y:322 }, { t:'chair_wood', x:62, y:330 },
+    { t:'chair_wood', x:138, y:330 }, { t:'chair_wood', x:100, y:296 },
+    { t:'vase_flowers', x:100, y:312 }, { t:'dresser', x:30, y:380 },
+    // кухня
+    { t:'stove', x:250, y:300 }, { t:'fridge', x:306, y:302 },
+    { t:'sink', x:242, y:378 }, { t:'counter', x:300, y:372 },
+    { t:'herb_shelf', x:336, y:290 },
+  ],
+  walls: [
+    {x:0,y:0,w:360,h:52},{x:0,y:52,w:8,h:348},{x:352,y:52,w:8,h:348},{x:0,y:394,w:360,h:6},
+    {x:8,y:116,w:96,h:8},{x:150,y:116,w:202,h:8},
+    {x:240,y:124,w:8,h:64},{x:240,y:216,w:8,h:42},
+    {x:8,y:258,w:130,h:8},{x:182,y:258,w:170,h:8},
+    {x:204,y:266,w:8,h:60},{x:204,y:356,w:8,h:36},
+  ],
+  spawn:{ fromWindow:[318, 100], fromStairs:[300, 250], default:[318, 100] },
+  interactables: [
+    { x:300,y:170,w:52,h:44, name:'up', prompt:'Лестница наверх',
+      action: async ()=> { Stealth.mark(1, 268, 130); await changeRoom('madFloor2', 268, 130); } },
+    { x:102,y:52,w:36,h:22, name:'frontDoor', prompt:'Парадная дверь', action(){
+        if (Stealth.on && !Stealth.taken)
+          return Dialogue.start([{who:'naya',expr:'normal',text:'(Уходить с пустыми руками? Нет. Не после того, как я сюда влезла.)'}]);
+        if (Stealth.on) return Stealth.leave();
+        Dialogue.start([{who:'naya',expr:'normal',text:'(Заперто изнутри на цепочку.)'}]);
+      }},
+    { x:300,y:80,w:40,h:34, name:'window', prompt:'Окно', action(){
+        if (Stealth.on && Stealth.taken) return Stealth.leave();
+        Dialogue.start([{who:'naya',expr:'normal',text:'(Открыто. Я оставила его так, чтобы уйти быстро.)'}]);
+      }},
+    { x:242,y:128,w:40,h:38, name:'hallCab', prompt:'Шкафчик в холле',
+      action(){ Stealth.pick('hallCab', this); } },
+    { x:22,y:216,w:40,h:38, name:'livShelf', prompt:'Книжный стеллаж',
+      action(){ Stealth.pick('livShelf', this); } },
+    { x:14,y:358,w:40,h:34, name:'dinDresser', prompt:'Комод',
+      action(){ Stealth.pick('dinDresser', this); } },
+    { x:196,y:140,w:52,h:40, name:'hideSofa', prompt:'За диваном', hide:true,
+      action(){ Stealth.hideHere({ x:196, y:186, label:'Ная присела за спинкой дивана.' }); } },
+    { x:284,y:280,w:44,h:44, name:'hideNook', prompt:'Ниша за холодильником', hide:true,
+      action(){ Stealth.hideHere({ x:306, y:326, label:'Ная втиснулась между шкафом и стеной.' }); } },
+    { x:82,y:298,w:40,h:34, name:'noiseDishes', prompt:'Стопка посуды', noise:true,
+      action(){ Stealth.makeNoise(100, 322, 'Посуда звякнула — громко, на весь дом.'); } },
+  ],
+  npcs: [],
+},
+
+madFloor2: {
+  name:"Дом Мадлен. Второй этаж", music:'sad', w:360, h:400,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.08, wind:0 },
+  light:{ tint:'#191520', dark:.44 },
+  lights:[
+    {x:78,y:120,r:44,c:'#cfe0e8',i:.22},{x:262,y:120,r:52,c:'#ffd0a0',i:.30},
+    {x:100,y:280,r:50,c:'#ffd8a8',i:.26},{x:272,y:330,r:44,c:'#ffcf90',i:.22},
+  ],
+  bgPaint(ctx) {
+    paintHousePlan(ctx, 360, 400, {
+      wall:'#57464e', wall2:'#4a3b43', floor:'#79664f', floor2:'#695742', wallH:52,
+      zones:[
+        { x:8,   y:52,  w:150, h:116, name:'ВАННАЯ',   floor:'#7f8c90', floor2:'#6f7c80', tiles:true },
+        { x:166, y:52,  w:186, h:116, name:'СПАЛЬНЯ',  floor:'#7d6250', floor2:'#6c5343' },
+        { x:8,   y:176, w:196, h:110, name:'БИБЛИОТЕКА', floor:'#7b6853', floor2:'#6b5846' },
+        { x:212, y:176, w:140, h:216, name:'КОРИДОР',  floor:'#6f5c4a', floor2:'#604e3e' },
+        { x:8,   y:294, w:196, h:98,  name:'ГОСТЕВАЯ', floor:'#77644f', floor2:'#675441' },
+      ],
+      parts:[
+        { x:158, y:52,  w:8,   h:66 }, { x:158, y:146, w:8, h:22 },
+        { x:8,   y:168, w:204, h:8 }, { x:248, y:168, w:104, h:8 },
+        { x:204, y:176, w:8,   h:60 }, { x:204, y:290, w:8, h:102 },
+        { x:8,   y:286, w:120, h:8 }, { x:172, y:286, w:32, h:8 },
+      ],
+    });
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('ВНИЗ', 268, 214); ctx.fillText('НАВЕРХ', 292, 300);
+  },
+  objects: [
+    // ванная
+    { t:'bathtub', x:40, y:120 }, { t:'sink', x:100, y:106 },
+    { t:'toilet', x:134, y:126 }, { t:'window_in', x:60, y:34 },
+    // спальня Мадлен: кровать, туалетный столик, свеча у изголовья
+    { t:'bed_double', x:262, y:118 }, { t:'dresser', x:328, y:104 },
+    { t:'mirror_tall', x:186, y:96 }, { t:'candle', x:314, y:76 },
+    { t:'window_in', x:262, y:34 }, { t:'rug_warm', x:230, y:150 },
+    // библиотека: стеллажи закрывают обзор от лестницы
+    { t:'library_shelf', x:40, y:212 }, { t:'library_shelf', x:110, y:212 },
+    { t:'desk', x:70, y:266 }, { t:'armchair', x:160, y:238 },
+    { t:'lamp_floor', x:186, y:200 }, { t:'book_stack', x:130, y:262 },
+    // коридор и лестницы
+    { t:'stairs_up', x:326, y:250 }, { t:'stairs_up', x:326, y:388 },
+    { t:'painting', x:290, y:180 }, { t:'radiator', x:224, y:250 },
+    // гостевая
+    { t:'bed_single', x:60, y:340 }, { t:'dresser', x:140, y:330 },
+    { t:'wardrobe', x:176, y:376 }, { t:'photo_frame', x:100, y:300 },
+  ],
+  walls: [
+    {x:0,y:0,w:360,h:52},{x:0,y:52,w:8,h:348},{x:352,y:52,w:8,h:348},{x:0,y:394,w:360,h:6},
+    {x:158,y:52,w:8,h:66},{x:158,y:146,w:8,h:22},
+    {x:8,y:168,w:204,h:8},{x:248,y:168,w:104,h:8},
+    {x:204,y:176,w:8,h:60},{x:204,y:290,w:8,h:102},
+    {x:8,y:286,w:120,h:8},{x:172,y:286,w:32,h:8},
+  ],
+  spawn:{ fromStairs:[300, 120], fromUp:[300, 330], default:[300, 200] },
+  interactables: [
+    { x:300,y:170,w:52,h:44, name:'down', prompt:'Вниз',
+      action: async ()=> { Stealth.mark(0, 268, 200); await changeRoom('madFloor1', 268, 200); } },
+    { x:300,y:308,w:52,h:44, name:'up', prompt:'Лестница на чердак',
+      action: async ()=> { Stealth.mark(2, 268, 210); await changeRoom('madFloor3', 268, 210); } },
+    { x:300,y:80,w:56,h:44, name:'bedDresser', prompt:'Туалетный столик',
+      action(){ Stealth.pick('bedDresser', this); } },
+    { x:26,y:190,w:44,h:40, name:'libShelfA', prompt:'Стеллаж у окна',
+      action(){ Stealth.pick('libShelfA', this); } },
+    { x:52,y:244,w:44,h:38, name:'libDesk', prompt:'Письменный стол',
+      action(){ Stealth.pick('libDesk', this); } },
+    { x:122,y:308,w:44,h:38, name:'guestDresser', prompt:'Комод в гостевой',
+      action(){ Stealth.pick('guestDresser', this); } },
+    { x:158,y:352,w:44,h:44, name:'hideWardrobe', prompt:'Шкаф', hide:true,
+      action(){ Stealth.hideHere({ x:176, y:382, label:'Ная забралась в шкаф и притянула дверцу.' }); } },
+    { x:24,y:96,w:40,h:48, name:'hideCurtain', prompt:'За занавеской ванной', hide:true,
+      action(){ Stealth.hideHere({ x:40, y:140, label:'Ная замерла за занавеской.' }); } },
+    { x:84,y:236,w:44,h:34, name:'noiseBooks', prompt:'Стопка книг', noise:true,
+      action(){ Stealth.makeNoise(130, 262, 'Книги посыпались на пол.'); } },
+  ],
+  npcs: [],
+},
+
+madFloor3: {
+  name:"Дом Мадлен. Чердак", music:'sad', w:360, h:340,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.16, wind:0 },
+  light:{ tint:'#140f1a', dark:.52 },
+  lights:[
+    {x:96,y:120,r:40,c:'#d8c090',i:.18},{x:272,y:126,r:56,c:'#c060ff',i:.34},
+    {x:150,y:280,r:48,c:'#ffd0a0',i:.24},
+  ],
+  bgPaint(ctx) {
+    paintHousePlan(ctx, 360, 340, {
+      wall:'#4c3d46', wall2:'#40333a', floor:'#6d5a4a', floor2:'#5e4c3e', wallH:48,
+      zones:[
+        { x:8,   y:48,  w:150, h:132, name:'КЛАДОВАЯ',  floor:'#6a5849', floor2:'#5b4a3c' },
+        { x:166, y:48,  w:186, h:132, name:'РИТУАЛЬНАЯ', floor:'#5a3a46', floor2:'#4c303a' },
+        { x:8,   y:188, w:344, h:144, name:'КАБИНЕТ',   floor:'#73604c', floor2:'#634f3f' },
+      ],
+      parts:[
+        { x:158, y:48, w:8, h:80 }, { x:158, y:156, w:8, h:24 },
+        { x:8,   y:180, w:196, h:8 }, { x:252, y:180, w:100, h:8 },
+      ],
+    });
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
+    ctx.fillText('ВНИЗ', 300, 206);
+  },
+  objects: [
+    // кладовая
+    { t:'metal_shelf', x:40, y:96 }, { t:'crate_stack', x:104, y:104 },
+    { t:'chest', x:46, y:158 }, { t:'crate_stack', x:130, y:160 },
+    // ритуальная комната: круг, алтарь, склянки
+    { t:'rune_circle', x:262, y:104 }, { t:'ritual_altar', x:262, y:126 },
+    { t:'candle', x:206, y:80 }, { t:'candle', x:318, y:80 },
+    { t:'candle', x:206, y:160 }, { t:'candle', x:318, y:160 },
+    { t:'jar_shelf', x:336, y:150 },
+    // кабинет
+    { t:'desk', x:150, y:270 }, { t:'armchair', x:96, y:282 },
+    { t:'stairs_up', x:326, y:322 }, { t:'globe_stand', x:230, y:276 },
+    { t:'library_shelf', x:40, y:244 }, { t:'bookshelf', x:274, y:244 },
+  ],
+  walls: [
+    {x:0,y:0,w:360,h:48},{x:0,y:48,w:8,h:292},{x:352,y:48,w:8,h:292},{x:0,y:334,w:360,h:6},
+    {x:158,y:48,w:8,h:80},{x:158,y:156,w:8,h:24},
+    {x:8,y:180,w:196,h:8},{x:252,y:180,w:100,h:8},
+  ],
+  spawn:{ fromStairs:[300, 130], default:[300, 200] },
+  interactables: [
+    { x:300,y:242,w:52,h:44, name:'down', prompt:'Вниз',
+      action: async ()=> { Stealth.mark(1, 268, 330); await changeRoom('madFloor2', 268, 330); } },
+    { x:238,y:104,w:52,h:44, name:'altar', prompt:'Алтарь',
+      action(){ Stealth.pick('altar', this); } },
+    { x:316,y:126,w:40,h:44, name:'jars', prompt:'Полка со склянками',
+      action(){ Stealth.pick('jars', this); } },
+    { x:30,y:136,w:40,h:34, name:'chest', prompt:'Сундук',
+      action(){ Stealth.pick('chest', this); } },
+    { x:128,y:246,w:48,h:40, name:'studyDesk', prompt:'Письменный стол',
+      action(){ Stealth.pick('studyDesk', this); } },
+    { x:252,y:226,w:44,h:40, name:'studyShelf', prompt:'Книжный стеллаж',
+      action(){ Stealth.pick('studyShelf', this); } },
+    { x:86,y:80,w:44,h:44, name:'hideCrates', prompt:'За ящиками', hide:true,
+      action(){ Stealth.hideHere({ x:104, y:126, label:'Ная присела за ящиками.' }); } },
+    { x:196,y:60,w:36,h:34, name:'noiseCandle', prompt:'Свеча на подставке', noise:true,
+      action(){ Stealth.makeNoise(206, 80, 'Подсвечник с грохотом упал.'); } },
+  ],
+  npcs: [],
+},
+
+/* ---------------------------------------------------------------- */
 witch2House: {
   /* Роза: старый дом, заваленный книгами. Тут живут восемьдесят два года
      подряд — фотографии по всем стенам, кресло-качалка у камина, стопки
@@ -13770,7 +14033,7 @@ backAlley: {
   ],
   interactables: [
     { x:100,y:258,w:40,h:34, name:'exit', prompt:'Уйти', action: async ()=> await changeRoom('street', 60, 220) },
-    { x:92,y:94,w:56,h:32, name:'window', prompt:'Окно', action(){ Scene.play('lonerBreakInScene'); }},
+    { x:92,y:94,w:56,h:32, name:'window', prompt:'Окно', action(){ Scene.play('madBreakIn'); }},
     { x:64,y:194,w:40,h:34, name:'crate', prompt:'Ящики', action(){
         Dialogue.start([{who:'naya',expr:'normal',text:'Если встать на ящик, я дотянусь до окна. Сью бы просто постучала в дверь.'}]);
       }},
@@ -18803,6 +19066,28 @@ const Player = {
 function playerBox(x, y) { return { x:x - Player.w/2, y:y - Player.h, w:Player.w, h:Player.h }; }
 function rectHit(a, b) { return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
 
+/* Пересекает ли отрезок прямоугольник. Нужен полю зрения: конус чего-то
+   стоит только тогда, когда его лучи упираются в стены и мебель. */
+function segRect(x0, y0, x1, y1, r) {
+  const rx = r.x, ry = r.y, rw = r.w, rh = r.h;
+  if (x0 >= rx && x0 <= rx + rw && y0 >= ry && y0 <= ry + rh) return true;
+  if (x1 >= rx && x1 <= rx + rw && y1 >= ry && y1 <= ry + rh) return true;
+  const dx = x1 - x0, dy = y1 - y0;
+  /* Отсечение отрезка прямоугольником по Лианг-Барски: четыре границы,
+     на каждой сужаем допустимый отрезок параметра. */
+  let t0 = 0, t1 = 1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x0 - rx, rx + rw - x0, y0 - ry, ry + rh - y0];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return false; continue; }
+    const t = q[i] / p[i];
+    if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+    else          { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return true;
+}
+
+
 function isBlocked(x, y) {
   const room = Rooms[gameState.currentRoom];
   const box = playerBox(x, y);
@@ -20723,6 +21008,722 @@ const Chase = {
   stop() {
     if (Game.chase) Game.chase.active = false;
     if (ChaseRun.resolve) { ChaseRun.finish(!!F('lonerEscaped')); }
+  },
+};
+
+/* =====================================================================
+   STEALTH — ПРОНИКНОВЕНИЕ В ДОМ ВЕДЬМЫ
+
+   Две кражи в игре раньше были сценами: несколько реплик, вспышка, флаг.
+   Теперь это два проникновения, которые игрок действительно проходит.
+
+   Система намеренно живёт ПОВЕРХ обычной игры, а не рядом с ней. Дом
+   ведьмы — это обычные комнаты `Rooms` со своими стенами, мебелью и
+   коллизией; Ная ходит теми же кнопками и тем же tryMove. Stealth
+   добавляет к этому четыре вещи: хозяйку с полем зрения, шум, укрытия и
+   цель. Поэтому ничего из существующего — управление, сохранения,
+   переходы, диалоги — трогать не пришлось.
+
+   Устройство:
+
+     Stealth      — миссия целиком: этажи, цель, тревога, чекпоинты;
+     Stealth.W    — хозяйка дома: состояние, маршрут, зрение, слух;
+     Stealth.SUE  — Сью: отвлечения во второй краже.
+
+   Главное правило: честность. Ведьма видит только то, что реально
+   попадает в её конус и не закрыто стеной или крупной мебелью, и слышит
+   только то, что действительно прозвучало рядом. Никакого «AI просто
+   знает, где игрок».                                                  */
+const Stealth = {
+  on:false, mission:null, def:null,
+  floor:0,                       // на каком этаже игрок
+  goal:'', alarm:0,              // alarm 0..1 — общая напряжённость дома
+  found:false, taken:false, escaped:false,
+  noises:[], hides:[], searched:{},
+  hidden:null,                   // в каком укрытии сидит Ная
+  caught:0, checkpoint:null,
+  hintPulse:0,
+
+  /* Балансные числа собраны в одном месте: миссии отличаются не кодом, а
+     этими значениями. */
+  CFG: {
+    VISION_RANGE: 96,            // как далеко видит, пикселей
+    VISION_ANGLE: 0.62,          // полуугол конуса, радиан (~36°)
+    VISION_NEAR:  22,            // вплотную замечает независимо от угла
+    DETECT_TIME:  900,           // сколько миллисекунд смотрит, прежде чем узнать
+    LOSE_TIME:   2600,           // сколько ищет, потеряв из виду
+    HEARING:      88,            // радиус слуха для обычного шума
+    PATROL_SPEED: 0.030,         // пикселей на миллисекунду
+    CHASE_SPEED:  0.062,
+    SEARCH_TIME: 4200,
+    CATCH_DIST:   14,
+  },
+
+  /* ---------- запуск и конец ---------- */
+  begin(id) {
+    const def = this.MISSIONS[id];
+    if (!def) { console.warn('stealth: нет миссии', id); return Promise.resolve(false); }
+    this.on = true; this.mission = id; this.def = def;
+    this.goal = def.goal;
+    this.alarm = 0; this.found = false; this.taken = false; this.escaped = false;
+    this.noises = []; this.searched = {}; this.hidden = null; this.caught = 0;
+    this.spot = def.spot ? def.spot() : def.spots[0];   // где лежит амулет в этот раз
+    this.W.spawn(def.witch);
+    this.SUE.reset(def.sue || 0);
+    this.checkpoint = { floor:def.start.floor, x:def.start.x, y:def.start.y };
+    Game.mode = 'explore';
+    return new Promise(res => { this._resolve = res; });
+  },
+  finish(ok) {
+    this.on = false;
+    const done = this._resolve; this._resolve = null;
+    this.W.clear();
+    Music.setNearGain && Music.setNearGain(1);
+    if (done) done(!!ok);
+  },
+
+  /* ---------- вспомогательное ---------- */
+  room() { return Rooms[gameState.currentRoom]; },
+  onFloor(i) { return this.def && this.def.floors[i] === gameState.currentRoom; },
+  floorOf(roomKey) { return this.def ? this.def.floors.indexOf(roomKey) : -1; },
+  sameFloor() { return this.on && this.W.floor === this.floorOf(gameState.currentRoom); },
+
+  /* Луч из точки в точку не должен проходить сквозь стену или крупную
+     мебель. Именно это отличает честный конус от треугольника поверх
+     планировки. */
+  blocksSight(x0, y0, x1, y1) {
+    const room = this.room(); if (!room) return true;
+    for (const w of room.walls) if (segRect(x0, y0, x1, y1, w)) return true;
+    for (const o of World.objectsOf(room)) {
+      const m = Art.meta(o.t); if (!m || !m.foot) continue;
+      if (m.flat || m.low) continue;                 // ковры и низкое не закрывают
+      const f = Art.footOf(o);
+      if (f && segRect(x0, y0, x1, y1, f)) return true;
+    }
+    return false;
+  },
+
+  /* ---------- шум ---------- */
+  noise(x, y, radius, power, who) {
+    if (!this.on) return;
+    this.noises.push({ x, y, r:radius, p:power, t:520, floor:this.floorOf(gameState.currentRoom), who:who || 'naya' });
+    if (this.noises.length > 8) this.noises.shift();
+  },
+
+  /* ---------- укрытия ---------- */
+  hideIn(spot) {
+    if (!this.on) return;
+    this.hidden = spot;
+    this.noise(Player.x, Player.y, 40, 0.4, 'hide');
+    UI.toast(spot.label || 'Ная спряталась.', 1500);
+  },
+  leaveHide() {
+    if (!this.hidden) return;
+    this.hidden = null;
+    UI.toast('Ная выбралась.', 1100);
+  },
+
+  /* ---------- цикл ---------- */
+  update(dt) {
+    if (!this.on || !gameState) return;
+    const f = this.floorOf(gameState.currentRoom);
+    if (f >= 0) this.floor = f;
+    for (const n of this.noises) n.t -= dt;
+    this.noises = this.noises.filter(n => n.t > 0);
+    this.W.update(dt);
+    this.SUE.update(dt);
+    /* Напряжённость дома тянется за состоянием хозяйки — от неё зависят
+       музыка и то, как выглядит конус. */
+    const want = this.W.state === 'CHASE' ? 1
+               : this.W.state === 'ALERT' || this.W.state === 'SEARCH' ? 0.72
+               : this.W.state === 'INVESTIGATE' ? 0.45
+               : this.W.state === 'SUSPICIOUS' ? 0.26 : 0;
+    this.alarm += (want - this.alarm) * Math.min(1, dt / 420);
+    this.music();
+    this.hintPulse = Math.max(0, this.hintPulse - dt);
+    if (this.hintPulse <= 0) { this.hintPulse = 900; this.crystalHint(); }
+  },
+
+  /* Музыка идёт слоями: тихо, тревожно, погоня. Слой выбирается по
+     состоянию хозяйки, а не по событию, поэтому напряжение спадает само,
+     как только она успокаивается. */
+  music() {
+    const want = this.alarm > 0.66 ? 'chase' : this.alarm > 0.22 ? 'tense' : (this.def.calm || 'sad');
+    if (Music.cur !== want) Music.play(want, this.alarm > 0.22 ? 1 : 0);
+  },
+
+  /* Кристалл отзывается на близость амулета, но не показывает его сквозь
+     стены: он только сужает область. */
+  crystalHint() {
+    if (!this.on || this.taken || !this.spot) return;
+    if (this.floorOf(gameState.currentRoom) !== this.spot.floor) return;
+    const d = Math.hypot(Player.x - this.spot.x, Player.y - this.spot.y);
+    if (d > 120) return;
+    const k = 1 - d / 120;
+    FX.spawn(Player.x, Player.y - 12, 1 + (k > 0.6 ? 1 : 0),
+             { color:'#c060ff', rise:-0.25, life:40 + k * 40 });
+    if (k > 0.72 && Math.random() < 0.4) Audio.beep(660, .05, 'sine', .03);
+  },
+
+  /* ---------- поиск амулета ---------- */
+  search(place) {
+    if (!this.on) return null;
+    this.noise(Player.x, Player.y, 56, 0.5, 'search');
+    const key = place.id;
+    const isIt = this.spot && this.spot.id === key;
+    this.searched[key] = true;
+    if (!isIt) return place.empty || '(Ничего. Только чужие вещи, которые я трогаю без спроса.)';
+    this.taken = true;
+    this.goal = 'Уйти из дома.';
+    this.alarm = Math.max(this.alarm, 0.5);
+    this.W.suspect(this.spot.x, this.spot.y, 1);   // дом замечает пропажу
+    return null;                                    // текст выдаёт сцена
+  },
+};
+
+/* ---------------------------------------------------------------------
+   НАВИГАЦИЯ ПО ДОМУ.
+
+   Первый вариант вёл хозяйку к точке по прямой, и она вставала в первую
+   же перегородку: маршрут через дверной проём пришлось бы выверять
+   вручную, по три-четыре точки на каждый поворот, и в двух домах на
+   шесть этажей это кончилось бы опечатками.
+
+   Поэтому дом один раз разбирается на сетку проходимых клеток, и путь
+   ищется поиском в ширину. Маршрут теперь задаётся крупно — «встань у
+   плиты», «загляни в библиотеку», — а как туда дойти, система считает
+   сама, по тем же стенам и той же мебели, что видит игрок.            */
+Stealth.nav = {
+  CELL: 8, grids: {},
+
+  grid(roomKey) {
+    if (this.grids[roomKey]) return this.grids[roomKey];
+    const room = Rooms[roomKey];
+    const C = this.CELL;
+    const w = Math.ceil(room.w / C), h = Math.ceil(room.h / C);
+    const g = new Uint8Array(w * h);
+    for (let gy = 0; gy < h; gy++) {
+      for (let gx = 0; gx < w; gx++) {
+        const x = gx * C + C / 2, y = gy * C + C / 2;
+        const box = { x:x - 5, y:y - 5, w:10, h:7 };
+        let blocked = x < 6 || y < 6 || x > room.w - 6 || y > room.h - 4;
+        if (!blocked) for (const wl of room.walls) if (rectHit(box, wl)) { blocked = true; break; }
+        if (!blocked) for (const o of (room.objects || [])) {
+          const m = Art.meta(o.t); if (!m || !m.foot) continue;
+          if (rectHit(box, { x:o.x + m.foot.x, y:o.y + m.foot.y, w:m.foot.w, h:m.foot.h })) { blocked = true; break; }
+        }
+        g[gy * w + gx] = blocked ? 1 : 0;
+      }
+    }
+    return (this.grids[roomKey] = { g, w, h, C });
+  },
+  free(gr, gx, gy) { return gx >= 0 && gy >= 0 && gx < gr.w && gy < gr.h && !gr.g[gy * gr.w + gx]; },
+  /* Ближайшая проходимая клетка — нужна, когда точку маршрута поставили
+     впритык к мебели. */
+  snap(gr, gx, gy) {
+    if (this.free(gr, gx, gy)) return [gx, gy];
+    for (let r = 1; r < 9; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++)
+          if (Math.abs(dx) === r || Math.abs(dy) === r)
+            if (this.free(gr, gx + dx, gy + dy)) return [gx + dx, gy + dy];
+    return null;
+  },
+  /* Путь как список точек в пикселях. Диагонали разрешены только когда
+     свободны обе соседние клетки — иначе фигура режет углы стен. */
+  path(roomKey, from, to) {
+    const gr = this.grid(roomKey), C = gr.C;
+    const a = this.snap(gr, Math.floor(from.x / C), Math.floor(from.y / C));
+    const b = this.snap(gr, Math.floor(to.x / C), Math.floor(to.y / C));
+    if (!a || !b) return null;
+    const start = a[1] * gr.w + a[0], goal = b[1] * gr.w + b[0];
+    if (start === goal) return [{ x:to.x, y:to.y }];
+    const prev = new Int32Array(gr.w * gr.h).fill(-1);
+    const seen = new Uint8Array(gr.w * gr.h);
+    const q = [start]; seen[start] = 1;
+    const D = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+    let head = 0, found = false;
+    while (head < q.length) {
+      const cur = q[head++];
+      if (cur === goal) { found = true; break; }
+      const cx = cur % gr.w, cy = (cur / gr.w) | 0;
+      for (const [dx, dy] of D) {
+        const nx = cx + dx, ny = cy + dy;
+        if (!this.free(gr, nx, ny)) continue;
+        if (dx && dy && (!this.free(gr, cx + dx, cy) || !this.free(gr, cx, cy + dy))) continue;
+        const ni = ny * gr.w + nx;
+        if (seen[ni]) continue;
+        seen[ni] = 1; prev[ni] = cur; q.push(ni);
+      }
+    }
+    if (!found) return null;
+    const out = [];
+    for (let cur = goal; cur !== start; cur = prev[cur]) {
+      const cx = cur % gr.w, cy = (cur / gr.w) | 0;
+      out.push({ x:cx * C + C / 2, y:cy * C + C / 2 });
+      if (prev[cur] < 0) break;
+    }
+    out.reverse();
+    if (out.length) { out[out.length - 1] = { x:to.x, y:to.y }; }
+    return out;
+  },
+};
+
+/* ---------------------------------------------------------------------
+   ХОЗЯЙКА ДОМА.
+
+   Восемь состояний, и переходы между ними должны быть понятны игроку с
+   первого раза: заметила — насторожилась — пошла проверять — увидела —
+   погналась — потеряла — поискала — вернулась к обходу. Ничего
+   случайного: если ведьма пошла в вашу сторону, тому была причина,
+   которую можно было увидеть или услышать.                            */
+Stealth.W = {
+  active:false, floor:0, x:0, y:0, dir:0, aim:0,
+  state:'PATROL', wp:0, wait:0, see:0, lose:0, searchT:0,
+  target:null, last:null, sprite:'witch1', name:'Мадлен', route:null,
+
+  spawn(w) {
+    this.active = true;
+    this.sprite = w.sprite; this.name = w.name;
+    this.routes = w.routes;                 // маршрут на каждый этаж
+    this.floor = w.floor || 0;
+    this.route = this.routes[this.floor];
+    this.wp = 0; this.wait = 0; this.see = 0; this.lose = 0; this.searchT = 0;
+    this.state = 'PATROL'; this.target = null; this.last = null;
+    const p = this.route[0];
+    this.x = p.x; this.y = p.y; this.dir = p.dir || 0; this.aim = this.dir;
+  },
+  clear() { this.active = false; },
+
+  /* Ная видна, если она на том же этаже, не в укрытии, попадает в конус
+     (или стоит вплотную) и между ними нет стены. */
+  canSee() {
+    if (!Stealth.sameFloor() || Stealth.hidden) return false;
+    const dx = Player.x - this.x, dy = Player.y - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d > Stealth.CFG.VISION_RANGE) return false;
+    if (d > Stealth.CFG.VISION_NEAR) {
+      let a = Math.atan2(dy, dx) - this.dir;
+      while (a > Math.PI) a -= Math.PI * 2;
+      while (a < -Math.PI) a += Math.PI * 2;
+      if (Math.abs(a) > Stealth.CFG.VISION_ANGLE) return false;
+    }
+    return !Stealth.blocksSight(this.x, this.y - 6, Player.x, Player.y - 6);
+  },
+
+  /* Внешний повод насторожиться: шум, пропажа, окрик Сью. */
+  suspect(x, y, power) {
+    if (!this.active) return;
+    if (this.state === 'CHASE') return;
+    this.last = { x, y };
+    this.target = { x, y };
+    this.state = power >= 1 ? 'INVESTIGATE' : 'SUSPICIOUS';
+    this.wait = 0; this.trail = null;
+  },
+
+  /* Шаг к цели идёт не по прямой, а по найденному пути: дом полон
+     перегородок, и по прямой хозяйка вставала в первую же стену. Путь
+     пересчитывается, только когда цель сменилась или маршрут кончился —
+     каждый кадр это было бы расточительно. */
+  step(dt, speed) {
+    const t = this.target; if (!t) return true;
+    if (Math.hypot(t.x - this.x, t.y - this.y) < 5) { this.trail = null; return true; }
+    if (!this.trail || !this.trailTo ||
+        Math.hypot(this.trailTo.x - t.x, this.trailTo.y - t.y) > 10) {
+      this.trail = Stealth.nav.path(gameState.currentRoom, this, t) || [t];
+      this.trailTo = { x:t.x, y:t.y };
+      this.ti = 0;
+    }
+    let step = speed * dt;
+    while (step > 0 && this.trail && this.ti < this.trail.length) {
+      const n = this.trail[this.ti];
+      const dx = n.x - this.x, dy = n.y - this.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 1.5) { this.ti++; continue; }
+      const k = Math.min(d, step) / d;
+      const nx = this.x + dx * k, ny = this.y + dy * k;
+      if (this.solid(nx, ny)) { this.trail = null; break; }  // мир изменился — пересчитаем
+      this.x = nx; this.y = ny;
+      this.aim = Math.atan2(dy, dx);
+      step -= d * k;
+      if (d * k >= d - 0.01) this.ti++;
+    }
+    if (this.trail && this.ti >= this.trail.length) { this.trail = null; return true; }
+    return Math.hypot(t.x - this.x, t.y - this.y) < 5;
+  },
+  solid(x, y) {
+    const room = Stealth.room(); if (!room) return true;
+    const box = { x:x - 5, y:y - 5, w:10, h:7 };
+    for (const w of room.walls) if (rectHit(box, w)) return true;
+    return World.blockedByProps(room, box);
+  },
+
+  update(dt) {
+    if (!this.active || !Stealth.on) return;
+    const C = Stealth.CFG;
+
+    /* Слух работает всегда и одинаково во всех состояниях. */
+    for (const n of Stealth.noises) {
+      if (n.heard || n.floor !== this.floor) continue;
+      const d = Math.hypot(n.x - this.x, n.y - this.y);
+      if (d < C.HEARING * (0.6 + n.p * 0.8)) { n.heard = true; this.suspect(n.x, n.y, n.p >= 0.8 ? 1 : 0); }
+    }
+
+    const sees = this.canSee();
+    if (sees) {
+      this.see += dt; this.lose = 0;
+      this.last = { x:Player.x, y:Player.y };
+    } else {
+      this.see = Math.max(0, this.see - dt * 0.6);
+      this.lose += dt;
+    }
+
+    switch (this.state) {
+      case 'PATROL': case 'IDLE': {
+        if (sees && this.see > C.DETECT_TIME * 0.3) { this.state = 'SUSPICIOUS'; break; }
+        const p = this.route[this.wp];
+        this.target = p;
+        if (this.step(dt, C.PATROL_SPEED)) {
+          this.wait += dt;
+          if (p.dir !== undefined) this.aim = p.dir;      // на точке смотрит куда велено
+          if (this.wait > (p.wait || 700)) {
+            this.wait = 0;
+            this.wp = (this.wp + 1) % this.route.length;
+            const nxt = this.route[this.wp];
+            if (nxt.floor !== undefined && nxt.floor !== this.floor) this.moveFloor(nxt.floor);
+          }
+        }
+        break;
+      }
+      case 'SUSPICIOUS':
+        if (sees && this.see > C.DETECT_TIME) { this.alert(); break; }
+        if (this.last) this.aim = Math.atan2(this.last.y - this.y, this.last.x - this.x);
+        this.wait += dt;
+        if (this.wait > 900) { this.wait = 0; this.state = 'INVESTIGATE'; this.target = this.last; }
+        if (!sees && this.lose > 2600) this.calm();
+        break;
+      case 'INVESTIGATE':
+        if (sees && this.see > C.DETECT_TIME * 0.6) { this.alert(); break; }
+        if (this.step(dt, C.PATROL_SPEED * 1.35)) {
+          this.wait += dt;
+          this.aim += dt * 0.0018;                        // на месте осматривается
+          if (this.wait > 1500) { this.wait = 0; this.calm(); }
+        }
+        break;
+      case 'ALERT':
+        this.wait += dt;
+        if (this.wait > 420) { this.wait = 0; this.state = 'CHASE'; }
+        break;
+      case 'CHASE': {
+        this.target = sees ? { x:Player.x, y:Player.y } : this.last;
+        this.step(dt, C.CHASE_SPEED);
+        if (sees && Math.hypot(Player.x - this.x, Player.y - this.y) < C.CATCH_DIST) { Stealth.caughtNow(); break; }
+        if (!sees && this.lose > C.LOSE_TIME) { this.state = 'SEARCH'; this.searchT = C.SEARCH_TIME; }
+        break;
+      }
+      case 'SEARCH':
+        this.searchT -= dt;
+        if (sees && this.see > C.DETECT_TIME * 0.4) { this.alert(); break; }
+        if (this.step(dt, C.PATROL_SPEED * 1.2)) {
+          /* Ищет вокруг последнего места: расходится кругами, а не стоит. */
+          const a = Math.random() * Math.PI * 2, r = 26 + Math.random() * 40;
+          const b = this.last || this.route[this.wp];
+          this.target = { x:b.x + Math.cos(a) * r, y:b.y + Math.sin(a) * r };
+        }
+        if (this.searchT <= 0) this.calm();
+        break;
+      case 'RETURN':
+        this.target = this.route[this.wp];
+        if (this.step(dt, C.PATROL_SPEED)) this.state = 'PATROL';
+        break;
+    }
+
+    /* Голова поворачивается не мгновенно — по ней и читается направление. */
+    let da = this.aim - this.dir;
+    while (da > Math.PI) da -= Math.PI * 2;
+    while (da < -Math.PI) da += Math.PI * 2;
+    this.dir += da * Math.min(1, dt / 220);
+  },
+
+  alert() {
+    if (this.state === 'CHASE' || this.state === 'ALERT') return;
+    this.state = 'ALERT'; this.wait = 0;
+    Audio.beep(880, .10, 'square', .07);
+    setTimeout(() => Audio.beep(660, .16, 'square', .06), 110);
+    UI.toast(this.name + ': «Кто здесь?!»', 1600);
+  },
+  calm() {
+    this.state = 'RETURN'; this.wait = 0; this.see = 0; this.searchT = 0;
+    this.target = this.route[this.wp];
+  },
+  /* Переход между этажами: игрок видит её, только когда они на одном
+     этаже, но маршрут идёт дальше и без него. */
+  moveFloor(f) {
+    this.floor = f;
+    this.route = this.routes[f];
+    this.wp = 0;
+    const p = this.route[0];
+    this.x = p.x; this.y = p.y; this.dir = p.dir || 0; this.aim = this.dir;
+    this.trail = null; this.trailTo = null;
+    if (Stealth.floorOf(gameState.currentRoom) === f) UI.toast('Шаги совсем рядом.', 1200);
+  },
+};
+
+/* ---------------------------------------------------------------------
+   СЬЮ. Во второй краже она стоит снаружи и отвлекает хозяйку: стучит в
+   окно, роняет что-то у крыльца, зовёт со двора. Это не кнопка «замри» —
+   Сью создаёт шум в конкретной точке дома, и ведьма идёт туда сама, по
+   обычным правилам. Окно времени игрок использует уже собственными
+   ногами.                                                              */
+Stealth.SUE = {
+  left:0, cool:0, busy:0, spotIdx:0,
+  reset(n) { this.left = n; this.cool = 0; this.busy = 0; this.spotIdx = 0; },
+  ready() { return Stealth.on && this.left > 0 && this.cool <= 0 && this.busy <= 0; },
+  update(dt) {
+    if (this.cool > 0) this.cool -= dt;
+    if (this.busy > 0) {
+      this.busy -= dt;
+      if (this.busy <= 0) UI.toast('Сью: «Всё, больше не могу тянуть.»', 1600);
+    }
+  },
+  call() {
+    if (!this.ready()) {
+      UI.toast(this.left <= 0 ? 'Сью уже сделала всё, что могла.' : 'Сью ещё не может.', 1500);
+      return false;
+    }
+    const spots = Stealth.def.sueSpots || [];
+    const s = spots[this.spotIdx % spots.length] || { x:60, y:300, floor:0, line:'Сью стучит в окно.' };
+    this.spotIdx++;
+    this.left--; this.cool = 9000; this.busy = 4200;
+    /* Отвлечение — это громкий шум в точке, до которой ведьме идти. Если
+       она на другом этаже, она спускается: маршрут ведёт её туда. */
+    Stealth.noise(s.x, s.y, 200, 1, 'sue');
+    if (Stealth.W.floor !== s.floor) Stealth.W.moveFloor(s.floor);
+    Stealth.W.suspect(s.x, s.y, 1);
+    UI.toast('Сью: «' + (s.line || 'Сейчас!') + '»', 2200);
+    return true;
+  },
+};
+
+/* ---------------------------------------------------------------------
+   ПОИМКА. Не мгновенный проигрыш: хозяйка выставляет Наю за дверь, и
+   миссия продолжается с последней безопасной точки. Сюжет от этого не
+   ломается — ломается только попытка.                                  */
+Stealth.caughtNow = function () {
+  if (!this.on || this._caughtLock) return;
+  this._caughtLock = true;
+  this.caught++;
+  const cp = this.checkpoint;
+  Audio.beep(180, .30, 'sawtooth', .10);
+  FX.addShake(6);
+  UI.toast(this.W.name + ' схватила Наю за руку.', 2200);
+  fadeOut(420).then(async () => {
+    this.W.state = 'RETURN'; this.W.see = 0; this.W.lose = 0; this.W.searchT = 0;
+    this.W.moveFloor(this.def.witch.floor || 0);
+    this.alarm = 0.2;
+    if (this.caught >= 3) { await fadeIn(300); this._caughtLock = false; this.finish(false); return; }
+    const target = this.def.floors[cp.floor];
+    if (gameState.currentRoom !== target) await changeRoom(target, cp.x, cp.y);
+    else { Player.x = cp.x; Player.y = cp.y; }
+    this.hidden = null;
+    await fadeIn(420);
+    this._caughtLock = false;
+    UI.toast('Ная выскользнула во двор. Придётся заново.', 2400);
+  });
+};
+
+/* Чекпоинт ставится в местах, докуда точно дошли: у входа, на лестнице,
+   на найденном амулете. Без них длинный дом переигрывать невыносимо. */
+Stealth.mark = function (floor, x, y) {
+  if (!this.on) return;
+  this.checkpoint = { floor, x, y };
+};
+
+/* ---------------------------------------------------------------------
+   ОТРИСОВКА. Конус — часть сцены, а не интерфейс: полупрозрачный сектор,
+   который темнеет и краснеет по мере того, как хозяйка настораживается.
+   Над ней маленькая метка состояния — её хватает, чтобы понять,
+   заметили тебя или нет, и она не превращает экран в панель приборов. */
+Stealth.draw = function (ctx, camX, camY) {
+  if (!this.on || !this.W.active) return;
+  const W = this.W;
+  if (!this.sameFloor()) return;
+  const x = W.x - camX, y = W.y - camY;
+  const C = this.CFG;
+  const a = this.alarm;
+
+  /* Конус рисуется лучами: каждый луч упирается в стену, поэтому сектор
+     сам обтекает мебель и не светит сквозь перегородки. */
+  ctx.save();
+  const col = a > 0.66 ? [255, 70, 80] : a > 0.25 ? [255, 170, 70] : [210, 210, 190];
+  const alpha = 0.10 + a * 0.13;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 6);
+  const steps = 22;
+  for (let i = 0; i <= steps; i++) {
+    const ang = W.dir - C.VISION_ANGLE + (C.VISION_ANGLE * 2) * (i / steps);
+    let d = C.VISION_RANGE;
+    for (let t = 10; t <= C.VISION_RANGE; t += 7) {
+      const px = W.x + Math.cos(ang) * t, py = W.y - 6 + Math.sin(ang) * t;
+      if (this.blocksSight(W.x, W.y - 6, px, py)) { d = t - 7; break; }
+    }
+    ctx.lineTo(x + Math.cos(ang) * d, y - 6 + Math.sin(ang) * d);
+  }
+  ctx.closePath();
+  const gr = ctx.createRadialGradient(x, y - 6, 4, x, y - 6, C.VISION_RANGE);
+  gr.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${(alpha * 1.5).toFixed(3)})`);
+  gr.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+  ctx.fillStyle = gr; ctx.fill();
+  ctx.restore();
+
+  /* Сама хозяйка — обычной куклой из мира. */
+  const img = Assets.images[W.sprite];
+  if (img) {
+    shadowEllipse(ctx, x, y + 3, 7, 2.5, .32);
+    ctx.drawImage(img, Math.round(x - img.width / 2), Math.round(y + 4 - img.height));
+  }
+
+  /* Метка состояния: серая — обход, жёлтая — что-то услышала, оранжевая —
+     идёт проверять, красная — увидела. */
+  const mark = W.state === 'CHASE' || W.state === 'ALERT' ? '#ff4a5a'
+             : W.state === 'INVESTIGATE' || W.state === 'SEARCH' ? '#ffa03a'
+             : W.state === 'SUSPICIOUS' ? '#ffe06a' : '#9a9a9a';
+  const my = y - (img ? img.height : 18) - 6;
+  ctx.fillStyle = 'rgba(10,8,14,.7)'; ctx.fillRect(x - 5, my - 4, 10, 8);
+  ctx.fillStyle = mark; ctx.fillRect(x - 4, my - 3, 8, 6);
+  /* Пока подозрение растёт, метка заполняется — видно, сколько осталось. */
+  if (W.see > 0 && W.state !== 'CHASE') {
+    const k = Math.min(1, W.see / this.CFG.DETECT_TIME);
+    ctx.fillStyle = '#0d0a10'; ctx.fillRect(x - 4, my - 3, 8, 6);
+    ctx.fillStyle = mark; ctx.fillRect(x - 4, my + 3 - 6 * k, 8, 6 * k);
+  }
+};
+
+/* HUD миссии: цель, отвлечения Сью, спрятанность. Больше на экране во
+   время кражи ничего и не нужно. */
+Stealth.drawHud = function (ctx) {
+  if (!this.on) return;
+  const W = CONFIG.VIEW_W;
+  ctx.fillStyle = 'rgba(10,8,14,.72)'; ctx.fillRect(0, 0, W, 13);
+  ctx.fillStyle = '#e0c0a0'; ctx.font = '7px Courier New'; ctx.textAlign = 'left';
+  ctx.fillText('ЦЕЛЬ: ' + this.goal, 4, 9);
+  ctx.textAlign = 'right';
+  if ((this.def.sue || 0) > 0) ctx.fillText('СЬЮ: ' + this.SUE.left, W - 4, 9);
+  ctx.textAlign = 'left';
+  if (this.hidden) {
+    ctx.fillStyle = 'rgba(10,8,14,.7)';
+    ctx.fillRect(W / 2 - 40, CONFIG.VIEW_H - 22, 80, 12);
+    ctx.fillStyle = '#a0d0a0'; ctx.textAlign = 'center';
+    ctx.fillText('В УКРЫТИИ · ДЕЙСТВИЕ — ВЫЙТИ', W / 2, CONFIG.VIEW_H - 13);
+    ctx.textAlign = 'left';
+  }
+};
+
+/* ---------------------------------------------------------------------
+   ЧТО ДЕЛАЕТ ИГРОК. Четыре глагола, и все они работают через обычные
+   интерактивы комнаты: обыскать, спрятаться, шуметь, уйти. Никакого
+   отдельного управления у кражи нет — те же кнопки, что и везде.      */
+
+/* Обыскать место. Большинство мест пустые, и это правильно: поиск
+   существует, только если он может ничего не дать. */
+Stealth.pick = function (id, place) {
+  if (!this.on) {
+    return Dialogue.start([{who:'naya',expr:'normal',text:'(Чужие вещи. Не сейчас.)'}]);
+  }
+  if (this.taken) {
+    return Dialogue.start([{who:'naya',expr:'normal',text:'(Хватит. У меня есть то, за чем я шла.)'}]);
+  }
+  if (this.searched[id]) {
+    return Dialogue.start([{who:'naya',expr:'normal',text:'(Здесь я уже смотрела.)'}]);
+  }
+  this.searched[id] = true;
+  this.noise(Player.x, Player.y, 54, 0.45, 'search');
+  Audio.beep(300, .07, 'sine', .04);
+  const hit = this.spot && this.spot.id === id;
+  if (!hit) {
+    const lines = this.def.empty || ['(Ничего. Только чужая жизнь, разложенная по полкам.)'];
+    return Dialogue.start([{who:'naya',expr:'normal',text:lines[(Math.random()*lines.length)|0]}]);
+  }
+  this.taken = true;
+  this.goal = this.def.goalOut;
+  this.mark(this.floorOf(gameState.currentRoom), Player.x, Player.y);
+  FX.magicCircle(Player.x, Player.y - 4, '#c060ff', 1200);
+  Audio.beep(660, .18, 'sine', .07);
+  /* Пропажу дом замечает сразу: хозяйка идёт туда, где взяли. */
+  this.alarm = Math.max(this.alarm, 0.5);
+  this.W.suspect(Player.x, Player.y, 1);
+  return Scene.play(this.def.onTake);
+};
+
+/* Спрятаться и выйти — один и тот же интерактив. */
+Stealth.hideHere = function (spot) {
+  if (!this.on) return;
+  if (this.hidden) { this.leaveHide(); return; }
+  Player.x = spot.x; Player.y = spot.y;
+  this.hideIn(spot);
+};
+
+/* Шум — единственный способ подвинуть хозяйку, не выходя к ней. */
+Stealth.makeNoise = function (x, y, line) {
+  if (!this.on) return;
+  Audio.beep(220, .16, 'triangle', .08);
+  this.noise(x, y, 190, 1, 'prop');
+  UI.toast(line, 1900);
+};
+
+/* Уйти. Засчитывается только с амулетом и только через вход. */
+Stealth.leave = function () {
+  if (!this.on) return;
+  if (!this.taken) {
+    return Dialogue.start([{who:'naya',expr:'normal',text:'(Не с пустыми руками.)'}]);
+  }
+  this.escaped = true;
+  Scene.play(this.def.onLeave);
+};
+
+/* ---------------------------------------------------------------------
+   МИССИИ. Отличаются картой, местом амулета, числом отвлечений и
+   маршрутом хозяйки — не кодом.                                        */
+Stealth.MISSIONS = {
+  /* ПЕРВАЯ КРАЖА, ветка одиночки. Дом Мадлен, Ная одна.
+     Обучающая: один этаж патрулируется плотно, второй реже, чердак
+     хозяйка навещает редко — туда и стоит добраться. */
+  madeleine: {
+    goal: 'Найти амулет.', goalOut: 'Уйти из дома.',
+    calm: 'sad',
+    floors: ['madFloor1', 'madFloor2', 'madFloor3'],
+    start: { floor:0, x:300, y:80 },
+    witch: { sprite:'witch1', name:'Мадлен', floor:0, routes:[
+      /* Первый этаж хозяйка обходит чаще всего: гостиная, столовая,
+         кухня и обратно к лестнице. Второй — реже, чердак — совсем
+         редко, и туда-то и надо успеть. */
+      [ { x:268, y:210, dir:3.14, wait:1200 },
+        { x:150, y:212, dir:1.57, wait:1000 },
+        { x:100, y:352, dir:0,    wait:1400 },
+        { x:272, y:340, dir:-1.57, wait:1200 },
+        { x:268, y:210, dir:-1.57, wait:900, floor:1 } ],
+      [ { x:268, y:200, dir:3.14, wait:1100 },
+        { x:150, y:250, dir:3.14, wait:1400 },
+        { x:80,  y:140, dir:0,    wait:1000 },
+        { x:230, y:140, dir:1.57, wait:1600 },
+        { x:268, y:330, dir:1.57, wait:900, floor:0 } ],
+      [ { x:268, y:220, dir:3.14, wait:900 },
+        { x:230, y:130, dir:0,    wait:2000 },
+        { x:120, y:280, dir:3.14, wait:1400 },
+        { x:268, y:220, dir:-1.57, wait:800, floor:1 } ],
+    ]},
+    /* Амулет всегда в ритуальной комнате: в первую кражу игрок должен
+       понять правило, а не угадывать. Искать всё равно придётся — по
+       дороге три этажа и семь мест, где его могло бы не быть. */
+    spots: [ { id:'altar', floor:2, x:262, y:126 } ],
+    empty: [
+      '(Ничего. Только чужая жизнь, разложенная по полкам.)',
+      '(Нитки, пуговицы, квитанции. Обычные вещи обычной женщины.)',
+      '(Пусто. И мне почему-то стыдно, что я это открыла.)',
+      '(Лекарства. Много лекарств. Она старая, а я об этом не думала.)',
+    ],
+    onTake: 'madTakeScene', onLeave: 'madLeaveScene',
+    sue: 0,
   },
 };
 
@@ -24865,41 +25866,80 @@ lonerDoor: [
   ]},
 ],
 
-lonerBreakInScene: [
+madBreakIn: [
   { music:'tense' },
   { dlg:[
     {who:'naya',expr:'normal',text:'(Ящик. Окно. Задвижка старая.)'},
     {who:'naya',expr:'talk',text:'(Порог — это дверь. Про окна в правилах ничего не было.)'},
   ]},
   { sfx:'glass' }, { shake:2 },
-  { wait:500 },
+  { fadeOut:420 },
+  { room:'madFloor1', x:318, y:100 },
+  { fadeIn:520 },
   { dlg:[
     {who:'naya',expr:'shocked',text:'(Я внутри. Я правда внутри.)'},
-    {who:'naya',expr:'normal',text:'(Алтарь. Амулет. Вот он.)'},
+    {who:'naya',expr:'normal',text:'(Свет внизу горит. Она не спит.)'},
+    {who:'naya',expr:'talk',text:'(Значит — тихо. Смотреть, куда она идёт, и не попадаться ей на глаза.)'},
   ]},
-  { magic:'#c060ff', dur:1400 },
-  { sfx:'rune' },
+  async ()=>{
+    setFlag('lonerBreakIn');
+    const ok = await Stealth.begin('madeleine');
+    if (ok) await Scene.play('madAfterTheft');
+    else    await Scene.play('madCaughtOut');
+  },
+],
+
+/* Амулет найден. Ритуал не срабатывает — и это главный сюжетный узел
+   ветки: Ная вошла не через порог, договор её не принял. */
+madTakeScene: [
+  { sfx:'rune' }, { magic:'#c060ff', dur:1200 },
   { dlg:[
-    {who:'naya',expr:'talk',text:'(Читаю... "именем крови и порога"...)'},
+    {who:'naya',expr:'shocked',text:'(Вот он. Холодный, лёгкий, ничей.)'},
+    {who:'naya',expr:'talk',text:'(Читаю... «именем крови и порога»...)'},
     {who:'naya',expr:'shocked',text:'(Ничего. Он не отзывается.)'},
     {who:'naya',expr:'angry',text:'(Почему он не отзывается?!)'},
   ]},
-  { sfx:'scare' }, { shake:6 },
-  { flash:'#40a0ff', dur:350, peak:0.85 },
+  { sfx:'scare' }, { shake:5 },
   { dlg:[
-    {who:'witch1',expr:'shocked',name:'Мадлен',text:'Кто здесь?! Кто в моём доме?!'},
-    {who:'naya',expr:'shocked',text:'(Она проснулась. Бежать. БЕЖАТЬ.)'},
+    {who:'witch1',expr:'shocked',name:'Мадлен',text:'Кто здесь? Кто в моём доме?!'},
+    {who:'naya',expr:'shocked',text:'(Она услышала. Вниз. К окну. Бегом.)'},
   ]},
-  { fadeOut:600 },
-  { wait:800 },
-  { fadeIn:600 },
-  { flag:'lonerBreakIn' },
+  ()=>{ UI.toast('Мадлен проснулась. Уходи.', 2400); },
+],
+
+/* Выход. Ная уносит амулет, который для неё ничего не значит. */
+madLeaveScene: [
+  { fadeOut:520 },
+  { wait:400 },
+  { fadeIn:420 },
+  ()=>{ Stealth.finish(true); },
+],
+
+madAfterTheft: [
+  { music:'sad' },
+  { room:'oldTown', x:80, y:200 },
   { stats:{ witchAmbition:+6, humanity:-10 } },
   { dlg:[
-    {who:'naya',expr:'empty',text:'Я убежала. Без амулета, с рассечённой ладонью и в чужих цветах на куртке.'},
+    {who:'naya',expr:'empty',text:'Я ушла через то же окно. С амулетом, который молчит, и с рассечённой ладонью.'},
     {who:'naya',expr:'sad',text:'Ритуал не сработал, потому что я вошла не через порог. Я не приняла договор — договор не принял меня.'},
     {who:'naya',expr:'empty',text:'Сью была не помощницей. Сью была условием.'},
     {who:'naya',expr:'sad',text:'(...и не только для двери.)'},
+  ]},
+  { dlg:[{who:'naya',expr:'normal',text:'(Надо узнать, что говорят в коммуне. Может, обошлось.)'}] },
+],
+
+/* Поймали трижды — Мадлен выставляет Наю за дверь. Сюжет тот же: без
+   Сью амулет всё равно молчит, — но игрок не остаётся ни с чем. */
+madCaughtOut: [
+  { music:'sad' },
+  { fadeOut:500 },
+  { room:'oldTown', x:80, y:200 },
+  { fadeIn:500 },
+  { stats:{ witchAmbition:+2, humanity:-6 } },
+  { dlg:[
+    {who:'witch1',expr:'angry',name:'Мадлен',text:'Вон. И скажи той, кто тебя послал, что я её тоже помню.'},
+    {who:'naya',expr:'empty',text:'(Она не кричала. Она держала меня за руку и вывела, как ребёнка.)'},
+    {who:'naya',expr:'sad',text:'(Это хуже крика.)'},
   ]},
   { dlg:[{who:'naya',expr:'normal',text:'(Надо узнать, что говорят в коммуне. Может, обошлось.)'}] },
 ],
@@ -25689,6 +26729,9 @@ function drawRoom() {
     if (nAlpha < 1) ctx.globalAlpha = 1;
   }
 
+  // 3b. хозяйка дома и её поле зрения — только во время проникновения
+  if (Stealth.on) Stealth.draw(ctx, camX, camY);
+
   // 4. room-specific animated overlay (runes, glows, story markers)
   if (room.overPaint) { ctx.save(); ctx.translate(-camX, -camY); room.overPaint(ctx); ctx.restore(); }
   if (room.prologue) {
@@ -25764,6 +26807,10 @@ function drawRoom() {
     ctx.textAlign = 'left';
   }
 
+  /* HUD проникновения рисуется последним: цель и запас отвлечений не
+     должны прятаться за погодой и вспышками. */
+  if (Stealth.on) Stealth.drawHud(ctx);
+
   FX.drawOverlay(ctx);
 }
 
@@ -25809,6 +26856,7 @@ function tick(t) {
     const room = Rooms[gameState.currentRoom];
     if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true); Cam.update(dt);
                  Music.updateNear(room, Player.x, Player.y);
+                 Stealth.update(dt);
                  Prologue.updateSwing(dt); Prologue.updateLegend(dt); }
     drawRoom();
   }
