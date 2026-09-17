@@ -139,6 +139,43 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   if (!same(mourn.revived)) bad.push('после возрождения музыка не вернулась: ' + JSON.stringify(mourn.revived));
   if (!same(mourn.left))    bad.push('после «оставить мёртвой» музыка не вернулась: ' + JSON.stringify(mourn.left));
   mourn.endings.forEach((e, i) => { if (!/^end/.test(e || '')) bad.push('концовка ' + i + ' в трауре подменена на ' + e); });
+
+  /* 3b. Тема концовки продолжается НА карточке.
+     Раньше Endings.show() звал Music.stop(), и ровно в тот момент, ради
+     которого тема и написана, наступала тишина. Проверяем оба случая:
+     тему включила финальная сцена (тогда переход не должен её задеть) и
+     тему никто не включал (тогда карточка включает её сама). */
+  const cards = await p.evaluate(async () => {
+    const out = {};
+    const TR = { I:'endLoner', II:'endWitch', III:'endRevenge', IV:'endStay' };
+    for (const id of ['I','II','III','IV']) {
+      Music.stop(); await new Promise(r => setTimeout(r, 60));
+      Music.play(TR[id]);                       // как это делает финальная сцена
+      const before = { cur:Music.cur, step:Music.step };
+      await Endings.show(id);
+      await new Promise(r => setTimeout(r, 260));
+      out[id] = { want:TR[id], before:before.cur, after:Music.cur, timer:!!Music.timer };
+      document.getElementById('endingScreen').classList.remove('show');
+      Game.endingShown = false;
+    }
+    /* и то же самое, когда сцена тему не включала */
+    Music.stop(); await new Promise(r => setTimeout(r, 60));
+    await Endings.show('III');
+    await new Promise(r => setTimeout(r, 260));
+    out.cold = { after:Music.cur, timer:!!Music.timer };
+    document.getElementById('endingScreen').classList.remove('show');
+    Game.endingShown = false;
+    return out;
+  });
+  console.log('музыка на карточке концовки:');
+  for (const id of ['I','II','III','IV']) {
+    const c = cards[id];
+    console.log('  %s  до=%s  после=%s  играет=%s', id.padEnd(3), c.before, c.after, c.timer);
+    if (c.after !== c.want) bad.push('концовка ' + id + ': на карточке ' + c.after + ', а должна ' + c.want);
+    if (!c.timer)           bad.push('концовка ' + id + ': музыка остановилась на карточке');
+  }
+  console.log('  без темы в сцене -> %s (играет=%s)', cards.cold.after, cards.cold.timer);
+  if (cards.cold.after !== 'endRevenge') bad.push('карточка не включила свою тему сама: ' + cards.cold.after);
   /* Главное меню стоит вне сюжета: его тема не должна зависеть от того,
      в каком состоянии лежит сохранение. */
   if (mourn.intro !== 'intro') bad.push('заглавная тема в трауре подменена на ' + mourn.intro);

@@ -20406,9 +20406,14 @@ const ChaseRun = {
   /* ПРЕПЯТСТВИЯ.
      Машина и автобус едут навстречу, поэтому сходятся с Наей быстро;
      люк и забор стоят на месте и уезжают вместе с дорогой.          */
+  /* v — встречная скорость В ПИКСЕЛЯХ НА МИЛЛИСЕКУНДУ, как и speed у
+     дороги: они просто складываются. Раньше здесь стоял пересчёт
+     `o.v * dt * 60 * 0.016 * 60`, то есть умножение на 57.6, и машина
+     шла полсотни пикселей за кадр — весь экран за десятую долю секунды.
+     Увернуться было нельзя в принципе, сколько ни смотри. */
   KINDS: [
-    { k:'car',   w:34, h:15, v:0.055, lanes:[0,1,2], say:'Машина!' },
-    { k:'bus',   w:52, h:19, v:0.040, lanes:[0,1],   say:'Автобус!' },
+    { k:'car',   w:34, h:15, v:0.040, lanes:[0,1,2], say:'Машина!' },
+    { k:'bus',   w:52, h:19, v:0.025, lanes:[0,1],   say:'Автобус!' },
     { k:'hatch', w:18, h:10, v:0,     lanes:[0,1,2], say:'Люк открыт.' },
     { k:'fence', w:16, h:20, v:0,     lanes:[0,1,2], say:'Забор.' },
   ],
@@ -20456,7 +20461,7 @@ const ChaseRun = {
 
     const world = this.speed * dt;
     for (const o of this.obs) {
-      o.x -= world + o.v * dt * 60 * 0.016 * 60;   // встречные идут быстрее дороги
+      o.x -= world + o.v * dt;                     // встречные идут быстрее дороги
       if (o.hit || this.stumble > 0) continue;
       const oy = this.laneY(o.lane);
       if (Math.abs(oy - this.y) < 11 && o.x < this.RUN_X + 9 && o.x + o.w > this.RUN_X - 7) {
@@ -20570,14 +20575,26 @@ Object.assign(ChaseRun, {
       g.fillRect(x, y, 3 + (i % 3), 1);
     }
 
-    /* ПРЕСЛЕДОВАТЕЛИ: три силуэта позади, отрыв виден глазами. */
+    /* ПРЕСЛЕДОВАТЕЛИ: за Наей идут ведьмы коммуны, теми же куклами, что
+       стоят в её домах и во дворе, — иначе непонятно, от кого бежим. */
     const px = this.RUN_X - this.gap;
-    for (let i = 0; i < 3; i++) this.runner(g, px - i * 11, this.laneY(i) , '#1a0e16', '#3a1424');
+    /* Ведьмы одеты в тёмное и ночью на асфальте пропадают. Под каждой —
+       багровый подсвет: и видно, и понятно, что это не прохожие. */
+    g.save(); g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const gx = px - i * 11, gy = this.laneY(i) - 8;
+      if (gx < -20 || gx > this.W + 20) continue;
+      const gl = g.createRadialGradient(gx, gy, 0, gx, gy, 16);
+      gl.addColorStop(0, 'rgba(200,40,70,.30)'); gl.addColorStop(1, 'rgba(200,40,70,0)');
+      g.fillStyle = gl; g.beginPath(); g.arc(gx, gy, 16, 0, Math.PI*2); g.fill();
+    }
+    g.restore();
+    for (let i = 0; i < 3; i++) this.runner(g, px - i * 11, this.laneY(i), this.WITCHES[i]);
 
     /* ПРЕПЯТСТВИЯ. */
     for (const o of this.obs) this.obstacle(g, o);
 
-    /* НАЯ. Из-под ног летит пыль — видно, что она правда бежит. */
+    /* НАЯ — той же куклой, что ходит по миру. */
     const bob = this.stumble > 0 ? 0 : Math.sin(this.step / 70) * 1.5;
     if (this.stumble <= 0) {
       g.fillStyle = 'rgba(190,170,140,.30)';
@@ -20586,7 +20603,7 @@ Object.assign(ChaseRun, {
         g.fillRect(Math.round(this.RUN_X - 6 - k), Math.round(this.y - 1 - (k * 0.12)), 2, 1);
       }
     }
-    this.runner(g, this.RUN_X, this.y + bob, '#6a2038', '#c0304d', this.stumble > 0);
+    this.runner(g, this.RUN_X, this.y + bob, 'naya', this.stumble > 0);
 
     /* Вспышка удара и виньетка. */
     if (this.flash > 0) { g.fillStyle = `rgba(255,60,80,${(this.flash*0.30).toFixed(3)})`; g.fillRect(0,0,W,H); }
@@ -20596,25 +20613,43 @@ Object.assign(ChaseRun, {
     g.restore();
   },
 
-  /* Бегущая фигура: та же схема, что у спрайтов в игре, только мельче
-     и с ногами, которые реально переставляются. */
-  runner(g, x, y, dark, light, fallen) {
+  /* Кто бежит. Ведьмы взяты те же, что стоят в коммуне. */
+  WITCHES: ['witch3', 'witch4', 'witch5'],
+
+  /* Бегущая фигура — обычная кукла из мира, 16x20. Бег показывают
+     подскок и наклон: отдельных кадров ходьбы у кукол нет, а рисовать
+     для погони вторую, непохожую фигуру было бы хуже всего. */
+  runner(g, x, y, sprite, fallen) {
     x = Math.round(x); y = Math.round(y);
-    if (x < -14 || x > this.W + 14) return;
-    shadowEllipse(g, x, y + 1, 6, 2, .30);
-    if (fallen) {                                   // упала — лежит поперёк
-      g.fillStyle = light; g.fillRect(x - 9, y - 6, 18, 6);
-      g.fillStyle = '#e8c49a'; g.fillRect(x + 8, y - 9, 5, 5);
+    if (x < -20 || x > this.W + 20) return;
+    shadowEllipse(g, x, y + 1, 7, 2.5, .30);
+    const img = (typeof Assets !== 'undefined' && Assets.images) ? Assets.images[sprite] : null;
+    if (img) {
+      const w = img.width, h = img.height;
+      g.save();
+      if (fallen) {                                 // упала — лежит поперёк дороги
+        g.translate(x, y - 3); g.rotate(-Math.PI / 2);
+        g.drawImage(img, -Math.round(w / 2), -h + 4);
+      } else {
+        const ph = Math.sin(this.step / 60 + x);
+        g.translate(x, y + Math.round(Math.abs(ph) * -1.5));
+        g.rotate(ph * 0.05);                        // корпус качается на бегу
+        g.drawImage(img, -Math.round(w / 2), -h);
+      }
+      g.restore();
       return;
     }
+    /* Ассеты ещё не собраны (первый кадр после загрузки) — рисуем
+       простую фигуру, чтобы дорога не осталась пустой. */
     const ph = Math.sin(this.step / 60 + x);
-    g.fillStyle = dark;                             // ноги
+    const dark = '#1a0e16', light = sprite === 'naya' ? '#c0304d' : '#3a1424';
+    g.fillStyle = dark;
     g.fillRect(x - 4, y - 8, 3, 8 + ph * 2);
     g.fillRect(x + 1, y - 8, 3, 8 - ph * 2);
-    g.fillStyle = light; g.fillRect(x - 5, y - 18, 10, 11);   // корпус
-    g.fillStyle = '#e8c49a'; g.fillRect(x - 4, y - 25, 8, 7);  // голова
-    g.fillStyle = dark; g.fillRect(x - 5, y - 26, 10, 4);      // волосы
-    g.fillStyle = light; g.fillRect(x + 4, y - 16, 4, 3 + ph); // рука
+    g.fillStyle = light; g.fillRect(x - 5, y - 18, 10, 11);
+    g.fillStyle = '#e8c49a'; g.fillRect(x - 4, y - 25, 8, 7);
+    g.fillStyle = dark; g.fillRect(x - 5, y - 26, 10, 4);
+    g.fillStyle = light; g.fillRect(x + 4, y - 16, 4, 3 + ph);
   },
 
   obstacle(g, o) {
@@ -21011,11 +21046,18 @@ const Endings = {
       : 'Сью осталась. Не простила — осталась.\nНая учится понимать, что это не одно и то же.';
     return '';
   },
+  /* У каждой концовки своя тема, и она должна звучать без шва: начаться
+     на последнем монологе и доиграть на карточке. Раньше show() гасил
+     музыку, и ровно в момент, ради которого тема и написана, наступала
+     тишина. */
+  TRACK: { I:'endLoner', II:'endWitch', III:'endRevenge', IV:'endStay' },
   async show(id) {
     Game.endingShown = true;
     try { Chase.stop(); } catch(e) {}
     setFlag('ending');
-    try { Music.stop(); } catch(e) {}
+    /* play() не перезапускает уже играющую тему, поэтому если сцена
+       включила её раньше, переход на карточку музыку не заденет. */
+    try { Music.play(this.TRACK[id] || 'sad'); } catch(e) {}
     const d = this.DEFS[id] || { roman:'КОНЦОВКА', name:String(id), sub:'' };
     try {
       META.endings[id] = true;
@@ -24308,7 +24350,6 @@ evilFinale: [
   { dlg:[
     {who:'nayaHell',expr:'empty',name:'Ная',text:'Мне больше некому мешать.'},
   ]},
-  { music:'none' },
   { wait:900 },
   { montage:['butterfly'] },
   { fadeOut:1800 },
