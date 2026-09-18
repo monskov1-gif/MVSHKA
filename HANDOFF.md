@@ -113,6 +113,7 @@ node tests/dev.js        # меню разработчика, переходы �
 node tests/archive.js    # четвёртый день: цель и коробки в архиве
 node tests/amulet.js     # второе имя без убийства: дом Клары, живая Роза
 node tests/stealth.js    # кража со взломом: обе миссии, механика слежки
+node tests/playthrough.js # обе кражи проходятся ногами от входа до выхода
 node tests/audio.js      # темы, фоновые события, время суток, плеер
 node tests/campus.js     # внимание охраны, высылка, обходной путь
 node tests/shift.js      # смена в кафе доигрывается до конца
