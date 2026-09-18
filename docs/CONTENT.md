@@ -98,9 +98,10 @@ techie, keeper`.
                (дневные witch1House и witch2House убраны: и днём, и ночью
                 в дома ведьм ходят через madFloor1..3 и roseFloor1..3)
                nightSpot 320x320 За городом, ночь
-КРАЖА          madFloor1 300x664 · madFloor2 300x664 · madFloor3 300x664
+КРАЖА          madFloor1 255x564 · madFloor2 255x564 · madFloor3 255x564
                (ночной дом Мадлен: три этажа по эталонному чертежу
-                docs/plan_madeleine.jpg; геометрия — MADELEINE_HOUSE_PLAN)
+                docs/plan_madeleine.jpg; геометрия — MADELEINE_HOUSE_PLAN,
+                обмер в системе 300x664, множитель unit=0.85, zoom 1.5)
                roseFloor1 380x420 · roseFloor2 380x420 · roseFloor3 380x380
                (ночной дом Розы: три этажа по плану)
 КОММУНА        communeRoad 380x280 · communeYard 340x300 · communeHall 300x300
