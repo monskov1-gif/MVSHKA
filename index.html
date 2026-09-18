@@ -19629,35 +19629,25 @@ const Dialogue = {
 ===================================================================== */
 function findNearestInteractable() {
   const room = Rooms[gameState.currentRoom];
+  let best = null, bestD = 30*30;
   const px = Player.x, py = Player.y - 8;
-  /* Выбор в два уровня.
-
-     Главный критерий — расстояние до КРАЯ зоны. Раньше мерили до центра,
-     и у большой зоны — лестничного марша, стеллажа во всю стену — центр
-     лежал внутри самой мебели: встать туда нельзя, и подсказка не
-     появлялась вообще никогда.
-
-     Но одного края мало: зоны перекрываются, и стоя внутри двух сразу мы
-     получаем ноль у обеих. Тогда решает второй критерий — расстояние до
-     центра, ровно как раньше. Иначе у окна срабатывал бы выход в
-     коридор, а на репетиции — площадка вместо самой репетиции. */
-  let best = null, bestEdge = 30*30, bestMid = Infinity;
-  const offer = (type, ref, edge, mid) => {
-    if (edge >= 30*30) return;
-    if (edge < bestEdge || (edge === bestEdge && mid < bestMid)) {
-      bestEdge = edge; bestMid = mid; best = { type, ref };
-    }
-  };
+  /* Выбор по ЦЕНТРУ зоны и радиусу 30 — правило всей игры, и менять его
+     нельзя. Пробовал мерить до края: у большой зоны это чинит случай,
+     когда центр лежит внутри самой мебели, но ломает две вещи разом.
+     Перекрывающиеся зоны дают ноль обеим, и решает порядок в массиве:
+     у окна срабатывал выход в коридор, на репетиции — площадка. А
+     человек, стоящий внутри чужой зоны, проигрывал ей всегда: подходишь
+     к Сью — игра предлагает стол. Вместо правила чинится расстановка:
+     зона обязана иметь центр, до которого можно дойти, и это проверяет
+     аудит этажей. */
   for (const it of roomObjs(room)) {
-    const qx = Math.max(it.x, Math.min(px, it.x + it.w));
-    const qy = Math.max(it.y, Math.min(py, it.y + it.h));
-    const mx = it.x + it.w / 2, my = it.y + it.h / 2;
-    offer('obj', it, (qx-px)*(qx-px) + (qy-py)*(qy-py),
-                     (mx-px)*(mx-px) + (my-py)*(my-py));
+    const cx = it.x + it.w/2, cy = it.y + it.h/2;
+    const d = (cx-px)*(cx-px) + (cy-py)*(cy-py);
+    if (d < bestD) { bestD = d; best = { type:'obj', ref:it }; }
   }
   for (const n of roomNPCs(room)) {
     const d = (n.x-px)*(n.x-px) + (n.y-py)*(n.y-py);
-    offer('npc', n, d, d);                 // у человека край и центр совпадают
+    if (d < bestD) { bestD = d; best = { type:'npc', ref:n }; }
   }
   return best;
 }
