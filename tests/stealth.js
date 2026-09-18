@@ -77,6 +77,17 @@ async function main() {
           });
           if (!Rooms[key]) bad.push('нет комнаты ' + key);
         });
+        /* Две зоны не должны спорить: игра выбирает по центру и радиусу
+           30, и если центры ближе 34 пикселей, встать «только к одной»
+           негде — именно так укрытие перекрывало лестницу. */
+        M.floors.forEach(key => {
+          const its = (Rooms[key].interactables || []);
+          its.forEach((a, i) => its.forEach((c, j) => {
+            if (j <= i) return;
+            const d = Math.hypot((a.x + a.w/2) - (c.x + c.w/2), (a.y + a.h/2) - (c.y + c.h/2));
+            if (d < 34) bad.push(`${key}: зоны «${a.prompt}» и «${c.prompt}» в ${d.toFixed(0)} px`);
+          }));
+        });
         (M.spots || []).forEach(sp => {
           const key = M.floors[sp.floor], gr = Stealth.nav.grid(key);
           const st = M.witch.routes[sp.floor][0];

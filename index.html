@@ -13513,16 +13513,19 @@ madFloor1: {
       action(){ Stealth.hideHere({ x:68, y:256, label:'Ная присела за спинкой дивана.' }); } },
     { x:74,y:430,w:36,h:24, name:'hideSideboard', prompt:'Между буфетом и стеной', hide:true,
       action(){ Stealth.hideHere({ x:92, y:442, label:'Ная втиснулась между буфетом и стеной.' }); } },
-    { x:334,y:296,w:36,h:24, name:'hideStairs', prompt:'Под лестницей', hide:true,
-      action(){ Stealth.hideHere({ x:352, y:308, label:'Ная забилась под марш лестницы.' }); } },
-    { x:92,y:404,w:36,h:24, name:'noiseDishes', prompt:'Стопка тарелок', noise:true,
-      action(){ Stealth.makeNoise(110, 416, 'Тарелки поехали и грохнулись об пол.'); } },
+    /* Укрытие было в восемнадцати пикселях от зоны лестницы, и игра
+       предлагала его вместо подъёма: встать так, чтобы сработала
+       лестница, было негде. Спрятаться теперь можно за креслом. */
+    { x:240,y:246,w:36,h:24, name:'hideArmchair', prompt:'За креслом', hide:true,
+      action(){ Stealth.hideHere({ x:258, y:258, label:'Ная присела за высокой спинкой кресла.' }); } },
+    { x:282,y:420,w:36,h:24, name:'noiseDishes', prompt:'Стопка тарелок', noise:true,
+      action(){ Stealth.makeNoise(300, 432, 'Тарелки поехали и грохнулись об пол.'); } },
     { x:352,y:428,w:36,h:24, name:'noiseKettle', prompt:'Чайник на плите', noise:true,
       action(){ Stealth.makeNoise(370, 440, 'Чайник с лязгом слетел с плиты.'); } },
     /* ДНЁМ это обычный визит: Мадлен поит гостей чаем в общем зале, а
        алтарь у неё на чердаке — туда она Наю и отправляет. Ночью, в
        краже, этих зон нет: дом тот же, но пустой и тёмный. */
-    { x:130,y:266,w:40,h:26, name:'cage', prompt:'Клетка с канарейкой',
+    { x:22,y:286,w:40,h:26, name:'cage', prompt:'Клетка с канарейкой',
       when:()=> !Stealth.on,
       action(){
         if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'Птицы нет. Дверца открыта — кто-то её выпустил. Не я.'}]);
@@ -13671,13 +13674,13 @@ madFloor2: {
     { x:132,y:430,w:36,h:24, name:'guestDresser', prompt:'Комод в гостевой',
       line:'(Постельное бельё, переложенное лавандой. Им давно не пользовались.)',
       action(){ Stealth.pick('guestDresser', this); } },
-    { x:232,y:418,w:36,h:24, name:'guestWardrobe', prompt:'Шкаф',
+    { x:206,y:416,w:36,h:24, name:'guestWardrobe', prompt:'Шкаф',
       line:'(Пустые плечики. Только они и звенят.)',
       action(){ Stealth.pick('guestWardrobe', this); } },
-    { x:214,y:404,w:36,h:24, name:'hideWardrobe', prompt:'В шкафу', hide:true,
-      action(){ Stealth.hideHere({ x:232, y:416, label:'Ная забралась в шкаф и притянула дверцу.' }); } },
-    { x:200,y:160,w:36,h:24, name:'hideBed', prompt:'За кроватью', hide:true,
-      action(){ Stealth.hideHere({ x:218, y:172, label:'Ная легла между кроватью и стеной.' }); } },
+    { x:268,y:416,w:36,h:24, name:'hideWardrobe', prompt:'В шкафу', hide:true,
+      action(){ Stealth.hideHere({ x:286, y:428, label:'Ная забралась в шкаф и притянула дверцу.' }); } },
+    { x:238,y:180,w:36,h:24, name:'hideBed', prompt:'За кроватью', hide:true,
+      action(){ Stealth.hideHere({ x:256, y:192, label:'Ная легла между кроватью и стеной.' }); } },
     { x:24,y:316,w:36,h:24, name:'hideArmchair', prompt:'За креслом', hide:true,
       action(){ Stealth.hideHere({ x:42, y:328, label:'Ная присела за высокой спинкой.' }); } },
     { x:152,y:272,w:36,h:24, name:'noiseBooks', prompt:'Стопка книг', noise:true,
@@ -13974,9 +13977,9 @@ roseFloor1: {
       action(){ Stealth.pick('livShelf', this); } },
     { x:182,y:126,w:36,h:24, name:'kitCab', prompt:'Кухонный шкаф',
       action(){ Stealth.pick('kitCab', this); } },
-    { x:42,y:92,w:36,h:24, name:'herbShelf', prompt:'Стеллаж с рассадой',
+    { x:92,y:92,w:36,h:24, name:'herbShelf', prompt:'Стеллаж с рассадой',
       action(){ Stealth.pick('herbShelf', this); } },
-    { x:272,y:346,w:36,h:24, name:'hallChest', prompt:'Сундук в прихожей',
+    { x:240,y:346,w:36,h:24, name:'hallChest', prompt:'Сундук в прихожей',
       action(){ Stealth.pick('hallChest', this); } },
     { x:178,y:224,w:36,h:24, name:'hallCab', prompt:'Буфет в холле',
       action(){ Stealth.pick('hallCab', this); } },
@@ -14018,9 +14021,6 @@ roseFloor1: {
           {who:'naya',expr:'normal',text:'Кресло у камина. Рядом корзинка с вязанием — начатый носок, спицы воткнуты.'},
           {who:'naya',expr:'sad',text:'(Она собиралась вернуться к нему вечером.)'},
         ]);
-      }},
-    { x:92,y:212,w:40,h:26, name:'dresserRose', prompt:'Комод с письмами', when:()=> !Stealth.on, action(){
-        Dialogue.start([{who:'naya',expr:'normal',text:'Стопка писем, перевязанная бечёвкой. Марки старые, лет тридцать.'}]);
       }},
   ],
   npcs: [
@@ -14137,18 +14137,16 @@ roseFloor2: {
       action(){ Stealth.pick('bedDresser', this); } },
     { x:18,y:250,w:36,h:24, name:'wardrobeA', prompt:'Платяной шкаф',
       action(){ Stealth.pick('wardrobeA', this); } },
-    { x:18,y:262,w:36,h:24, name:'chest', prompt:'Сундук в гардеробной',
-      action(){ Stealth.pick('chest', this); } },
     { x:152,y:376,w:36,h:24, name:'guestWardrobe', prompt:'Шкаф в гостевой',
       action(){ Stealth.pick('guestWardrobe', this); } },
     { x:244,y:282,w:36,h:24, name:'hallChest', prompt:'Сундук в коридоре',
       action(){ Stealth.pick('hallChest', this); } },
-    { x:60,y:250,w:36,h:24, name:'hideWardrobe', prompt:'В шкафу', hide:true,
-      action(){ Stealth.hideHere({ x:78, y:262, label:'Ная забралась в шкаф между платьями.' }); } },
+    { x:60,y:290,w:36,h:24, name:'hideWardrobe', prompt:'В шкафу', hide:true,
+      action(){ Stealth.hideHere({ x:78, y:302, label:'Ная забралась в шкаф между платьями.' }); } },
     { x:92,y:150,w:36,h:24, name:'hideBed', prompt:'За кроватью', hide:true,
       action(){ Stealth.hideHere({ x:110, y:162, label:'Ная легла между кроватью и стеной.' }); } },
-    { x:132,y:376,w:36,h:24, name:'hideGuest', prompt:'За кроватью в гостевой', hide:true,
-      action(){ Stealth.hideHere({ x:150, y:388, label:'Ная вжалась в угол за кроватью.' }); } },
+    { x:24,y:402,w:36,h:24, name:'hideGuest', prompt:'За кроватью в гостевой', hide:true,
+      action(){ Stealth.hideHere({ x:42, y:414, label:'Ная вжалась в угол за кроватью.' }); } },
     { x:12,y:112,w:36,h:24, name:'noiseMirror', prompt:'Зеркало', noise:true,
       action(){ Stealth.makeNoise(30, 124, 'Зеркало качнулось и глухо стукнуло о стену.'); } },
   ],
