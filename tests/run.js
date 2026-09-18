@@ -107,7 +107,10 @@ async function endingI() {
     await H.step(page,'obj','toLeftHouse',[],'I'); // lonerDoor
     await H.step(page,'obj','toAlley',[],'I');
     await H.step(page,'obj','window',[],'I');      // break-in
-    await H.step(page,'obj','exit',[],'I');
+    await H.stealth(page, 'I', []);               // кража у Мадлен
+    /* madAfterTheft сама выводит Наю в старый квартал, отдельного
+       выхода из переулка больше нет. */
+    await H.step(page,'obj','toStreet',[],'I');
     await H.step(page,'obj','toRightHouse',[],'I');
     await H.step(page,'obj','toLiving',[],'I');
     await H.step(page,'obj','toCommune',[],'I');   // discovered -> chase

@@ -305,6 +305,29 @@ async function toUni(page, tag) {
   await step(page, 'obj', 'mainEntrance', [], tag);   // передний двор -> холл
 }
 
+/* Кража со взломом. Бот проходит её теми же интерактивами, что и игрок:
+   лестницами наверх, обыском тайника, выходом через окно или сад. Хозяйка
+   на время сюжетного прогона снимается — здесь проверяется сюжет, а саму
+   слежку, шум и поимку проверяет tests/stealth.js. Тайник выбирается
+   случайно, поэтому этаж читается из состояния, а не задан числом. */
+async function stealth(page, tag, picks) {
+  await page.waitForFunction(() => typeof Stealth !== 'undefined' && Stealth.on, { timeout:20000 });
+  const plan = await page.evaluate(() => {
+    Stealth.W.clear();
+    return { spot:Stealth.spot.id, floor:Stealth.spot.floor, mission:Stealth.mission };
+  });
+  if (process.env.STEPLOG)
+    process.stdout.write(`    · ${tag}: кража «${plan.mission}», тайник ${plan.spot}, этаж ${plan.floor + 1}\n`);
+  for (let f = 0; f < plan.floor; f++) await step(page, 'obj', 'up', [], tag + ':вверх');
+  await step(page, 'obj', plan.spot, [], tag + ':тайник');
+  if (!await page.evaluate(() => Stealth.taken))
+    throw new Error(`${tag}: амулет не взят в «${plan.spot}»`);
+  for (let f = plan.floor; f > 0; f--) await step(page, 'obj', 'down', [], tag + ':вниз');
+  await step(page, 'obj', plan.mission === 'rosa' ? 'garden' : 'window', picks || [], tag + ':выход');
+  await page.waitForFunction(() => !Stealth.on, { timeout:15000 });
+  return plan;
+}
+
 async function amuletArc(page, picks, tag) {
   await step(page, 'obj', 'door', [], tag);
   await step(page, 'obj', 'toStairs', [], tag);
@@ -323,7 +346,8 @@ async function amuletArc(page, picks, tag) {
   await step(page, 'obj', 'toOldTown', [], tag);                  // old quarter
   await step(page, 'obj', 'toRose', [], tag);                     // Rose's own house
   for (let i = 0; i < 3; i++) await step(page, 'npc', 'Роза', [], tag);
-  await step(page, 'obj', 'cabinet', [picks.amulet2], tag);       // -> naya room
+  await step(page, 'obj', 'cabinet', [], tag);                    // шкаф пуст -> ночная кража
+  await stealth(page, tag, [picks.amulet2]);                      // -> naya room
   await step(page, 'obj', 'door', [], tag);
   await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
@@ -402,4 +426,4 @@ async function chase(page, tag) {
   return out;
 }
 
-module.exports = { run, newGame, opening, university, toUni, amuletArc, step, pump, snap, useObj, useNpc, chase, errors };
+module.exports = { run, newGame, opening, university, toUni, amuletArc, stealth, step, pump, snap, useObj, useNpc, chase, errors };

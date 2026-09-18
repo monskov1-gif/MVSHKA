@@ -97,6 +97,10 @@ techie, keeper`.
                witch1House 320x340 Дом Мадлен
                witch2House 320x340 Дом Розы · witch3House 320x340 Дом за городом
                nightSpot 320x320 За городом, ночь
+КРАЖА          madFloor1 360x400 · madFloor2 360x400 · madFloor3 360x340
+               (ночной дом Мадлен: три этажа по плану)
+               roseFloor1 380x420 · roseFloor2 380x420 · roseFloor3 380x380
+               (ночной дом Розы: три этажа по плану)
 КОММУНА        communeRoad 380x280 · communeYard 340x300 · communeHall 300x300
                trialRoom 260x260 Комната испытания · forestEdge 340x300
 АД             hell 320x340 Нижний город · lilithHall 360x380 Тронный зал
@@ -182,7 +186,10 @@ uniBackYard   toStreet→street  window→uniServiceStair
 * **развилка** — `sueDead`, `reviveChoiceMade`, `sueRevived`, `sueLeftDead`,
   `pathChosen`, `chosenWitchPath`, `chosenEarthPath`, `gaveCrystalAway`;
 * **ветка «злая Ная»** — 12 флагов с префиксом `evil`;
-* **ветка «одиночка»** — 8 флагов с префиксом `loner`.
+* **ветка «одиночка»** — 8 флагов с префиксом `loner`;
+* **кража со взломом** — `lonerBreakIn` (влезла к Мадлен), `rosaPlan` (шкаф
+  пуст, план на ночь), `rosaBreakIn` (вошла в дом Розы), `rosaRetry`
+  (служебный: выбрала вернуться следующей ночью).
 
 **Счётчики (17):** `uniDay`, `sueRehearsal`, `campusHeat`,
 `cafeMinigameProgress`, `witch2Distract`, `mirrorLooks`, `impTalks`,
@@ -271,5 +278,7 @@ tests/shift_clicks.js   мини-игра глазами человека: чи�
 tests/layout.js         одиннадцать разрешений, поворот на ходу, размеры кнопок,
                         настройки отображения и совпадение превью с игрой
 tests/chase.js          погоня: полосы, препятствия, падения, оба исхода
+tests/stealth.js        кража: обход без стен, конус и стены, шум, укрытие,
+                        кристалл, отвлечения Сью, три поимки
 tests/shots.js          скриншоты комнат — визуальная проверка компоновки
 ```

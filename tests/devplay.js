@@ -71,7 +71,10 @@ const card = async page => {
     await H.step(page,'obj','toLeftHouse',[],'LONER');  // lonerDoor
     await H.step(page,'obj','toAlley',[],'LONER');
     await H.step(page,'obj','window',[],'LONER');       // взлом
-    await H.step(page,'obj','exit',[],'LONER');
+    await H.stealth(page, 'LONER', []);                // кража у Мадлен
+    /* madAfterTheft сама выводит Наю в старый квартал, отдельного
+       выхода из переулка больше нет. */
+    await H.step(page,'obj','toStreet',[],'LONER');
     await H.step(page,'obj','toRightHouse',[],'LONER');
     await H.step(page,'obj','toLiving',[],'LONER');
     await H.step(page,'obj','toCommune',[],'LONER');    // обнаружили -> погоня
