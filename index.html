@@ -21318,7 +21318,7 @@ const Stealth = {
     RUN_NOISE:     82, RUN_POWER: 0.85,
     /* Лестница: на каком расстоянии от площадки слышно хозяйку и сколько
        миллисекунд Ная «не видна» сразу после перехода на этаж. */
-    STAIR_LISTEN: 130, FLOOR_GRACE: 700,
+    STAIR_LISTEN: 110, FLOOR_GRACE: 700,
   },
 
   /* ---------- запуск и конец ---------- */
@@ -21386,8 +21386,12 @@ const Stealth = {
   /* Луч из точки в точку не должен проходить сквозь стену или крупную
      мебель. Именно это отличает честный конус от треугольника поверх
      планировки. */
-  blocksSight(x0, y0, x1, y1) {
-    const room = this.room(); if (!room) return true;
+  blocksSight(x0, y0, x1, y1) { return this.sightIn(gameState.currentRoom, x0, y0, x1, y1); },
+
+  /* То же самое, но для любого этажа: нужно лестнице, которая решает,
+     видит ли хозяйка площадку, стоя на другом этаже. */
+  sightIn(roomKey, x0, y0, x1, y1) {
+    const room = Rooms[roomKey]; if (!room) return true;
     for (const w of room.walls) if (segRect(x0, y0, x1, y1, w)) return true;
     for (const o of World.objectsOf(room)) {
       const m = Art.meta(o.t); if (!m || !m.foot) continue;
@@ -22155,8 +22159,13 @@ Stealth.makeNoise = function (x, y, line) {
 Stealth.climb = async function (toRoom, x, y) {
   if (this.on) {
     const fi = this.floorOf(toRoom);
+    /* Ждать надо не «когда хозяйка вообще на том этаже», а когда она
+       действительно у площадки и смотрит в ту сторону. Дом маленький:
+       если считать по одному расстоянию, она блокирует лестницу из-за
+       стены в кухне, и спуститься нельзя почти никогда. */
     if (fi >= 0 && this.W.active && this.W.floor === fi &&
-        Math.hypot(this.W.x - x, this.W.y - y) < this.CFG.STAIR_LISTEN) {
+        Math.hypot(this.W.x - x, this.W.y - y) < this.CFG.STAIR_LISTEN &&
+        !this.sightIn(toRoom, this.W.x, this.W.y - 6, x, y)) {
       return Dialogue.start([
         {who:'naya',expr:'worried',text:'(Шаги. Прямо за лестницей. Не сейчас.)'},
       ]);

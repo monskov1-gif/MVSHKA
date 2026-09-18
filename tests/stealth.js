@@ -143,6 +143,12 @@ async function main() {
       /* 3. Сквозь стены не видно. Ная ставится в конус, но за стену. */
       const sight = await page.evaluate(() => {
         const W = Stealth.W;
+        /* За время замера обхода хозяйка могла уйти на другой этаж, а
+           сквозь перекрытие она видеть и не должна. Возвращаем её к
+           игроку — проверяем зрение, а не переходы между этажами. */
+        const fi = Stealth.floorOf(gameState.currentRoom);
+        if (W.floor !== fi) W.moveFloor(fi);
+        Stealth.grace = 0;
         const room = Rooms[W.roomKey()];
         // на её этаж, иначе canSee отсекается ещё до проверки луча
         if (gameState.currentRoom !== W.roomKey()) return null;
@@ -177,6 +183,9 @@ async function main() {
             сколько миллисекунд уходит до погони. */
       const detect = await page.evaluate(() => {
         const W = Stealth.W, C = Stealth.CFG;
+        const fi = Stealth.floorOf(gameState.currentRoom);
+        if (W.floor !== fi) W.moveFloor(fi);
+        Stealth.grace = 0;
         W.state = 'PATROL'; W.see = 0; W.lose = 0; Stealth.alarm = 0; Stealth.hidden = null;
         Player.x = W.x + Math.cos(W.dir) * 18; Player.y = W.y + Math.sin(W.dir) * 18;
         let t = 0;

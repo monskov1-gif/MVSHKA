@@ -114,7 +114,7 @@ async function playMission(page, id, tag) {
     /* Подъём по лестнице: если хозяйка над лестницей — игра говорит об
        этом, и бот честно ждёт, а не ломится. */
     async function climb(name) {
-      for (let k = 0; k < 8 && left() > 0; k++) {
+      for (let k = 0; k < 14 && left() > 0; k++) {
         const wasRoom = gameState.currentRoom;
         if (!await use(name)) return false;
         if (gameState.currentRoom !== wasRoom) return true;
