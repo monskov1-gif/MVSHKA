@@ -8123,7 +8123,11 @@ function woodGrain(g, x, y, w, h, col) {
   /* Круглый ковёр в гостевой. */
   D('rug_round', {w:46,h:46,ax:23,ay:23,foot:null, flat:true}, g => {
     const ring = (r, c) => { g.fillStyle = c; g.beginPath(); g.arc(23, 23, r, 0, Math.PI*2); g.fill(); };
-    ring(22, '#4e3040'); ring(18, '#6a4258'); ring(12, '#7c4e66'); ring(6, '#5a3548');
+    /* Приглушённый, под общий тон дома: яркий фиолет читался как пятно
+       из другой игры. */
+    ring(22, '#4a3a36'); ring(18, '#5e4842'); ring(12, '#6d544b'); ring(6, '#56413c');
+    g.strokeStyle = 'rgba(210,180,150,.16)'; g.lineWidth = 1;
+    g.beginPath(); g.arc(23, 23, 15, 0, Math.PI*2); g.stroke();
   });
 
   /* Штора на окне: две полосы ткани и карниз. Настенная. */
