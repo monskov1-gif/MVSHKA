@@ -74,8 +74,17 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
         return d ? { t:o.t, x:o.x - d.ax, y:o.y - d.ay, w:d.w, h:d.h, d } : null;
       }).filter(Boolean);
       const wallH = (room.walls || []).filter(w => w.x === 0 && w.y === 0 && w.w >= room.w - 1).map(w => w.h)[0];
+      /* Настенное висит либо на верхней полосе стены, либо на внутренней
+         перегородке — в планировках этажей перегородки такая же стена, и
+         картина над камином в гостиной совершенно законна. Раньше правило
+         знало только про верхнюю полосу и потому всегда было красным на
+         домах ведьм. Считаем законной опорой любую стену, к лицевой
+         стороне которой предмет примыкает снизу. */
+      const onPartition = (o) => (room.walls || []).some(w =>
+        o.x + o.w > w.x && o.x < w.x + w.w &&           // перекрывается по горизонтали
+        o.y + o.h >= w.y + w.h - 2 && o.y + o.h <= w.y + w.h + 26);
       boxes.forEach(o => {
-        if (wallH && ART.includes(o.t) && o.y + o.h > wallH + 2)
+        if (wallH && ART.includes(o.t) && o.y + o.h > wallH + 2 && !onPartition(o))
           lowArt.push({ room:rk, t:o.t, bottom:(o.y + o.h) | 0, wallH });
       });
       (room.npcs || []).forEach(n => boxes.forEach(o => {

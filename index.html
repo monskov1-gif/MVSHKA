@@ -14062,6 +14062,243 @@ roseFloor3: {
 },
 
 /* ---------------------------------------------------------------- */
+/* ---------------------------------------------------------------- */
+witch2House: {
+  /* Роза: старый дом, заваленный книгами. Тут живут восемьдесят два года
+     подряд — фотографии по всем стенам, кресло-качалка у камина, стопки
+     книг в каждой зоне. Амулет спрятан в шкафу в спальне. */
+  name:"Дом Розы", music:'tense', w:320, h:340,
+  zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
+  light:{ tint:'#241c1a', dark:.2 },
+  lights:[
+    {x:70,y:150,r:52,c:'#ffbe74',i:.44},{x:230,y:130,r:44,c:'#ffd8a0',i:.30},
+    {x:96,y:292,r:42,c:'#ffd0a0',i:.28},{x:258,y:296,r:36,c:'#d8dce8',i:.18},
+  ],
+  sun:{ x:120, y:48, w:36, len:96, tilt:.2, a:.10 },
+  bgPaint(ctx) {
+    paintHousePlan(ctx, 320, 340, {
+      wall:'#5e4a3c', wall2:'#503e33', floor:'#7f6a52', floor2:'#6f5b45', wallH:52,
+      zones:[
+        { x:8,  y:52,  w:172, h:184, name:'ГОСТИНАЯ', floor:'#836d55', floor2:'#725d46' },
+        { x:188,y:52,  w:124, h:184, name:'СПАЛЬНЯ',  floor:'#7a6450', floor2:'#6a5542' },
+        { x:8,  y:244, w:172, h:91,  name:'КУХНЯ',    floor:'#8a8172', floor2:'#797063', tiles:true },
+        { x:188,y:244, w:124, h:91,  name:'ПРИХОЖАЯ', floor:'#6f5b46', floor2:'#61503c' },
+      ],
+      parts:[
+        { x:180, y:52,  w:8,   h:88 }, { x:180, y:178, w:8, h:157 },
+        { x:8,   y:236, w:56,  h:8 },  { x:100, y:236, w:128, h:8 }, { x:264, y:236, w:48, h:8 },
+      ],
+    });
+    paintDoor(ctx, 228, 326, 32, 14);
+    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New'; ctx.fillText('НА УЛИЦУ', 220, 322);
+  },
+  objects: [
+    // гостиная: камин, кресло-качалка, стена с фотографиями
+    { t:'window_in', x:120, y:34 },
+    { t:'photo_frame', x:44, y:28 }, { t:'photo_frame', x:64, y:28 }, { t:'photo_frame', x:84, y:28 },
+    { t:'clock', x:160, y:26 },
+    { t:'fireplace', x:34, y:120 },
+    { t:'rocking_chair', x:80, y:140 },
+    { t:'sewing_basket', x:104, y:150 },
+    { t:'book_stack', x:32, y:170 }, { t:'book_stack', x:150, y:120 },
+    { t:'table_round', x:120, y:190 },
+    { t:'vase_flowers', x:120, y:180 },
+    { t:'rug_warm', x:120, y:206 },
+    { t:'sofa_modern', x:120, y:222 },
+    { t:'lamp_floor', x:162, y:196 },
+    // спальня: шкаф с амулетом
+    { t:'window_in', x:250, y:34 },
+    { t:'painting', x:296, y:28 }, { t:'photo_frame', x:212, y:28 },
+    { t:'cabinet', x:246, y:112 },
+    { t:'dresser', x:206, y:150 },
+    { t:'tv_stand', x:290, y:186 },
+    { t:'armchair', x:222, y:200 },
+    { t:'book_stack', x:288, y:150 },
+    // кухня
+    { t:'counter', x:56, y:280 },
+    { t:'herb_shelf', x:120, y:278 },
+    { t:'cat_bed', x:34, y:322 },
+    { t:'plant_pot', x:160, y:322 },
+    // прихожая
+    { t:'coat_rack', x:204, y:290 },
+    { t:'boots', x:292, y:308 },
+    { t:'book_stack', x:288, y:266 },
+  ],
+  walls: [
+    {x:0,y:0,w:320,h:52},{x:0,y:0,w:8,h:340},{x:312,y:0,w:8,h:340},{x:0,y:335,w:320,h:5},
+    {x:180,y:52,w:8,h:88},{x:180,y:178,w:8,h:157},
+    {x:8,y:236,w:56,h:8},{x:100,y:236,w:128,h:8},{x:264,y:236,w:48,h:8},
+  ],
+  interactables: [
+    { x:226,y:300,w:44,h:34, name:'exit', prompt:'Выйти', action: async ()=> {
+        if (!F('secondAmulet')) { UI.toast('Уйти сейчас — значит вернуться сюда снова.'); return; }
+        await changeRoom('oldTown', 80, 200);
+      }},
+    { x:16,y:96,w:42,h:34, name:'fire', prompt:'Камин', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'В камине тепло. По-настоящему тепло. У меня дома батареи еле дышат.'}]);
+      }},
+    { x:98,y:172,w:44,h:32, name:'tea', prompt:'Столик', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Чай на троих. Она заварила его до того, как мы постучали.'}]);
+      }},
+    { x:272,y:166,w:40,h:32, name:'tvLook', prompt:'Телевизор', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Включён без звука. Идёт прогноз погоды.'},
+          {who:'naya',expr:'sad',text:'Обещают дождь до конца недели. Это единственное честное предсказание в этом доме.'},
+        ]);
+      }},
+    { x:226,y:96,w:44,h:34, name:'cabinet', prompt:'Шкаф', action(){
+        if (F('hiddenAmulet')) return Dialogue.start([
+          {who:'naya',expr:'normal',text:'(Второе имя уже у меня. Открывать её шкаф незачем.)'},
+          {who:'naya',expr:'sad',text:'(И, кажется, впервые за месяц это не отговорка.)'},
+        ]);
+        if (F('secondAmulet')) return Dialogue.start([{who:'naya',expr:'normal',text:'Шкаф пуст.'}]);
+        const d = C('witch2Distract');
+        if (d < 3) return Dialogue.start([
+          {who:'sue',expr:'worried',text:'Ная, она смотрит! Я не открою шкаф, пока она не отвернётся.'},
+          {who:'naya',expr:'talk',text:'(Нужно отвлечь её разговором ещё ' + (3-d) + ' раз.)'},
+        ]);
+        /* Шкаф пуст: имя наверху. Отсюда начинается ночная кража. */
+        Scene.play('rosaBreakIn');
+      }},
+    { x:36,y:56,w:76,h:28, name:'photos', prompt:'Фотографии', action(){
+        if (F('hiddenAmulet')) return Dialogue.start([{who:'naya',expr:'sad',text:'На одной из них — молодая Роза с сёстрами. Восемь женщин. Теперь семь.'}]);
+        if (F('secondAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'На одной из них — молодая Роза с сёстрами. Восемь женщин. Теперь их шесть.'}]);
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Внуки, свадьба, кто-то на пляже. Обычная стена обычной бабушки.'},
+          {who:'naya',expr:'sad',text:'(Я почему-то ожидала пентаграмм.)'},
+        ]);
+      }},
+    { x:62,y:122,w:40,h:34, name:'chairRose', prompt:'Кресло-качалка', action(){
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Кресло-качалка у камина. Рядом корзинка с вязанием — начатый носок, спицы воткнуты.'},
+          {who:'naya',expr:'sad',text:'(Она собиралась вернуться к нему вечером.)'},
+        ]);
+      }},
+    { x:86,y:84,w:44,h:32, name:'herbs2', prompt:'Травы', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Полынь, мята, ещё что-то горькое. Она рассказывала про каждый пучок минут по пять.'}]);
+      }},
+    { x:8,y:190,w:40,h:34, name:'dresserRose', prompt:'Комод', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'На комоде — стопка писем, перевязанная бечёвкой. Марки старые, лет тридцать.'}]);
+      }},
+  ],
+  npcs: [
+    { x:130,y:306, sprite:'sue', name:'Сью',
+      when:()=> !F('secondAmulet'),
+      dialogue:()=> {
+        const d = C('witch2Distract');
+        if (d < 3) return Dialogue.start([
+          {who:'sue',expr:'worried',text:'Отвлеки её ещё. Я жду сигнала.'},
+          {who:'naya',expr:'talk',text:'(Поговорить с ведьмой ещё ' + (3-d) + ' раз.)'},
+        ]);
+        return Dialogue.start([{who:'sue',expr:'worried',text:'Она отвернулась. Иди к шкафу — быстро.'}]);
+      }},
+    /* Роза жива, пока у неё не забрали имя. Если Ная нашла имя Клары в
+       заколоченном доме, отвлекать хозяйку больше незачем — и Роза
+       остаётся в своём доме до конца истории. */
+    { x:196,y:244, sprite:'witch2', name:'Роза',
+      when:()=> !F('secondAmulet') || F('hiddenAmulet'),
+      dialogue:()=> {
+        if (F('hiddenAmulet')) return Dialogue.start([
+          {who:'witch2',expr:'smile',name:'Роза',text:'Опять ты. Садись, чай остывает.'},
+          {who:'naya',expr:'normal',text:'Я на минуту.'},
+          {who:'witch2',expr:'smile',name:'Роза',text:'Все на минуту. Женевьева тоже на минуту, а сидит по три часа.'},
+          {who:'naya',expr:'sad',text:'(Она даже не знает, зачем я приходила в первый раз.)'},
+        ]);
+        return Scene.play('distractWitch2');
+      } },
+  ],
+},
+
+/* ---------------------------------------------------------------- */
+nightSpot: {
+  name:"За городом. Ночь", music:'tense', w:320, h:320, wet:true, wetFrom:110,
+  zone:'forest', weather:{ rain:.34, fog:.52, wind:.35, leaves:.3 }, light:{ tint:'#080a16', dark:.58 },
+  lights:[
+    {x:160,y:186,r:34,c:'#40a0ff',i:.34,flicker:true},
+    {x:44,y:206,r:28,c:'#c9a05a',i:.24},
+  ],
+  bgPaint(ctx) {
+    const W = 320, H = 320;
+    const sky = ctx.createLinearGradient(0,0,0,110);
+    sky.addColorStop(0,'#06050e'); sky.addColorStop(1,'#191c2c');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,110);
+    ctx.fillStyle = '#8090b0'; ctx.beginPath(); ctx.arc(268,34,12,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(128,144,176,.08)'; ctx.beginPath(); ctx.arc(268,34,28,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#0b0d16';
+    for (let x=0;x<W;x+=10) { const h=34+((x*17)%44); ctx.fillRect(x,110-h,10,h); }
+    // раскисшая земля
+    ctx.fillStyle = '#26241f'; ctx.fillRect(0,106,W,H-106);
+    ctx.fillStyle = '#2e2c25';
+    for (let i=0;i<240;i++) ctx.fillRect((i*61)%W, 110+((i*37)%208), 3, 2);
+    // подъездная дорожка к дому
+    ctx.fillStyle = '#38342c';
+    ctx.beginPath(); ctx.moveTo(132,318); ctx.lineTo(188,318); ctx.lineTo(176,196); ctx.lineTo(146,196); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#413c33';
+    ctx.beginPath(); ctx.moveTo(140,318); ctx.lineTo(180,318); ctx.lineTo(172,198); ctx.lineTo(150,198); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(120,140,170,.12)';
+    [[104,262,16,6],[214,248,13,5]].forEach(([x,y,rx,ry]) => {
+      ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2); ctx.fill();
+    });
+    ctx.fillStyle = '#5a6070'; ctx.font = '6px Courier New'; ctx.fillText('дом за городом', 128, 130);
+  },
+  overPaint(ctx) {
+    if (!F('thirdAmulet')) paintRunes(ctx, [[160,222,8],[134,238,6],[186,238,6]], '#40a0ff', Date.now());
+  },
+  ambient() { if (Math.random()<0.12) FX.spawn(Math.random()*320, 320, 1, {color:'#20304a', rise:-0.25, life:120}); },
+  objects: [
+    { t:'house_boarded', x:160, y:190 },
+    { t:'pine', x:36, y:150 }, { t:'pine', x:96, y:136 },
+    { t:'pine', x:238, y:134 }, { t:'pine', x:296, y:154 },
+    { t:'tree_bare', x:64, y:186 }, { t:'tree_bare', x:274, y:198 },
+    { t:'fence_wood', x:24, y:268 }, { t:'fence_wood', x:56, y:268 },
+    { t:'fence_wood', x:264, y:268 }, { t:'fence_wood', x:296, y:268 },
+    { t:'lamp_street', x:44, y:246 },
+    { t:'standing_stone', x:226, y:222 },
+    { t:'stump', x:100, y:236 }, { t:'log', x:238, y:288 },
+    { t:'fern', x:132, y:262 }, { t:'fern', x:198, y:270 },
+    { t:'puddle', x:108, y:262 }, { t:'puddle', x:218, y:248 },
+    { t:'bin', x:120, y:200 },
+  ],
+  walls: [
+    {x:0,y:0,w:320,h:110},{x:0,y:0,w:8,h:320},{x:312,y:0,w:8,h:320},{x:0,y:315,w:320,h:5},
+  ],
+  interactables: [
+    { x:140,y:284,w:44,h:30, name:'exit', prompt:'Уйти', action: async ()=> {
+        if (!F('thirdAmulet')) {
+          return Dialogue.start([
+            {who:'naya',expr:'talk',text:'Мы дошли. Уходить сейчас — значит вернуться сюда завтра. И послезавтра.'},
+            {who:'sue',expr:'worried',text:'...ладно. Только быстро.'},
+          ]);
+        }
+        await changeRoom('oldTown', 218, 288);
+      }},
+    { x:144,y:170,w:32,h:26, name:'enter', prompt:'Войти в дом', action: async ()=> {
+        if (F('thirdAmulet')) { UI.toast('Больше туда нельзя.'); return; }
+        await changeRoom('witch3House', 112, 318);
+      }},
+    { x:142,y:210,w:36,h:26, name:'wards', prompt:'Руны у порога', action(){
+        Audio.rune();
+        Dialogue.start([
+          {who:'naya',expr:'normal',text:'Руны у самого порога. Свежие — краска ещё липнет.'},
+          {who:'sue',expr:'worried',text:'Это же значит "не входить"? Даже я понимаю, что это значит.'},
+          {who:'naya',expr:'talk',text:'Это значит "здесь то, что нам нужно".'},
+        ]);
+      }},
+    { x:210,y:200,w:34,h:30, name:'stoneN', prompt:'Камень', action(){
+        Dialogue.start([{who:'naya',expr:'normal',text:'Межевой камень. Дом стоит ровно за ним — вне города, вне чужих глаз.'}]);
+      }},
+  ],
+  npcs: [
+    { x:206,y:290, sprite:'sue', name:'Сью',
+      when:()=> !F('thirdAmulet'),
+      dialogue:()=> Dialogue.start([
+        {who:'sue',expr:'worried',text:'Ная. Последний раз спрашиваю по-человечески. Что мы здесь делаем?'},
+        {who:'naya',expr:'talk',text:'Заканчиваем. Правда. После этого — всё.'},
+        {who:'sue',expr:'sad',text:'Ты это уже говорила. Два раза.'},
+      ]) },
+  ],
+},
+
 witch3House: {
   /* Третий дом: тёмный, с травами и артефактами. Живут тут явно давно и
      скрытно — снаружи обычный дом за городом, а внутри кладовая с сушёными
