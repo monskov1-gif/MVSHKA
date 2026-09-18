@@ -332,7 +332,13 @@ async function amuletArc(page, picks, tag) {
   await step(page, 'obj', 'door', [], tag);
   await step(page, 'obj', 'toStairs', [], tag);
   await step(page, 'obj', 'toStreet', [], tag);
-  await step(page, 'obj', 'toLeftHouse', [], tag);                // Madlen's house
+  await step(page, 'obj', 'toLeftHouse', [], tag);                // дом Мадлен, первый этаж
+  /* Алтарь у Мадлен на чердаке: она сама отправляет туда, и до него
+     надо подняться двумя маршами. Дом теперь один и тот же днём и
+     ночью, поэтому путь настоящий, а не «зашёл и сразу алтарь». */
+  await step(page, 'npc', 'Мадлен', [], tag);
+  await step(page, 'obj', 'up', [], tag);
+  await step(page, 'obj', 'up', [], tag);
   await step(page, 'obj', 'altar', [picks.amulet1], tag);         // -> naya room
   await step(page, 'obj', 'door', [], tag);
   await step(page, 'obj', 'toStairs', [], tag);
