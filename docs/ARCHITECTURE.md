@@ -20,6 +20,11 @@
  4292..4790   Campus, Shift                        внимание охраны, мини-игра смены
  4788..5090   Quests, UniDay, Journal, Recap       цели, четыре дня, журнал, пересказы
  5104..5340   Patrol, paintHousePlan, paintPlayground
+ 5340..10760  MADELEINE_HOUSE_PLAN, MadPlan        канонический план дома Мадлен:
+                                                   геометрия, отрисовка, сверка с
+                                                   эталоном, отладочный слой;
+                                                   модели мебели mad_*;
+                                                   makeMadRoom собирает madFloor1..3
  5340..10760  Rooms                                55 комнат — главный массив данных
 10791..10905  Player, tryMove, changeRoom          движение и переходы
 10907..11150  Dialogue, doInteract                 реплики, выборы, взаимодействие

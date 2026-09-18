@@ -1020,6 +1020,19 @@
         <button class="devMini" id="devStSue">+1 Сью</button>
         <button class="devMini" id="devStEnd">завершить удачей</button>
       </div>
+      <div class="devRow"><b>дом Мадлен: план</b></div>
+      <div class="devGrid">
+        <button class="devMini" id="devPlanRef">эталон поверх</button>
+        <button class="devMini" id="devPlanGrid">сетка</button>
+        <button class="devMini" id="devPlanCoords">координаты</button>
+        <button class="devMini" id="devPlanColl">коллизии</button>
+        <button class="devMini" id="devPlanBounds">границы мебели</button>
+        <button class="devMini" id="devPlanDoors">проёмы и лестницы</button>
+        <button class="devMini" id="devPlanWin">окна</button>
+        <button class="devMini" id="devPlanDiff">карта различий</button>
+        <button class="devMini" id="devPlanCheck">сверка с эталоном</button>
+        <button class="devMini" id="devPlanImg">подложить чертёж</button>
+      </div>
       <div class="devGrid" id="devStealthGrid"></div>
 
       <div class="devSection">ОБЩИЕ ТЕСТЫ</div>
@@ -11928,6 +11941,1733 @@ const UNI_OLD_WALL = wallLayout(560, [
   { k:'door', label:'—', w:38, id:'old3', style:'shut' },
 ]);
 
+/* =====================================================================
+   ДОМ МАДЛЕН — КАНОНИЧЕСКИЙ ПЛАН ЭТАЖЕЙ
+
+   Источник — эталонный чертёж «Дом Мадлен. План этажей»: три панели в
+   одном изображении. Контур этажа занимает на нём 398×881 пиксель,
+   панели стоят в точках (22,276), (451,277) и (892,276). Всё, что
+   ниже, снято с этого чертежа и пересчитано в игровые пиксели комнаты
+   300×664 — тот же контур с коэффициентом 300/398 = 0.7538. Отношение
+   сторон сохранено ровно: 300/664 = 0.4518 против 398/881 = 0.4517.
+   Прежний дом был 420×470, то есть 0.894 — вдвое шире, чем на плане, и
+   потому распадался на широкие пустые коробки с мебелью посередине.
+
+   ЭТО ЕДИНСТВЕННАЯ ГЕОМЕТРИЯ ДОМА. Из неё выводятся фон, стены-
+   коллизии, проходимость, конус зрения хозяйки, маршруты обхода, места
+   обыска и укрытий, отладочный слой и сверка с эталоном. Второй,
+   «примерной» планировки для картинки не существует: сдвинешь стену
+   здесь — сдвинется всё остальное.
+
+   Стены заданы линиями (parts) и проёмами (doors); прямоугольники для
+   коллизий считает MadPlan.walls() вычитанием проёмов из линий. Дверь
+   физически не может оказаться нарисованной в одном месте, а коллизия
+   в другом: это одна и та же запись.
+
+   ЛЕСТНИЦА — ЕДИНСТВЕННОЕ МЕСТО, ГДЕ ЭТАЛОН ПРОТИВОРЕЧИТ СЕБЕ. Один и
+   тот же марш нарисован на трёх панелях в трёх разных местах по X:
+   182..247 на первом этаже, 252..290 на втором, 205..250 на третьем.
+   Дом от этого перестаёт быть домом — поднимаешься и оказываешься в
+   другом конце этажа. Шахта сведена в одну колонку x 188..248 на всех
+   трёх этажах. Отклонения от каждой панели сверка показывает отдельным
+   разделом, а не замалчивает.
+===================================================================== */
+
+const MADELEINE_HOUSE_PLAN = (function buildMadeleinePlan() {
+
+  /* Базовый масштаб. Размеры мебели считаются от него, а не наоборот:
+     человек обязан проходить вдоль стола, между диваном и стеной, у
+     кровати, у лестницы и в дверном проёме. PASS — самый узкий проход,
+     который считается проходимым: две ширины игрока. */
+  const M = {
+    PLAYER_W: 10, PLAYER_H: 8,      // коллизия игрока, как в Player
+    WALL_T:   12,                   // толщина стены
+    DOOR_W:   28,                   // чистый проём двери
+    ARCH_W:   50,                   // широкая арка между зонами
+    PASS:     20,                   // минимальный проход у мебели
+    CHAIR_W:  18, TABLE_W: 78, SOFA_W: 120,
+    SCALE:    300 / 398,            // эталонный пиксель → игровой
+  };
+
+  /* Где на эталонном изображении лежит контур каждого этажа: по этим
+     числам отладочный слой берёт из картинки ровно тот прямоугольник,
+     который соответствует комнате. */
+  const SRC = { w:398, h:881, panels:[ {x:22,y:276}, {x:451,y:277}, {x:892,y:276} ] };
+
+  /* Оболочка одна на все этажи — это один и тот же дом. Низ толще: под
+     южной стеной на эталоне нарисовано крыльцо, и это не пол. */
+  const SHELL = { w:300, h:664, t:M.WALL_T, south:{ y:624, h:40 } };
+
+  /* Шахта лестницы. Марш A связывает первый этаж со вторым, марш B —
+     второй с третьим, между ними площадка y 340..360. */
+  const SHAFT = { x:188, w:60, A:{ y:360, h:56 }, B:{ y:284, h:56 } };
+  const SX = SHAFT.x + SHAFT.w / 2;               // ось шахты: 218
+
+  const F = [
+    /* =============================== ПЕРВЫЙ ЭТАЖ ================== */
+    { id:'madFloor1', title:'Первый этаж', sub:'Прихожая и общий зал',
+      zones:[
+        { id:'hall',    name:'ПРИХОЖАЯ', x:12,  y:12,  w:276, h:100, kind:'wood' },
+        { id:'living',  name:'ГОСТИНАЯ', x:12,  y:124, w:276, h:224, kind:'wood' },
+        { id:'dining',  name:'СТОЛОВАЯ', x:12,  y:348, w:164, h:276, kind:'wood' },
+        { id:'stairH',  name:'',         x:188, y:360, w:100, h:56,  kind:'wood' },
+        { id:'kitchen', name:'КУХНЯ',    x:188, y:416, w:100, h:208, kind:'tile' },
+      ],
+      parts:[
+        { id:'w1_hall',  x:12,  y:112, w:276, h:12 },   // прихожая | гостиная
+        { id:'w1_livS',  x:176, y:348, w:112, h:12 },   // гостиная | лестница и кухня
+        { id:'w1_spine', x:176, y:360, w:12,  h:264 },  // столовая | кухня
+        { id:'w1_stE',   x:248, y:360, w:12,  h:56  },  // восточная стена шахты
+      ],
+      doors:[
+        { id:'d1_front', x:78,  y:0,   w:28, h:12, kind:'front', a:'street', b:'hall',
+          ref:{x:78,y:0,w:28,h:12} },
+        { id:'d1_arch',  x:86,  y:112, w:50, h:12, kind:'arch',  a:'hall',   b:'living',
+          ref:{x:86,y:112,w:50,h:12} },
+        { id:'d1_kit',   x:176, y:415, w:12, h:46, kind:'open',  a:'dining', b:'kitchen',
+          ref:{x:176,y:415,w:12,h:46} },
+      ],
+      windows:[
+        { id:'v1_hall', x:170, y:0, w:38, h:12, side:'n', enter:true, ref:{x:170,y:0,w:38,h:12} },
+      ],
+      stairs:[
+        { id:'s1_up', x:SHAFT.x, y:SHAFT.A.y, w:SHAFT.w, h:SHAFT.A.h, dir:'up', head:'n',
+          link:'A', to:'madFloor2', land:{x:SX,y:424}, toXY:{x:SX,y:356},
+          ref:{x:182,y:358,w:65,h:50},
+          note:'ширина марша сведена к 60 px, общей для трёх этажей' },
+      ],
+      furniture:[
+        // ПРИХОЖАЯ — всё вдоль стен, середина свободна: тут принимают гостей
+        { id:'f1_console', t:'mad_console',    x:14,  y:14,  w:36,  h:26,  ref:{x:14,y:14,w:36,h:26} },
+        { id:'f1_hallCab', t:'mad_cab_low',    x:14,  y:48,  w:20,  h:32,  ref:{x:14,y:46,w:20,h:32} },
+        { id:'f1_runner',  t:'mad_runner',     x:82,  y:74,  w:66,  h:34,  ref:{x:82,y:74,w:66,h:34} },
+        { id:'f1_coats',   t:'mad_coatrack',   x:226, y:14,  w:54,  h:26,  ref:{x:226,y:14,w:54,h:26} },
+        { id:'f1_mirror',  t:'mad_mirror',     x:270, y:52,  w:18,  h:38,  ref:{x:270,y:52,w:18,h:38} },
+        // ГОСТИНАЯ — камин у стены, диван развёрнут на него, столик между ними
+        { id:'f1_rug',     t:'mad_rug_big',    x:30,  y:172, w:242, h:172, ref:{x:30,y:172,w:242,h:172} },
+        { id:'f1_sofa',    t:'mad_sofa',       x:38,  y:200, w:52,  h:120, rot:90, ref:{x:38,y:200,w:52,h:120} },
+        { id:'f1_coffee',  t:'mad_coffee',     x:112, y:232, w:48,  h:70,  ref:{x:112,y:230,w:48,h:70} },
+        { id:'f1_armN',    t:'mad_armchair',   x:164, y:166, w:40,  h:50,  ref:{x:164,y:164,w:38,h:52} },
+        { id:'f1_armS',    t:'mad_armchair',   x:206, y:296, w:40,  h:50,  ref:{x:204,y:300,w:42,h:46} },
+        { id:'f1_fire',    t:'mad_fireplace',  x:270, y:194, w:18,  h:96,  ref:{x:270,y:194,w:18,h:96} },
+        { id:'f1_lampN',   t:'mad_lamp_floor', x:42,  y:178, w:16,  h:18,  ref:{x:42,y:178,w:16,h:18} },
+        { id:'f1_lampS',   t:'mad_lamp_floor', x:42,  y:324, w:16,  h:18,  ref:{x:42,y:324,w:16,h:18} },
+        { id:'f1_plantNW', t:'mad_plant',      x:14,  y:126, w:26,  h:42,  ref:{x:14,y:126,w:26,h:42} },
+        { id:'f1_cage',    t:'mad_birdcage',   x:14,  y:296, w:22,  h:30,  extra:true,
+          note:'клетка с канарейкой — дневная деталь, на чертеже её нет' },
+        { id:'f1_drum',    t:'mad_side_table', x:132, y:352, w:26,  h:26,  ref:{x:132,y:352,w:28,h:28} },
+        { id:'f1_plantP',  t:'mad_plant_big',  x:18,  y:350, w:40,  h:38,  ref:{x:18,y:348,w:40,h:38} },
+        // СТОЛОВАЯ — стол в центре зоны, стулья вокруг, буфет у стены
+        { id:'f1_dinRug',  t:'mad_rug_warm',   x:20,  y:390, w:120, h:158, ref:{x:20,y:390,w:120,h:158} },
+        { id:'f1_table',   t:'mad_dining',     x:42,  y:428, w:78,  h:104, ref:{x:42,y:428,w:78,h:104} },
+        { id:'f1_chairN1', t:'mad_chair',      x:56,  y:410, w:18,  h:18,  ref:{x:56,y:414,w:18,h:18} },
+        { id:'f1_chairN2', t:'mad_chair',      x:88,  y:410, w:18,  h:18,  ref:{x:86,y:414,w:18,h:18} },
+        { id:'f1_chairS1', t:'mad_chair',      x:56,  y:532, w:18,  h:18,  ref:{x:56,y:528,w:18,h:18} },
+        { id:'f1_chairS2', t:'mad_chair',      x:88,  y:532, w:18,  h:18,  ref:{x:86,y:528,w:18,h:18} },
+        { id:'f1_dinLamp', t:'mad_hang_lamp',  x:70,  y:470, w:18,  h:18,  ref:{x:70,y:470,w:18,h:18} },
+        { id:'f1_buffet',  t:'mad_buffet',     x:38,  y:586, w:74,  h:30,  ref:{x:38,y:584,w:74,h:30} },
+        { id:'f1_plantS',  t:'mad_plant_low',  x:138, y:590, w:28,  h:30,  ref:{x:138,y:588,w:26,h:42},
+          note:'эталонная высота 42 px уходила в южную стену' },
+        { id:'f1_art1',    t:'mad_painting',   x:12,  y:470, w:6,   h:40,  ref:{x:12,y:470,w:6,h:40} },
+        // КУХНЯ — техника и мойка вдоль стен, середина проходная
+        { id:'f1_herbs',   t:'mad_herb_shelf', x:252, y:362, w:32,  h:20,  ref:{x:226,y:414,w:32,h:20},
+          note:'на эталоне висят на южной стене лестничной выгородки; у сведённой шахты её нет — перевешены на северную стену кухни' },
+        { id:'f1_plantK',  t:'mad_plant',      x:262, y:412, w:26,  h:42,  ref:{x:262,y:412,w:26,h:42} },
+        { id:'f1_fridge',  t:'mad_fridge',     x:262, y:456, w:26,  h:48,  ref:{x:262,y:452,w:26,h:48} },
+        { id:'f1_stove',   t:'mad_stove',      x:262, y:504, w:26,  h:58,  ref:{x:264,y:502,w:24,h:58} },
+        { id:'f1_counter', t:'mad_counter',    x:192, y:586, w:96,  h:28,  ref:{x:192,y:586,w:96,h:28} },
+        { id:'f1_sink',    t:'mad_sink',       x:200, y:590, w:40,  h:24,  on:'f1_counter', ref:{x:200,y:588,w:40,h:24} },
+        { id:'f1_dishes',  t:'mad_dishes',     x:250, y:592, w:20,  h:18,  on:'f1_counter', ref:{x:246,y:588,w:20,h:18} },
+      ],
+      /* Интерактивы лежат на том, что нарисовано: у каждого есть предмет
+         (on) и точка подхода (at) на свободном полу. */
+      acts:[
+        { id:'frontDoor', kind:'front',  on:'', at:{x:92,y:30},   prompt:'Главный вход' },
+        { id:'window',    kind:'window', on:'', at:{x:189,y:34},  prompt:'Окно' },
+        { id:'up',        kind:'stair',  on:'', at:{x:SX,y:424},  prompt:'Лестница на 2 этаж', stair:'s1_up' },
+        { id:'coats',     kind:'search', on:'f1_coats',   at:{x:253,y:58},
+          line:'(Два пальто и зонт. Одно пальто мужское, и оно висит тут давно.)' },
+        { id:'hallMirror',kind:'search', on:'f1_mirror',  at:{x:252,y:104},
+          line:'(Зеркало мутное по краям. В нём я выгляжу старше, чем есть.)' },
+        { id:'mantel',    kind:'search', on:'f1_fire',    at:{x:258,y:242},
+          line:'(Спички, сухие лепестки и одна серёжка без пары.)' },
+        { id:'teaTable',  kind:'search', on:'f1_coffee',  at:{x:176,y:266},
+          line:'(Чашка с недопитым чаем. Он ещё не остыл до конца.)' },
+        { id:'sideboard', kind:'search', on:'f1_buffet',  at:{x:75,y:572},
+          line:'(Сервиз на двенадцать персон. Двенадцать — это для кого?)' },
+        { id:'kitCab',    kind:'search', on:'f1_counter', at:{x:214,y:572},
+          line:'(Крупы, соль, жестянка из-под печенья. В жестянке — пуговицы.)' },
+        { id:'hideSofa',  kind:'hide',   on:'f1_sofa',    at:{x:104,y:262}, to:{x:96,y:262},
+          prompt:'За диваном', label:'Ная присела за спинкой дивана.' },
+        { id:'hideBuffet',kind:'hide',   on:'f1_buffet',  at:{x:126,y:600}, to:{x:126,y:606},
+          prompt:'Между буфетом и стеной', label:'Ная втиснулась между буфетом и стеной.' },
+        { id:'hideArm',   kind:'hide',   on:'f1_armS',    at:{x:226,y:274}, to:{x:226,y:288},
+          prompt:'За креслом', label:'Ная присела за высокой спинкой кресла.' },
+        { id:'noiseDish', kind:'noise',  on:'f1_dishes',  at:{x:260,y:576},
+          prompt:'Стопка тарелок', label:'Тарелки поехали и грохнулись об пол.' },
+        { id:'noiseKettle',kind:'noise', on:'f1_stove',   at:{x:246,y:532},
+          prompt:'Чайник на плите', label:'Чайник с лязгом слетел с плиты.' },
+        // Днём это обычный визит: клетка, кресло и травы Мадлен
+        { id:'cage',     kind:'day', on:'f1_cage',   at:{x:70,y:350},  prompt:'Клетка с канарейкой' },
+        { id:'armchair1',kind:'day', on:'f1_armN',   at:{x:150,y:190},  prompt:'Кресло у окна' },
+        { id:'herbs1',   kind:'day', on:'f1_herbs',  at:{x:238,y:392},  prompt:'Травы над плитой' },
+      ],
+      /* Точки обхода хозяйки: на свободном полу и не ближе 120 пикселей
+         от лестничной площадки — иначе Мадлен встречала бы Наю прямо на
+         ступеньках. */
+      route:[
+        { x:150, y:252, dir:0,     wait:1300 },
+        { x:150, y:404, dir:1.57,  wait:1400 },
+        { x:150, y:568, dir:1.57,  wait:1200 },
+        { x:150, y:60,  dir:3.14,  wait:1100 },
+        { x:240, y:210, dir:-1.57, wait:1000, floor:1 },
+      ],
+    },
+    /* =============================== ВТОРОЙ ЭТАЖ ================== */
+    { id:'madFloor2', title:'Второй этаж', sub:'Личные комнаты',
+      zones:[
+        { id:'bath',    name:'ВАННАЯ',     x:12,  y:12,  w:98,  h:138, kind:'tile' },
+        { id:'linen',   name:'',           x:12,  y:150, w:98,  h:66,  kind:'wood' },
+        { id:'bedroom', name:'СПАЛЬНЯ',    x:122, y:12,  w:166, h:204, kind:'wood' },
+        { id:'library', name:'БИБЛИОТЕКА', x:12,  y:228, w:164, h:208, kind:'wood' },
+        { id:'guest',   name:'ГОСТЕВАЯ',   x:12,  y:448, w:164, h:176, kind:'wood' },
+        { id:'stairH',  name:'',           x:188, y:228, w:100, h:212, kind:'wood' },
+        { id:'dress',   name:'ГАРДЕРОБ',   x:188, y:452, w:100, h:172, kind:'wood' },
+      ],
+      parts:[
+        { id:'w2_bathE', x:110, y:12,  w:12,  h:204 },  // ванная | спальня
+        { id:'w2_cross', x:12,  y:216, w:276, h:12  },  // спальня и ванная | низ
+        { id:'w2_hallW', x:176, y:228, w:12,  h:396 },  // холл | комнаты
+        { id:'w2_guest', x:12,  y:436, w:164, h:12  },  // библиотека | гостевая
+        { id:'w2_dress', x:188, y:440, w:100, h:12  },  // холл | гардероб
+      ],
+      doors:[
+        { id:'d2_bath',  x:110, y:176, w:12, h:24, kind:'door', a:'bath',    b:'bedroom', ref:{x:110,y:177,w:12,h:13},
+          note:'на эталоне проём вышел 13 px — уже самого игрока; расширен до 24, иначе в ванную не войти' },
+        { id:'d2_libN',  x:64,  y:216, w:56, h:12, kind:'arch', a:'linen',   b:'library', ref:{x:64,y:216,w:56,h:12} },
+        { id:'d2_hallN', x:190, y:216, w:32, h:12, kind:'door', a:'bedroom', b:'stairH',  ref:{x:190,y:216,w:32,h:12} },
+        { id:'d2_lib',   x:176, y:272, w:12, h:50, kind:'door', a:'stairH',  b:'library', ref:{x:176,y:270,w:12,h:53} },
+        { id:'d2_guest', x:82,  y:436, w:42, h:12, kind:'arch', a:'library', b:'guest',   ref:{x:82,y:436,w:42,h:12} },
+        { id:'d2_dress', x:196, y:440, w:38, h:12, kind:'door', a:'stairH',  b:'dress',   ref:{x:196,y:440,w:38,h:12} },
+        { id:'d2_guestE',x:176, y:510, w:12, h:36, kind:'door', a:'guest',   b:'dress',   ref:{x:176,y:509,w:12,h:37} },
+      ],
+      windows:[
+        { id:'v2_bed', x:162, y:0, w:44, h:12, side:'n', ref:{x:161,y:0,w:45,h:12} },
+      ],
+      stairs:[
+        { id:'s2_down', x:SHAFT.x, y:SHAFT.A.y, w:SHAFT.w, h:SHAFT.A.h, dir:'down', head:'n',
+          link:'A', to:'madFloor1', land:{x:SX,y:356}, toXY:{x:SX,y:424},
+          ref:{x:252,y:338,w:38,h:67},
+          note:'эталон рисует тот же марш при x 252 — шахта сведена в общую колонку' },
+        { id:'s2_up',   x:SHAFT.x, y:SHAFT.B.y, w:SHAFT.w, h:SHAFT.B.h, dir:'up',   head:'s',
+          link:'B', to:'madFloor3', land:{x:SX,y:280}, toXY:{x:SX,y:350},
+          ref:{x:252,y:274,w:38,h:56},
+          note:'эталон рисует тот же марш при x 252 — шахта сведена в общую колонку' },
+      ],
+      furniture:[
+        // ВАННАЯ — ванна под стеной, раковина и унитаз по сторонам
+        { id:'f2_tub',     t:'mad_bathtub',      x:20,  y:16,  w:66,  h:32,  ref:{x:20,y:14,w:66,h:32} },
+        { id:'f2_toilet',  t:'mad_toilet',       x:16,  y:88,  w:22,  h:30,  ref:{x:16,y:88,w:22,h:30} },
+        { id:'f2_basin',   t:'mad_basin',        x:88,  y:72,  w:20,  h:28,  ref:{x:92,y:72,w:20,h:28} },
+        { id:'f2_bathMat', t:'mad_bath_mat',     x:40,  y:86,  w:50,  h:44,  ref:{x:40,y:85,w:50,h:44} },
+        { id:'f2_bathSh',  t:'mad_wall_cab',     x:44,  y:14,  w:30,  h:22,  ref:{x:44,y:14,w:30,h:22} },
+        { id:'f2_linen',   t:'mad_linen_cab',    x:14,  y:152, w:46,  h:62,  ref:{x:14,y:150,w:46,h:62} },
+        // СПАЛЬНЯ — кровать ориентирована на стену, тумбочки по сторонам
+        { id:'f2_bedRug',  t:'mad_rug_bed',      x:158, y:58,  w:130, h:102, ref:{x:158,y:58,w:130,h:102} },
+        { id:'f2_bed',     t:'mad_bed_double',   x:192, y:22,  w:66,  h:94,  ref:{x:192,y:22,w:66,h:94} },
+        { id:'f2_nsL',     t:'mad_nightstand',   x:170, y:22,  w:20,  h:24,  ref:{x:170,y:22,w:20,h:24} },
+        { id:'f2_nsR',     t:'mad_nightstand',   x:262, y:26,  w:20,  h:24,  ref:{x:266,y:25,w:20,h:24} },
+        { id:'f2_candle',  t:'mad_candle',       x:266, y:14,  w:14,  h:16,  ref:{x:268,y:14,w:14,h:16} },
+        { id:'f2_wardBed', t:'mad_wardrobe',     x:126, y:56,  w:26,  h:46,  ref:{x:126,y:55,w:26,h:46} },
+        { id:'f2_vanity',  t:'mad_vanity',       x:254, y:158, w:32,  h:44,  ref:{x:255,y:157,w:32,h:44} },
+        { id:'f2_plantB',  t:'mad_plant',        x:126, y:136, w:26,  h:42,  ref:{x:126,y:135,w:26,h:42} },
+        { id:'f2_artB',    t:'mad_painting_h',   x:224, y:12,  w:34,  h:6,   ref:{x:224,y:12,w:34,h:6} },
+        // БИБЛИОТЕКА — стеллажи вдоль стен, стол у стены, кресло отдельной зоной
+        { id:'f2_shelfA',  t:'mad_bookshelf',    x:14,  y:240, w:24,  h:84,  ref:{x:16,y:240,w:24,h:84} },
+        { id:'f2_shelfB',  t:'mad_bookshelf',    x:14,  y:330, w:24,  h:84,  ref:{x:16,y:330,w:24,h:84} },
+        { id:'f2_libRug',  t:'mad_rug_lib',      x:104, y:274, w:50,  h:96,  ref:{x:104,y:272,w:50,h:96} },
+        { id:'f2_arm',     t:'mad_armchair_read',x:46,  y:330, w:52,  h:48,  ref:{x:25,y:330,w:54,h:50},
+          note:'на эталоне кресло налезает на нижний стеллаж — отодвинуто от стены' },
+        { id:'f2_libSide', t:'mad_side_table',   x:102, y:352, w:26,  h:26,  ref:{x:78,y:352,w:20,h:24},
+          note:'сдвинут вместе с креслом, чтобы остаться его столиком' },
+        { id:'f2_libLamp', t:'mad_lamp_floor',   x:84,  y:382, w:16,  h:18,  ref:{x:60,y:376,w:16,h:18},
+          note:'сдвинут вместе с креслом' },
+        { id:'f2_desk',    t:'mad_desk',         x:152, y:330, w:24,  h:104, ref:{x:152,y:295,w:24,h:104},
+          note:'на эталоне стол стоит поперёк собственного проёма в холл — сдвинут на юг, чтобы дверь открывалась' },
+        { id:'f2_plantL',  t:'mad_plant',        x:146, y:230, w:26,  h:42,  ref:{x:146,y:228,w:26,h:42} },
+        // ГОСТЕВАЯ — кровать у стены, комод под картиной, круглый ковёр
+        { id:'f2_gBed',    t:'mad_bed_single',   x:22,  y:530, w:64,  h:90,  ref:{x:22,y:528,w:64,h:90} },
+        { id:'f2_gRug',    t:'mad_rug_round',    x:104, y:528, w:52,  h:70,  ref:{x:104,y:530,w:52,h:70} },
+        { id:'f2_gDress',  t:'mad_dresser',      x:104, y:598, w:52,  h:26,  ref:{x:104,y:600,w:52,h:26} },
+        { id:'f2_gPlant',  t:'mad_plant_low',    x:22,  y:466, w:28,  h:30,  ref:{x:22,y:465,w:28,h:30} },
+        { id:'f2_gArt',    t:'mad_painting_h',   x:104, y:448, w:34,  h:6,   ref:{x:104,y:448,w:34,h:6} },
+        // ГАРДЕРОБ — шкаф во всю стену, сундук, тумбочка
+        { id:'f2_ward',    t:'mad_wardrobe_big', x:258, y:458, w:30,  h:158, ref:{x:258,y:456,w:30,h:158} },
+        { id:'f2_chest',   t:'mad_chest',        x:196, y:556, w:38,  h:26,  ref:{x:196,y:560,w:38,h:26} },
+        { id:'f2_ns2',     t:'mad_nightstand',   x:232, y:596, w:20,  h:24,  ref:{x:265,y:610,w:22,h:30},
+          note:'эталонное место занято шкафом во всю стену и выходит за южную стену' },
+        { id:'f2_dArt',    t:'mad_painting_h',   x:212, y:472, w:34,  h:6,   ref:{x:212,y:472,w:34,h:6} },
+      ],
+      acts:[
+        { id:'down',  kind:'stair', on:'', at:{x:SX,y:356}, prompt:'Лестница на 1 этаж', stair:'s2_down' },
+        { id:'up',    kind:'stair', on:'', at:{x:SX,y:280}, prompt:'Лестница на 3 этаж', stair:'s2_up' },
+        { id:'vanity',   kind:'search', on:'f2_vanity', at:{x:240,y:186},
+          line:'(Гребень, шпильки, пудреница. И фотография, положенная лицом вниз.)' },
+        { id:'bedside',  kind:'search', on:'f2_nsR',    at:{x:272,y:68},
+          line:'(Очки, стакан воды и книга, заложенная лентой на середине.)' },
+        { id:'bathShelf',kind:'search', on:'f2_bathSh', at:{x:59,y:62},
+          line:'(Мыло, склянка с чем-то травяным и очень много лекарств.)' },
+        { id:'libShelfA',kind:'search', on:'f2_shelfA', at:{x:52,y:282},
+          line:'(Корешки вытерты до белизны. Эти книги читали, а не расставляли.)' },
+        { id:'libShelfB',kind:'search', on:'f2_shelfB', at:{x:52,y:400},
+          line:'(Подшивки газет за тридцать лет. Все за один и тот же месяц.)' },
+        { id:'libDesk',  kind:'search', on:'f2_desk',   at:{x:138,y:382},
+          line:'(Начатое письмо. «Дорогая моя девочка» — и дальше ничего.)' },
+        { id:'guestDresser',kind:'search', on:'f2_gDress', at:{x:130,y:580},
+          line:'(Постельное бельё, переложенное лавандой. Им давно не пользовались.)' },
+        { id:'guestWardrobe',kind:'search', on:'f2_ward', at:{x:244,y:500},
+          line:'(Пустые плечики. Только они и звенят.)' },
+        { id:'hideWardrobe',kind:'hide', on:'f2_ward',  at:{x:244,y:560}, to:{x:270,y:560},
+          prompt:'В шкафу', label:'Ная забралась в шкаф и притянула дверцу.' },
+        { id:'hideBed',  kind:'hide', on:'f2_bed',      at:{x:176,y:100}, to:{x:182,y:100},
+          prompt:'За кроватью', label:'Ная легла между кроватью и стеной.' },
+        { id:'hideArm',  kind:'hide', on:'f2_arm',      at:{x:72,y:322}, to:{x:36,y:358},
+          prompt:'За креслом', label:'Ная присела за высокой спинкой.' },
+        { id:'noiseBooks',kind:'noise', on:'f2_libSide', at:{x:138,y:340},
+          prompt:'Стопка книг', label:'Книги посыпались на пол.' },
+      ],
+      route:[
+        { x:238, y:330, dir:1.57,  wait:1200 },
+        { x:120, y:580, dir:1.57,  wait:1000 },
+        { x:90,  y:300, dir:0,     wait:1400 },
+        { x:160, y:120, dir:3.14,  wait:1200 },
+        { x:60,  y:60,  dir:-1.57, wait:900, floor:0 },
+      ],
+    },
+    /* =============================== ТРЕТИЙ ЭТАЖ ================== */
+    { id:'madFloor3', title:'Чердак', sub:'Чердак и ритуальная комната',
+      zones:[
+        { id:'store',  name:'КЛАДОВАЯ',   x:12,  y:12,  w:106, h:256, kind:'stone' },
+        { id:'ritual', name:'РИТУАЛЬНАЯ', x:130, y:12,  w:158, h:256, kind:'ritual' },
+        { id:'corr',   name:'',           x:12,  y:280, w:164, h:126, kind:'wood' },
+        { id:'stairH', name:'',           x:188, y:280, w:100, h:126, kind:'wood' },
+        { id:'study',  name:'КАБИНЕТ',    x:12,  y:418, w:276, h:206, kind:'wood' },
+      ],
+      parts:[
+        { id:'w3_storE', x:118, y:12,  w:12,  h:256 },  // кладовая | ритуальная
+        { id:'w3_cross', x:12,  y:268, w:276, h:12, ref:{x:12,y:290,w:276,h:12},
+          note:'поднята на 22 px: сведённому маршу нужен выход в коридор' },  // верх | коридор
+        { id:'w3_hallW', x:176, y:280, w:12,  h:126 },  // коридор | холл
+        { id:'w3_study', x:12,  y:406, w:276, h:12  },  // коридор | кабинет
+      ],
+      doors:[
+        { id:'d3_store', x:118, y:158, w:12, h:34, kind:'door', a:'store',  b:'ritual', ref:{x:118,y:158,w:12,h:34} },
+        { id:'d3_corrW', x:59,  y:268, w:33, h:12, kind:'door', a:'store',  b:'corr',   ref:{x:59,y:268,w:33,h:12} },
+        { id:'d3_corrE', x:148, y:268, w:28, h:12, kind:'arch', a:'ritual', b:'corr',   ref:{x:151,y:268,w:46,h:12},
+          note:'эталонный проём 46 px заходил на стену холла — укорочен до 28' },
+        { id:'d3_hallN', x:242, y:268, w:46, h:12, kind:'open', a:'ritual', b:'stairH', ref:{x:242,y:268,w:46,h:12} },
+        { id:'d3_study', x:41,  y:406, w:36, h:12, kind:'door', a:'corr',   b:'study',  ref:{x:41,y:406,w:36,h:12} },
+        { id:'d3_studyE',x:166, y:406, w:44, h:12, kind:'arch', a:'stairH', b:'study',  ref:{x:166,y:406,w:44,h:12} },
+      ],
+      windows:[
+        { id:'v3_rit', x:170, y:0, w:26, h:12, side:'n', ref:{x:169,y:0,w:27,h:12} },
+      ],
+      stairs:[
+        { id:'s3_down', x:SHAFT.x, y:SHAFT.B.y, w:SHAFT.w, h:SHAFT.B.h, dir:'down', head:'s',
+          link:'B', to:'madFloor2', land:{x:SX,y:350}, toXY:{x:SX,y:280},
+          ref:{x:205,y:300,w:45,h:105},
+          note:'эталон рисует марш 45×105 при x 205 — сведён к общей шахте 60×56' },
+      ],
+      furniture:[
+        // КЛАДОВАЯ — стеллаж и ящики вдоль стен, сундук в углу
+        { id:'f3_shelfCr', t:'mad_crate_shelf',  x:14,  y:76,  w:24,  h:76,  ref:{x:18,y:75,w:24,h:76} },
+        { id:'f3_crate',   t:'mad_crate',        x:14,  y:156, w:26,  h:30,  ref:{x:20,y:148,w:26,h:30} },
+        { id:'f3_chest',   t:'mad_chest_big',    x:22,  y:222, w:64,  h:36,  ref:{x:22,y:220,w:64,h:36} },
+        { id:'f3_crate2',  t:'mad_crate',        x:82,  y:26,  w:26,  h:30,  ref:{x:82,y:26,w:26,h:30} },
+        { id:'f3_storeSh', t:'mad_wall_cab',     x:82,  y:120, w:30,  h:22,  ref:{x:82,y:120,w:30,h:22} },
+        // РИТУАЛЬНАЯ — круг в центре, алтарь у стены, свечи по кругу
+        { id:'f3_circle',  t:'mad_ritual_rug',   x:146, y:56,  w:134, h:176, ref:{x:146,y:55,w:134,h:176} },
+        { id:'f3_altar',   t:'mad_altar',        x:166, y:174, w:86,  h:44,  ref:{x:165,y:172,w:86,h:44} },
+        { id:'f3_candA',   t:'mad_candle',       x:170, y:158, w:14,  h:16,  ref:{x:170,y:164,w:14,h:16} },
+        { id:'f3_candB',   t:'mad_candle',       x:236, y:158, w:14,  h:16,  ref:{x:238,y:168,w:14,h:16} },
+        { id:'f3_candC',   t:'mad_candle',       x:150, y:222, w:14,  h:16,  ref:{x:258,y:180,w:14,h:16},
+          note:'перенесена на свободный угол круга: эталонное место ушло под стеллаж со склянками' },
+        { id:'f3_candD',   t:'mad_candle',       x:236, y:222, w:14,  h:16,  ref:{x:258,y:212,w:14,h:16},
+          note:'перенесена вместе с предыдущей' },
+        { id:'f3_shrine',  t:'mad_shrine',       x:142, y:16,  w:34,  h:56,  ref:{x:142,y:14,w:34,h:56} },
+        { id:'f3_jars',    t:'mad_jar_shelf',    x:256, y:176, w:30,  h:80,  ref:{x:255,y:220,w:30,h:80},
+          note:'эталонное место перекрывает проём из ритуальной в холл — поднят на север' },
+        { id:'f3_ritSh',   t:'mad_wall_cab',     x:250, y:14,  w:30,  h:22,  ref:{x:250,y:14,w:30,h:22} },
+        // КОРИДОР — дорожка и комод, середина свободна
+        { id:'f3_corrRug', t:'mad_rug_corr',     x:54,  y:312, w:122, h:80,  ref:{x:62,y:312,w:122,h:80} },
+        { id:'f3_corrCab', t:'mad_cab_corr',     x:16,  y:322, w:26,  h:54,  ref:{x:18,y:320,w:26,h:54} },
+        // КАБИНЕТ — стол ориентирован на стену, стеллаж во всю стену
+        { id:'f3_studyRug',t:'mad_rug_study',    x:20,  y:446, w:230, h:174, ref:{x:20,y:445,w:230,h:174} },
+        { id:'f3_desk3',   t:'mad_desk_big',     x:96,  y:486, w:84,  h:70,  ref:{x:95,y:485,w:84,h:70} },
+        { id:'f3_chair3',  t:'mad_chair_desk',   x:124, y:560, w:28,  h:26,  ref:{x:126,y:565,w:28,h:26} },
+        { id:'f3_globe',   t:'mad_globe',        x:234, y:512, w:26,  h:34,  ref:{x:235,y:510,w:26,h:34} },
+        { id:'f3_shelf3',  t:'mad_bookshelf_tall',x:264, y:452, w:24, h:166, ref:{x:272,y:455,w:24,h:166},
+          note:'эталонный стеллаж на 8 px уходит в восточную стену — придвинут вплотную' },
+        { id:'f3_arm3',    t:'mad_armchair_read',x:34,  y:556, w:52,  h:48,  ref:{x:35,y:558,w:52,h:48} },
+        { id:'f3_side3',   t:'mad_side_table',   x:16,  y:594, w:26,  h:26,  ref:{x:20,y:594,w:26,h:26} },
+        { id:'f3_cab3',    t:'mad_cab_slim',     x:14,  y:480, w:18,  h:74,  ref:{x:14,y:480,w:18,h:74} },
+        { id:'f3_plant3',  t:'mad_plant',        x:234, y:440, w:26,  h:42,  ref:{x:234,y:440,w:26,h:42} },
+      ],
+      acts:[
+        { id:'down',  kind:'stair', on:'', at:{x:SX,y:350}, prompt:'Лестница на 2 этаж', stair:'s3_down' },
+        { id:'altar', kind:'search', on:'f3_altar', at:{x:158,y:208},
+          line:'(Чаша, нож и соль. Всё вымыто и лежит ровно, как приборы к ужину.)' },
+        { id:'jars',  kind:'search', on:'f3_jars',  at:{x:246,y:240},
+          line:'(Подписано её рукой: «от бессонницы», «от тоски», «на всякий случай».)' },
+        { id:'crates',kind:'search', on:'f3_shelfCr', at:{x:54,y:114},
+          line:'(Ящики с барахлом. Детская обувь, перевязанная бечёвкой.)' },
+        { id:'chest3',kind:'search', on:'f3_chest',   at:{x:100,y:250},
+          line:'(Сундук не заперт. Внутри платья на девочку лет десяти.)' },
+        { id:'desk3', kind:'search', on:'f3_desk3',   at:{x:190,y:520},
+          line:'(Расчётные книги. Каждая строка — чужая беда и цена за неё.)' },
+        { id:'shelf3',kind:'search', on:'f3_shelf3',  at:{x:248,y:560},
+          line:'(Травники и справочники. Между страницами засушенные листья.)' },
+        { id:'hideCrate',kind:'hide', on:'f3_crate',  at:{x:54,y:176}, to:{x:46,y:180},
+          prompt:'За ящиками', label:'Ная села на пол за ящиками.' },
+        { id:'hideDesk', kind:'hide', on:'f3_desk3',  at:{x:196,y:562}, to:{x:186,y:548},
+          prompt:'Под столом', label:'Ная забралась под стол и подтянула колени.' },
+        { id:'hideArm',  kind:'hide', on:'f3_arm3',   at:{x:100,y:590}, to:{x:92,y:596},
+          prompt:'За креслом', label:'Ная присела за спинкой кресла.' },
+        { id:'noiseJars',kind:'noise', on:'f3_jars',  at:{x:240,y:160},
+          prompt:'Склянки на полке', label:'Склянки поехали и зазвенели.' },
+      ],
+      route:[
+        { x:70,  y:340, dir:0,     wait:1100 },
+        { x:209, y:120, dir:-1.57, wait:1600 },
+        { x:100, y:600, dir:1.57,  wait:1300 },
+        { x:215, y:470, dir:-1.57, wait:800, floor:1 },
+      ],
+    },
+  ];
+
+  return { metrics:M, src:SRC, shell:SHELL, shaft:SHAFT, floors:F,
+    /* Допуски сверки с эталоном. Архитектура обязана совпасть почти
+       идеально, декор — приблизительно: игровой рендер не повторяет
+       каждый художественный пиксель текстуры. */
+    tol:{ wall:4, door:3, window:3, stair:3, big:5, small:12 } };
+})();
+
+/* =====================================================================
+   МЕБЕЛЬ ДОМА МАДЛЕН
+
+   Отдельные модели под размеры плана. Прежние пропсы не подходили: они
+   рисовались под дом 420×470, где мебель занимала треть той площади,
+   какую занимает на чертеже. Здесь размер каждого предмета взят из
+   эталона, а не подобран на глаз.
+
+   Правила для всех моделей:
+     • ax/ay нулевые — координата плана есть левый верхний угол рисунка,
+       поэтому «мебель стоит там, где нарисована» выполняется буквально;
+     • foot — основание предмета, а не вся картинка: за спинку дивана
+       и за столешницу можно зайти, в тумбу нельзя;
+     • стиль тот же, что во всей игре: 2D сверху, тёплое дерево,
+       приглушённый цвет, мягкая тень под основанием.
+===================================================================== */
+(function defineMadeleineFurniture() {
+  const D = (k, m, f) => Art.def(k, m, f);
+  /* Модель занимает свой прямоугольник целиком; основание задаётся
+     глубиной от нижней кромки. base=0 — предмет непроходим целиком. */
+  const mk = (k, w, h, base, draw, extra) => D(k, Object.assign({
+    w, h, ax:w / 2, ay:h,
+    foot: base === null ? null : { x:-w / 2 + 1, y:-(base || h), w:w - 2, h:(base || h) - 1 },
+  }, extra || {}), g => draw(g, w, h));
+
+  const rim = (g, w, h, top, side) => {            // корпус сверху и передняя стенка
+    g.fillStyle = side; g.fillRect(0, 2, w, h - 2);
+    g.fillStyle = top;  g.fillRect(1, 0, w - 2, h - 5);
+    g.fillStyle = shade(top, 1.14); g.fillRect(1, 0, w - 2, 1);
+    g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(0, h - 3, w, 3);
+  };
+  const grain = (g, w, h, col, step) => {
+    g.fillStyle = col;
+    for (let y = 3; y < h - 4; y += (step || 4)) g.fillRect(2, y, w - 4, 1);
+  };
+  const shadow = (g, w, h) => shadowEllipse(g, w / 2, h - 2, w * .46, 2.4, .26);
+
+  /* ---- корпусная мебель: комоды, шкафы, буфеты, тумбы ---- */
+  const caseBox = (k, w, h, top, side, drawers) => mk(k, w, h, Math.max(6, h * .55), (g) => {
+    shadow(g, w, h); rim(g, w, h, top, side); grain(g, w, h, shade(top, .88));
+    const n = drawers || Math.max(1, Math.round(h / 22));
+    g.fillStyle = shade(side, .78);
+    for (let i = 0; i < n; i++) {
+      const y = 3 + i * ((h - 8) / n);
+      g.fillRect(3, y, w - 6, (h - 8) / n - 2);
+      g.fillStyle = '#c8a86a'; g.fillRect(w / 2 - 2, y + ((h - 8) / n - 2) / 2 - 1, 4, 2);
+      g.fillStyle = shade(side, .78);
+    }
+  });
+  caseBox('mad_console',    36, 26, '#6b5240', '#4e3a2c');
+  caseBox('mad_cab_low',    20, 32, '#66503c', '#4a3628');
+  caseBox('mad_cab_corr',   26, 54, '#66503c', '#4a3628');
+  caseBox('mad_cab_slim',   18, 74, '#5f4a38', '#463324');
+  caseBox('mad_buffet',     74, 30, '#6d5138', '#4d3826', 3);
+  caseBox('mad_dresser',    52, 26, '#6a4f3a', '#4b3728', 3);
+  caseBox('mad_nightstand', 20, 24, '#6b5240', '#4e3a2c', 2);
+  caseBox('mad_linen_cab',  46, 62, '#5e4636', '#443124', 3);
+  caseBox('mad_wardrobe',   26, 46, '#5c4434', '#422f22', 2);
+  caseBox('mad_shrine',     34, 56, '#513a4a', '#392838', 3);
+
+  /* Шкаф во всю стену: створки, а не ящики — в такой и прячутся. */
+  mk('mad_wardrobe_big', 30, 158, 24, (g, w, h) => {
+    shadow(g, w, h); rim(g, w, h, '#5c4434', '#422f22');
+    g.fillStyle = 'rgba(0,0,0,.30)';
+    for (let y = 6; y < h - 8; y += 26) g.fillRect(3, y, w - 6, 22);
+    g.fillStyle = '#c8a86a';
+    for (let y = 16; y < h - 10; y += 26) { g.fillRect(w / 2 - 3, y, 2, 6); g.fillRect(w / 2 + 1, y, 2, 6); }
+  });
+
+  /* Туалетный столик: столешница, зеркало у стены, пузырьки. */
+  mk('mad_vanity', 32, 44, 16, (g, w, h) => {
+    shadow(g, w, h); rim(g, w, h, '#6d5240', '#4e3a2c');
+    g.fillStyle = '#2f3540'; g.fillRect(4, 2, w - 8, 12);
+    g.fillStyle = '#8fa0ab'; g.fillRect(5, 3, w - 10, 10);
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(6, 4, 4, 8);
+    g.fillStyle = '#c9b08a'; g.fillRect(6, 18, 5, 4); g.fillRect(14, 19, 4, 3);
+    g.fillStyle = '#9a6a7a'; g.fillRect(21, 18, 5, 5);
+    g.fillStyle = shade('#4e3a2c', .8); g.fillRect(3, 28, w - 6, 8);
+    g.fillStyle = '#c8a86a'; g.fillRect(w / 2 - 2, 31, 4, 2);
+  });
+
+  /* ---- стеллажи ---- */
+  const shelfTall = (k, w, h, cols) => mk(k, w, h, Math.max(7, h * .5), (g) => {
+    shadow(g, w, h);
+    g.fillStyle = '#3f2f24'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#54402f'; g.fillRect(1, 1, w - 2, h - 3);
+    for (let y = 2; y < h - 4; y += 15) {
+      g.fillStyle = '#6a5138'; g.fillRect(2, y + 12, w - 4, 2);          // полка
+      let x = 3;
+      while (x < w - 4) {
+        const bw = 2 + ((x + y) % 3);
+        g.fillStyle = cols[(x + y) % cols.length];
+        g.fillRect(x, y + 2, Math.min(bw, w - 4 - x), 10);
+        x += bw + 1;
+      }
+    }
+    g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(0, h - 3, w, 3);
+  });
+  shelfTall('mad_bookshelf',      24, 84,  ['#7a3a32','#6a5a34','#3a5a52','#5a3a5a','#8a6a42']);
+  shelfTall('mad_bookshelf_tall', 24, 166, ['#7a3a32','#6a5a34','#3a5a52','#5a3a5a','#8a6a42']);
+
+  /* Стеллаж с ящиками в кладовой. */
+  mk('mad_crate_shelf', 24, 76, 38, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#3c3028'; g.fillRect(0, 0, w, h);
+    for (let y = 2; y < h - 4; y += 18) {
+      g.fillStyle = '#5a4a3a'; g.fillRect(2, y, w - 4, 14);
+      g.fillStyle = '#4a3c2e'; g.fillRect(3, y + 1, w - 6, 12);
+      g.fillStyle = '#6a5744'; g.fillRect(3, y + 6, w - 6, 1);
+      g.fillStyle = '#6a5744'; g.fillRect(w / 2 - 1, y + 1, 2, 12);
+    }
+    g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(0, h - 3, w, 3);
+  });
+  mk('mad_crate', 26, 30, 0, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#4e3f2e'; g.fillRect(0, 1, w, h - 1);
+    g.fillStyle = '#65523c'; g.fillRect(1, 0, w - 2, h - 4);
+    g.strokeStyle = '#3a2e22'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(2, 2); g.lineTo(w - 3, h - 6);
+    g.moveTo(w - 3, 2); g.lineTo(2, h - 6); g.stroke();
+    g.fillStyle = 'rgba(0,0,0,.30)'; g.fillRect(0, h - 3, w, 3);
+  });
+
+  /* Стеллаж со склянками: стекло на полках светится. */
+  mk('mad_jar_shelf', 30, 80, 38, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#3b3040'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#4c3e52'; g.fillRect(1, 1, w - 2, h - 3);
+    for (let y = 3; y < h - 6; y += 16) {
+      g.fillStyle = '#5f4f68'; g.fillRect(2, y + 12, w - 4, 2);
+      for (let x = 4; x < w - 6; x += 8) {
+        g.fillStyle = ['#7fa88a','#a8907f','#8a7fa8'][(x + y) % 3];
+        g.fillRect(x, y + 3, 5, 9);
+        g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + 1, y + 4, 1, 6);
+      }
+    }
+    g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(0, h - 3, w, 3);
+  });
+
+  /* ---- ковры: плоские декали, их топчут ---- */
+  const rug = (k, w, h, a, b, style) => D(k, { w, h, ax:w / 2, ay:h / 2, foot:null, flat:true }, g => {
+    g.fillStyle = a; g.fillRect(0, 0, w, h);
+    g.fillStyle = b; g.fillRect(2, 2, w - 4, h - 4);
+    g.fillStyle = shade(a, 1.18); g.fillRect(4, 4, w - 8, 1); g.fillRect(4, h - 5, w - 8, 1);
+    g.fillRect(4, 4, 1, h - 8); g.fillRect(w - 5, 4, 1, h - 8);
+    if (style === 'medallion') {
+      g.fillStyle = shade(a, .80);                       // узорный бордюр
+      g.fillRect(6, 6, w - 12, 3); g.fillRect(6, h - 9, w - 12, 3);
+      g.fillRect(6, 6, 3, h - 12); g.fillRect(w - 9, 6, 3, h - 12);
+      g.fillStyle = shade(b, 1.12);
+      for (let x = 12; x < w - 12; x += 10) { g.fillRect(x, 7, 3, 1); g.fillRect(x, h - 8, 3, 1); }
+      for (let y = 12; y < h - 12; y += 10) { g.fillRect(7, y, 1, 3); g.fillRect(w - 8, y, 1, 3); }
+      g.fillStyle = shade(a, 1.10);
+      g.beginPath(); g.ellipse(w / 2, h / 2, w * .30, h * .30, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = b;
+      g.beginPath(); g.ellipse(w / 2, h / 2, w * .24, h * .24, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = shade(a, 1.18);
+      g.beginPath(); g.ellipse(w / 2, h / 2, w * .13, h * .13, 0, 0, Math.PI * 2); g.fill();
+    } else if (style === 'round') {
+      g.clearRect(0, 0, w, h);
+      g.fillStyle = a; g.beginPath(); g.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = b; g.beginPath(); g.ellipse(w / 2, h / 2, w / 2 - 3, h / 2 - 3, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = shade(a, 1.14);
+      g.beginPath(); g.ellipse(w / 2, h / 2, w / 4, h / 4, 0, 0, Math.PI * 2); g.fill();
+    } else {
+      g.fillStyle = shade(b, 1.12);
+      for (let y = 8; y < h - 8; y += 12) for (let x = 8; x < w - 8; x += 12) g.fillRect(x, y, 3, 3);
+    }
+  });
+  rug('mad_rug_big',   242, 172, '#7a3a38', '#8a4a44', 'medallion');
+  rug('mad_rug_warm',  120, 158, '#8a6a3a', '#7a5c32');
+  rug('mad_runner',     66,  34, '#7a3a34', '#6a322c');
+  rug('mad_rug_bed',   130, 102, '#7d5c62', '#6c4c52', 'medallion');
+  rug('mad_rug_lib',    50,  96, '#5f5a46', '#6f6a52');
+  rug('mad_rug_round',  52,  70, '#6a2f3a', '#7a3a44', 'round');
+  rug('mad_rug_corr',  122,  80, '#6a3440', '#5a2c36', 'medallion');
+  rug('mad_rug_study', 230, 174, '#6a4038', '#5c3730', 'medallion');
+  rug('mad_bath_mat',   50,  44, '#6f8c90', '#7f9ca0');
+
+  /* Ритуальный круг: пентакль, а не просто ковёр. */
+  D('mad_ritual_rug', { w:134, h:176, ax:67, ay:88, foot:null, flat:true }, g => {
+    const w = 134, h = 176, cx = w / 2, cy = h / 2, r = Math.min(w, h) * .42;
+    g.fillStyle = '#4a2c46'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#58324f'; g.fillRect(3, 3, w - 6, h - 6);
+    g.strokeStyle = '#c08a6a'; g.lineWidth = 1;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.arc(cx, cy, r - 5, 0, Math.PI * 2); g.stroke();
+    g.beginPath();
+    for (let k = 0; k < 5; k++) {
+      const a = -Math.PI / 2 + k * 4 * Math.PI / 5;
+      const px = cx + Math.cos(a) * (r - 7), py = cy + Math.sin(a) * (r - 7);
+      k ? g.lineTo(px, py) : g.moveTo(px, py);
+    }
+    g.closePath(); g.stroke();
+    g.fillStyle = 'rgba(200,140,110,.55)';
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4;
+      g.fillRect(cx + Math.cos(a) * (r + 6) - 1, cy + Math.sin(a) * (r + 6) - 1, 3, 3);
+    }
+  });
+
+  /* ---- столы ---- */
+  const table = (k, w, h, top, side, round) => mk(k, w, h, Math.max(6, h * .5), (g) => {
+    shadow(g, w, h);
+    if (round) {
+      g.fillStyle = side; g.beginPath(); g.ellipse(w / 2, h / 2 + 2, w / 2 - 1, h / 2 - 2, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = top;  g.beginPath(); g.ellipse(w / 2, h / 2, w / 2 - 2, h / 2 - 3, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = shade(top, 1.12);
+      g.beginPath(); g.ellipse(w / 2, h / 2 - 1, w / 2 - 6, h / 2 - 7, 0, 0, Math.PI * 2); g.fill();
+    } else {
+      rim(g, w, h, top, side); grain(g, w, h, shade(top, .86), 5);
+      g.fillStyle = shade(side, .7);
+      g.fillRect(2, h - 6, 3, 4); g.fillRect(w - 5, h - 6, 3, 4);
+    }
+  });
+  table('mad_coffee',     48,  70, '#6f5440', '#4f3a2c', true);
+  table('mad_side_table', 26,  26, '#6b5240', '#4b3729', true);
+  table('mad_dining',     78, 104, '#74553c', '#513a28');
+  table('mad_desk',       24, 104, '#6a4f38', '#4a3626');
+  table('mad_desk_big',   84,  70, '#6a4f38', '#4a3626');
+
+  /* ---- сиденья ---- */
+  const chair = (k, w, h) => mk(k, w, h, Math.max(5, h * .6), (g) => {
+    shadow(g, w, h);
+    g.fillStyle = '#4a3527'; g.fillRect(1, 0, w - 2, 4);            // спинка
+    g.fillStyle = '#5e4632'; g.fillRect(2, 4, w - 4, h - 7);        // сиденье
+    g.fillStyle = '#6d5340'; g.fillRect(3, 5, w - 6, 2);
+    g.fillStyle = '#39281d'; g.fillRect(1, h - 3, w - 2, 3);
+  });
+  chair('mad_chair',      18, 18);
+  chair('mad_chair_desk', 28, 26);
+
+  const armchair = (k, w, h) => mk(k, w, h, Math.max(8, h * .7), (g) => {
+    shadow(g, w, h);
+    g.fillStyle = '#5a2f34'; g.fillRect(2, 0, w - 4, 9);                       // спинка
+    g.fillStyle = '#6d3a40'; g.fillRect(3, 1, w - 6, 3);
+    g.fillStyle = '#5a2f34'; g.fillRect(0, 6, 6, h - 12); g.fillRect(w - 6, 6, 6, h - 12);
+    g.fillStyle = '#7d454b'; g.fillRect(6, 9, w - 12, h - 16);                 // подушка
+    g.fillStyle = '#8d5158'; g.fillRect(7, 10, w - 14, 2);
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(6, h - 9, w - 12, 2);
+    g.fillStyle = '#3a2420'; g.fillRect(2, h - 4, w - 4, 4);
+  });
+  armchair('mad_armchair',      40, 50);
+  armchair('mad_armchair_read', 52, 48);
+
+  /* Диван развёрнут на камин: спинка у западной стены, сиденья к востоку. */
+  mk('mad_sofa', 52, 120, 90, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#5a2f34'; g.fillRect(0, 0, w, h);                          // общий силуэт
+    g.fillStyle = '#4a262b'; g.fillRect(0, 2, 15, h - 4);                     // спинка у стены
+    g.fillStyle = '#6d3a40'; g.fillRect(1, 3, 4, h - 6);
+    g.fillStyle = '#4a262b'; g.fillRect(13, 0, w - 13, 11);                   // подлокотники
+    g.fillRect(13, h - 11, w - 13, 11);
+    g.fillStyle = '#6d3a40'; g.fillRect(15, 1, w - 17, 4); g.fillRect(15, h - 10, w - 17, 4);
+    for (let k = 0; k < 2; k++) {                                             // подушки
+      const y = 13 + k * 48;
+      g.fillStyle = '#8a4a52'; g.fillRect(16, y, w - 20, 45);
+      g.fillStyle = '#9c5a60'; g.fillRect(16, y, w - 20, 3);
+      g.fillStyle = 'rgba(0,0,0,.26)'; g.fillRect(16, y + 43, w - 20, 2);
+      g.fillStyle = 'rgba(255,220,200,.10)'; g.fillRect(19, y + 6, w - 26, 1);
+    }
+    g.fillStyle = '#3a2420'; g.fillRect(0, h - 3, w, 3); g.fillRect(w - 4, 6, 4, h - 12);
+  });
+
+  /* ---- кровати ---- */
+  const bed = (k, w, h, blanket) => mk(k, w, h, h - 8, (g) => {
+    shadow(g, w, h);
+    g.fillStyle = '#4a3a2e'; g.fillRect(1, 0, w - 2, 7);                       // спинка
+    g.fillStyle = '#5c4838'; g.fillRect(2, 1, w - 4, 3);
+    g.fillStyle = '#cfc4b4'; g.fillRect(3, 8, w - 6, h - 14);                  // матрас
+    g.fillStyle = '#e8e2d6'; g.fillRect(6, 10, (w - 12) / 2 - 2, 14);          // подушки
+    g.fillStyle = '#e8e2d6'; g.fillRect(w / 2 + 2, 10, (w - 12) / 2 - 2, 14);
+    g.fillStyle = blanket; g.fillRect(3, 28, w - 6, h - 34);                   // одеяло
+    g.fillStyle = shade(blanket, 1.14); g.fillRect(3, 28, w - 6, 2);
+    g.fillStyle = shade(blanket, .80);
+    for (let x = 9; x < w - 8; x += 11) g.fillRect(x, 31, 1, h - 39);
+    g.fillStyle = '#3a2d24'; g.fillRect(1, h - 6, w - 2, 6);
+  });
+  bed('mad_bed_double', 66, 94, '#8a4450');
+  bed('mad_bed_single', 64, 90, '#b08890');
+
+  /* ---- камин, техника, сантехника ---- */
+  mk('mad_fireplace', 18, 96, 0, (g, w, h) => {
+    g.fillStyle = '#4a4046'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#5c5058'; g.fillRect(1, 2, w - 2, h - 4);
+    g.fillStyle = '#2a1d1a'; g.fillRect(3, h * .22, w - 6, h * .56);           // топка
+    g.fillStyle = '#ff8a3c'; g.fillRect(5, h * .40, w - 10, h * .36);
+    g.fillStyle = '#ffd08a'; g.fillRect(6, h * .52, w - 12, h * .22);
+    g.fillStyle = '#6d6068'; g.fillRect(0, h * .16, w, 3); g.fillRect(0, h * .80, w, 3);
+  });
+  mk('mad_stove', 26, 58, 0, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#35383c'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#4a4e54'; g.fillRect(1, 1, w - 2, h - 3);
+    g.fillStyle = '#23262a';
+    for (let k = 0; k < 4; k++) g.beginPath(), g.arc(7 + (k % 2) * 12, 10 + ((k / 2) | 0) * 13, 4, 0, 6.3), g.fill();
+    g.fillStyle = '#8d949c'; g.fillRect(2, h - 22, w - 4, 18);                 // дверца
+    g.fillStyle = '#2d3136'; g.fillRect(4, h - 20, w - 8, 12);
+    g.fillStyle = '#c9cdd2'; g.fillRect(4, h - 26, w - 8, 2);
+  });
+  mk('mad_fridge', 26, 48, 0, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#7d8288'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#9aa0a6'; g.fillRect(1, 1, w - 2, h - 3);
+    g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(2, 2, 4, h - 6);
+    g.fillStyle = '#5f646a'; g.fillRect(1, h * .34, w - 2, 2);
+    g.fillStyle = '#c9cdd2'; g.fillRect(w - 6, 6, 2, 9); g.fillRect(w - 6, h * .40, 2, 9);
+  });
+  mk('mad_counter', 96, 28, 20, (g, w, h) => {
+    g.fillStyle = '#3f3a34'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#8f8a80'; g.fillRect(0, 0, w, h - 6);                       // столешница
+    g.fillStyle = '#9d988d'; g.fillRect(0, 0, w, 2);
+    g.fillStyle = '#5b4e3e'; g.fillRect(0, h - 6, w, 6);                       // тумбы
+    g.fillStyle = 'rgba(0,0,0,.28)';
+    for (let x = 12; x < w; x += 24) g.fillRect(x, h - 6, 1, 6);
+  });
+  D('mad_sink', { w:40, h:24, ax:20, ay:24, foot:null }, g => {
+    g.fillStyle = '#6f7378'; g.fillRect(0, 0, 40, 24);
+    g.fillStyle = '#9aa0a6'; g.fillRect(2, 2, 36, 20);
+    g.fillStyle = '#5a5e64'; g.fillRect(4, 5, 15, 15); g.fillRect(21, 5, 15, 15);
+    g.fillStyle = '#c9cdd2'; g.fillRect(18, 0, 4, 6);
+  });
+  D('mad_dishes', { w:20, h:18, ax:10, ay:18, foot:null }, g => {
+    for (let k = 0; k < 4; k++) {
+      g.fillStyle = k % 2 ? '#d9cfbc' : '#e8e4dc';
+      g.beginPath(); g.ellipse(10, 12 - k * 2, 8 - k * .4, 4 - k * .2, 0, 0, 6.3); g.fill();
+      g.fillStyle = 'rgba(0,0,0,.18)';
+      g.beginPath(); g.ellipse(10, 13 - k * 2, 8 - k * .4, 1.2, 0, 0, 6.3); g.fill();
+    }
+  });
+  mk('mad_bathtub', 66, 32, 0, (g, w, h) => {
+    g.fillStyle = '#8c9296'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c6cdd0'; g.fillRect(2, 2, w - 4, h - 5);
+    g.fillStyle = '#9fb4bc';
+    g.beginPath(); g.ellipse(w / 2, h / 2, w / 2 - 6, h / 2 - 5, 0, 0, 6.3); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.30)';
+    g.beginPath(); g.ellipse(w / 2 - 6, h / 2 - 2, w / 5, h / 5, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#c9cdd2'; g.fillRect(4, h / 2 - 2, 4, 4);
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(0, h - 3, w, 3);
+  });
+  mk('mad_toilet', 22, 30, 0, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#b9bec2'; g.fillRect(3, 0, w - 6, 9);                       // бачок
+    g.fillStyle = '#d6dadd'; g.fillRect(4, 1, w - 8, 7);
+    g.fillStyle = '#cfd4d8';
+    g.beginPath(); g.ellipse(w / 2, 19, w / 2 - 3, 9, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#9aa0a6';
+    g.beginPath(); g.ellipse(w / 2, 19, w / 2 - 6, 6, 0, 0, 6.3); g.fill();
+  });
+  mk('mad_basin', 20, 28, 0, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#b9bec2'; g.fillRect(2, 4, w - 4, h - 8);
+    g.fillStyle = '#d6dadd';
+    g.beginPath(); g.ellipse(w / 2, h / 2, w / 2 - 3, h / 2 - 5, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#8f959a';
+    g.beginPath(); g.ellipse(w / 2, h / 2, w / 2 - 6, h / 2 - 8, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#c9cdd2'; g.fillRect(w / 2 - 1, 1, 2, 5);
+  });
+
+  /* ---- алтарь: стол под кругом, чаша и нож ---- */
+  mk('mad_altar', 86, 44, 26, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#3e2c30'; g.fillRect(0, 2, w, h - 2);
+    g.fillStyle = '#5a3f3c'; g.fillRect(1, 0, w - 2, h - 6);
+    grain(g, w, h - 6, '#4c3531', 5);
+    g.fillStyle = '#c08a6a';
+    g.beginPath(); g.ellipse(w / 2, (h - 6) / 2, 13, 9, 0, 0, 6.3); g.stroke ? g.fill() : g.fill();
+    g.fillStyle = '#5a3f3c';
+    g.beginPath(); g.ellipse(w / 2, (h - 6) / 2, 10, 6, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#9a9aa8'; g.fillRect(w / 2 + 18, 10, 14, 2);                // нож
+    g.fillStyle = '#5a4434'; g.fillRect(w / 2 + 13, 9, 6, 4);
+    g.fillStyle = '#d8cfbc'; g.fillRect(12, 12, 6, 6);                         // соль
+    g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(0, h - 3, w, 3);
+  });
+
+  /* ---- мелочь: свечи, лампы, глобус, растения, картины ---- */
+  D('mad_candle', { w:14, h:16, ax:7, ay:16, foot:null }, g => {
+    g.fillStyle = 'rgba(255,190,110,.18)';
+    g.beginPath(); g.arc(7, 9, 7, 0, 6.3); g.fill();
+    g.fillStyle = '#5a4434'; g.fillRect(4, 11, 6, 4);
+    g.fillStyle = '#e6dcc4'; g.fillRect(5, 4, 4, 8);
+    g.fillStyle = '#ffce7a'; g.fillRect(6, 1, 2, 4);
+    g.fillStyle = '#fff2c8'; g.fillRect(6, 2, 2, 2);
+  });
+  mk('mad_lamp_floor', 16, 18, 6, (g, w, h) => {
+    g.fillStyle = 'rgba(255,205,130,.20)';
+    g.beginPath(); g.arc(w / 2, h / 2, 9, 0, 6.3); g.fill();
+    g.fillStyle = '#c9a86a'; g.beginPath(); g.ellipse(w / 2, h / 2 - 2, 6, 5, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#ffe0a0'; g.beginPath(); g.ellipse(w / 2, h / 2 - 2, 4, 3, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#4a4038'; g.fillRect(w / 2 - 2, h - 5, 4, 4);
+  });
+  D('mad_hang_lamp', { w:18, h:18, ax:9, ay:9, foot:null, wall:true }, g => {
+    g.fillStyle = 'rgba(255,205,130,.22)';
+    g.beginPath(); g.arc(9, 9, 9, 0, 6.3); g.fill();
+    g.fillStyle = '#7a6244'; g.beginPath(); g.ellipse(9, 8, 7, 6, 0, 0, 6.3); g.fill();
+    g.fillStyle = '#ffdc9a'; g.beginPath(); g.ellipse(9, 9, 4, 3, 0, 0, 6.3); g.fill();
+  });
+  mk('mad_globe', 26, 34, 10, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#4a3a2c'; g.fillRect(w / 2 - 2, h - 12, 4, 9);
+    g.fillStyle = '#5a4634'; g.fillRect(w / 2 - 6, h - 4, 12, 3);
+    g.fillStyle = '#c8a86a'; g.beginPath(); g.arc(w / 2, 12, 11, 0, 6.3); g.fill();
+    g.fillStyle = '#3f6a7a'; g.beginPath(); g.arc(w / 2, 12, 10, 0, 6.3); g.fill();
+    g.fillStyle = '#6a8a5a'; g.fillRect(w / 2 - 7, 8, 7, 5); g.fillRect(w / 2 + 1, 13, 5, 4);
+    g.fillStyle = 'rgba(255,255,255,.22)'; g.beginPath(); g.arc(w / 2 - 4, 8, 3, 0, 6.3); g.fill();
+  });
+  const plant = (k, w, h) => mk(k, w, h, Math.max(6, h * .30), (g) => {
+    shadow(g, w, h);
+    g.fillStyle = '#6a4a38'; g.fillRect(w / 2 - w * .28, h - h * .28, w * .56, h * .26);
+    g.fillStyle = '#7d5a44'; g.fillRect(w / 2 - w * .28, h - h * .28, w * .56, 2);
+    for (let k2 = 0; k2 < 7; k2++) {
+      const a = -Math.PI / 2 + (k2 - 3) * .40;
+      g.fillStyle = ['#3f5a32','#4a6a3a','#35502c'][k2 % 3];
+      g.beginPath();
+      g.ellipse(w / 2 + Math.cos(a) * w * .26, h * .40 + Math.sin(a) * h * .20,
+                w * .17, h * .11, a, 0, 6.3);
+      g.fill();
+    }
+  });
+  plant('mad_plant',     26, 42);
+  plant('mad_plant_low', 28, 30);
+  plant('mad_plant_big', 40, 38);
+
+  const art = (k, w, h) => D(k, { w, h, ax:w / 2, ay:h / 2, foot:null, wall:true }, g => {
+    g.fillStyle = '#3a2c22'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#7a5c3a'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2f3a44'; g.fillRect(1, 1, w - 2, h - 2);
+    g.fillStyle = '#4a5a52'; g.fillRect(2, 2, w - 4, Math.max(1, (h - 4) / 2));
+    g.fillStyle = 'rgba(255,240,200,.14)'; g.fillRect(1, 1, w - 2, 1);
+  });
+  art('mad_painting',    6, 40);
+  art('mad_painting_h', 34,  6);
+
+  const wallCab = (k, w, h) => D(k, { w, h, ax:w / 2, ay:h / 2, foot:null, wall:true }, g => {
+    g.fillStyle = '#4a3828'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#65503a'; g.fillRect(1, 1, w - 2, h - 2);
+    g.fillStyle = 'rgba(0,0,0,.26)'; g.fillRect(2, 2, w / 2 - 3, h - 4);
+    g.fillStyle = '#c8a86a'; g.fillRect(w / 2 - 1, h / 2 - 1, 2, 2);
+  });
+  wallCab('mad_wall_cab', 30, 22);
+  D('mad_herb_shelf', { w:32, h:20, ax:16, ay:10, foot:null, wall:true }, g => {
+    g.fillStyle = '#5a4634'; g.fillRect(0, 0, 32, 4);
+    for (let x = 2; x < 30; x += 7) {
+      g.fillStyle = ['#6a7a42','#7a6a38','#5a6a3a'][(x / 7) | 0];
+      g.fillRect(x, 4, 5, 12);
+      g.fillStyle = '#d8cfbc'; g.fillRect(x, 4, 5, 2);
+    }
+  });
+  mk('mad_coatrack', 54, 26, 8, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#4a3828'; g.fillRect(0, 0, w, 5);
+    g.fillStyle = '#65503a'; g.fillRect(1, 1, w - 2, 3);
+    g.fillStyle = '#3a2c22';
+    for (let x = 6; x < w - 4; x += 11) g.fillRect(x, 5, 2, 4);
+    g.fillStyle = '#4f4a5a'; g.fillRect(7, 7, 13, h - 10);                     // пальто
+    g.fillStyle = '#5e5868'; g.fillRect(8, 8, 11, 4);
+    g.fillStyle = '#5a4046'; g.fillRect(24, 7, 12, h - 12);
+    g.fillStyle = '#3f4a52'; g.fillRect(40, 8, 8, h - 14);                     // зонт
+  });
+  mk('mad_mirror', 18, 38, 6, (g, w, h) => {
+    g.fillStyle = '#4a3828'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#7a5c3a'; g.fillRect(1, 1, w - 2, h - 2);
+    g.fillStyle = '#3f4650'; g.fillRect(3, 3, w - 6, h - 6);
+    g.fillStyle = 'rgba(190,205,220,.55)'; g.fillRect(4, 4, w - 8, h - 8);
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(5, 6, 3, h - 14);
+    g.fillStyle = 'rgba(80,70,80,.35)'; g.fillRect(4, h - 12, w - 8, 7);
+  });
+  mk('mad_birdcage', 22, 30, 12, (g, w, h) => {
+    shadow(g, w, h);
+    g.fillStyle = '#4a4038'; g.fillRect(2, h - 8, w - 4, 6);                  // подставка
+    g.fillStyle = '#6a5a48'; g.fillRect(3, h - 8, w - 6, 2);
+    g.fillStyle = '#8a7a60';                                                  // прутья
+    for (let x = 3; x < w - 2; x += 4) g.fillRect(x, 4, 1, h - 12);
+    g.fillStyle = '#9a8a6a'; g.fillRect(2, 3, w - 4, 2); g.fillRect(2, h - 12, w - 4, 2);
+    g.fillStyle = '#d8c060'; g.fillRect(w / 2 - 2, h / 2 - 3, 4, 5);          // канарейка
+    g.fillStyle = '#f0dc90'; g.fillRect(w / 2 - 1, h / 2 - 4, 2, 2);
+    g.fillStyle = '#7a6a52'; g.fillRect(w / 2 - 1, 0, 2, 4);                  // крючок
+  });
+  caseBox('mad_chest',     38, 26, '#6a4f38', '#4a3626', 1);
+  caseBox('mad_chest_big', 64, 36, '#6a4f38', '#4a3626', 1);
+})();
+
+/* ---------------------------------------------------------------------
+   MadPlan — всё, что дом умеет, считается здесь и только здесь.
+
+   Стены для коллизий, фон, зоны, пропсы, точки обхода, отладочный слой
+   и сверка с эталоном берут одни и те же записи плана. Отдельного
+   «визуального» варианта планировки не существует.                    */
+
+const MadPlan = {
+  P: MADELEINE_HOUSE_PLAN,
+
+  index(id) { return this.P.floors.findIndex(f => f.id === id); },
+  floor(i)  { return this.P.floors[i]; },
+  byId(id)  { return this.P.floors[this.index(id)] || null; },
+  isMad(id) { return this.index(id) >= 0; },
+
+  /* --- геометрия ---------------------------------------------------- */
+
+  /* Полосу стены режут проёмы. Полоса всегда осевая: либо горизонтальная
+     (высота — толщина стены), либо вертикальная. Резать надо по длинной
+     оси, поэтому направление определяется формой полосы, а не флагом. */
+  cut(band, holes) {
+    const horiz = band.w >= band.h;
+    const a0 = horiz ? band.x : band.y, a1 = a0 + (horiz ? band.w : band.h);
+    const spans = [];
+    holes.forEach(h => {
+      // проём режет полосу, только если действительно её пересекает
+      if (horiz) { if (h.y + h.h <= band.y || h.y >= band.y + band.h) return; spans.push([h.x, h.x + h.w]); }
+      else       { if (h.x + h.w <= band.x || h.x >= band.x + band.w) return; spans.push([h.y, h.y + h.h]); }
+    });
+    spans.sort((p, q) => p[0] - q[0]);
+    const out = []; let p = a0;
+    spans.forEach(([s, e]) => {
+      if (e <= p) return;
+      if (s > p) out.push([p, Math.min(s, a1)]);
+      p = Math.max(p, e);
+    });
+    if (p < a1) out.push([p, a1]);
+    return out.filter(([s, e]) => e - s > 0).map(([s, e]) => horiz
+      ? { x:s, y:band.y, w:e - s, h:band.h }
+      : { x:band.x, y:s, w:band.w, h:e - s });
+  },
+
+  /* Оболочка дома: четыре полосы. Низ толще — под южной стеной на
+     эталоне нарисовано крыльцо, и это не пол. */
+  shellBands() {
+    const S = this.P.shell, t = S.t;
+    return [
+      { id:'shell_n', x:0, y:0, w:S.w, h:t },
+      { id:'shell_w', x:0, y:0, w:t, h:S.h },
+      { id:'shell_e', x:S.w - t, y:0, w:t, h:S.h },
+      { id:'shell_s', x:0, y:S.south.y, w:S.w, h:S.south.h },
+    ];
+  },
+
+  /* Все стены этажа как коллизия. Проёмы вычтены, поэтому нарисованная
+     дверь и проходимость — одна и та же запись. Окна из стены не
+     вырезаются: через окно не ходят (кроме одного, помеченного enter). */
+  walls(i) {
+    const f = this.floor(i); if (!f) return [];
+    if (f._walls) return f._walls;
+    const holes = f.doors.filter(d => d.kind !== 'sealed');
+    const out = [];
+    this.shellBands().forEach(b => this.cut(b, holes).forEach(r => out.push(r)));
+    f.parts.forEach(b => this.cut(b, holes).forEach(r => out.push(r)));
+    f._walls = out;
+    return out;
+  },
+
+  /* Прямоугольники мебели: рисунок и коллизия. foot берётся из модели,
+     то есть совпадает с основанием предмета, а не с целой картинкой. */
+  box(o) { return { x:o.x, y:o.y, w:o.w, h:o.h }; },
+  foot(o) {
+    const d = Art.meta(o.t);
+    if (!d || !d.foot || o.on) return null;
+    return { x:o.x + d.ax + d.foot.x, y:o.y + d.ay + d.foot.y, w:d.foot.w, h:d.foot.h };
+  },
+
+  /* Пропсы для движка. Модель рисуется от левого верхнего угла своего
+     прямоугольника — ax/ay у всех madeleine-моделей нулевые, поэтому
+     координата плана и координата рисунка это одно и то же число. */
+  props(i) {
+    const f = this.floor(i); if (!f) return [];
+    return f.furniture.map(o => {
+      const d = Art.meta(o.t);
+      return { t:o.t, x:o.x + (d ? d.ax : 0), y:o.y + (d ? d.ay : 0), id:o.id };
+    });
+  },
+
+  zoneAt(i, x, y) {
+    const f = this.floor(i); if (!f) return null;
+    return f.zones.find(z => x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h) || null;
+  },
+
+  /* Свободна ли точка: внутри дома, не в стене, не в мебели. Тот же
+     ответ, который получит и хозяйка, и игрок, и тест проходимости. */
+  free(i, x, y, pad) {
+    pad = pad === undefined ? 1 : pad;
+    const b = { x:x - this.P.metrics.PLAYER_W / 2 - pad, y:y - this.P.metrics.PLAYER_H - pad,
+                w:this.P.metrics.PLAYER_W + pad * 2, h:this.P.metrics.PLAYER_H + pad * 2 };
+    if (this.walls(i).some(w => rectHit(b, w))) return false;
+    return !this.floor(i).furniture.some(o => { const ft = this.foot(o); return ft && rectHit(b, ft); });
+  },
+};
+
+/* ---------------------------------------------------------------------
+   ОТРИСОВКА ФОНА. Рисуется по тем же записям: зоны — пол, parts —
+   стены, doors — пороги, windows — окна, stairs — ступени.           */
+
+MadPlan.FLOORS = {
+  wood:   { a:'#7d6a58', b:'#6d5b4a', line:'rgba(0,0,0,.10)' },
+  tile:   { a:'#8a8478', b:'#797369', line:'rgba(0,0,0,.08)' },
+  stone:  { a:'#726d68', b:'#635e5a', line:'rgba(0,0,0,.10)' },
+  ritual: { a:'#5a4258', b:'#4c364a', line:'rgba(0,0,0,.12)' },
+};
+
+MadPlan.paint = function (ctx, i) {
+  const f = this.floor(i), S = this.P.shell, t = S.t;
+  const wall = ['#5b4a52', '#564650', '#4e4048'][i];
+
+  // за пределами дома — ночь, а не пол
+  ctx.fillStyle = '#16121a'; ctx.fillRect(0, 0, S.w, S.h);
+
+  // пол по зонам
+  f.zones.forEach(z => {
+    const p = this.FLOORS[z.kind] || this.FLOORS.wood;
+    ctx.fillStyle = p.a; ctx.fillRect(z.x, z.y, z.w, z.h);
+    ctx.fillStyle = p.b;
+    if (z.kind === 'tile' || z.kind === 'stone') {
+      for (let y = z.y; y < z.y + z.h; y += 10)
+        for (let x = z.x + (((y / 10) | 0) % 2) * 5; x < z.x + z.w; x += 10)
+          ctx.fillRect(x, y, 4, 4);
+    } else {
+      for (let y = z.y + 5; y < z.y + z.h; y += 11) ctx.fillRect(z.x, y, z.w, 1);
+      for (let x = z.x; x < z.x + z.w; x += 42) ctx.fillRect(x, z.y, 1, z.h);
+    }
+    ctx.fillStyle = p.line; ctx.fillRect(z.x, z.y, z.w, 4);
+  });
+
+  // стены: тело, светлая кромка сверху, тень снизу — так читается толщина
+  const paintBand = r => {
+    ctx.fillStyle = shade(wall, .72); ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = shade(wall, 1.10); ctx.fillRect(r.x, r.y, r.w, 2);
+    ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(r.x, r.y + r.h - 2, r.w, 2);
+    if (r.h > r.w) { ctx.fillStyle = 'rgba(255,240,220,.05)'; ctx.fillRect(r.x, r.y, 2, r.h); }
+  };
+  this.walls(i).forEach(paintBand);
+
+  /* Проём — это дыра в стене, и пол в нём продолжается. Без этого
+     сквозные проходы зияли чёрным фоном между зонами. */
+  f.doors.forEach(d => {
+    const near = f.zones.find(z => rectHit({ x:d.x - 3, y:d.y - 3, w:d.w + 6, h:d.h + 6 }, z));
+    const p = this.FLOORS[(near && near.kind) || 'wood'];
+    ctx.fillStyle = p.a; ctx.fillRect(d.x, d.y, d.w, d.h);
+  });
+
+  // пороги проёмов: доска между зонами, по ней и видно, что здесь ходят
+  f.doors.forEach(d => {
+    if (d.kind === 'open') return;
+    ctx.fillStyle = 'rgba(42,26,18,.80)'; ctx.fillRect(d.x, d.y, d.w, d.h);
+    ctx.fillStyle = d.kind === 'front' ? '#8a6040' : 'rgba(150,120,92,.55)';
+    ctx.fillRect(d.x + 1, d.y + 1, d.w - 2, d.h - 2);
+    if (d.kind === 'front') { ctx.fillStyle = '#c0a060'; ctx.fillRect(d.x + d.w - 6, d.y + d.h - 5, 3, 3); }
+  });
+
+  // окна: стекло в проёме стены плюс отсвет на полу
+  f.windows.forEach(v => {
+    ctx.fillStyle = '#2c3340'; ctx.fillRect(v.x, v.y, v.w, v.h);
+    ctx.fillStyle = '#57616f'; ctx.fillRect(v.x + 1, v.y + 2, v.w - 2, v.h - 4);
+    ctx.fillStyle = 'rgba(200,220,240,.22)';
+    if (v.side === 'n') ctx.fillRect(v.x, v.y + v.h, v.w, 6);
+    if (v.side === 'w') ctx.fillRect(v.x + v.w, v.y, 6, v.h);
+    ctx.fillStyle = shade(wall, 1.2);
+    if (v.w > v.h) ctx.fillRect(v.x + v.w / 2 - 1, v.y, 2, v.h);
+    else ctx.fillRect(v.x, v.y + v.h / 2 - 1, v.w, 2);
+  });
+
+  // лестница: ступени поперёк марша, у нижней кромки — площадка
+  f.stairs.forEach(s => {
+    ctx.fillStyle = '#4a3a2c'; ctx.fillRect(s.x, s.y, s.w, s.h);
+    for (let k = 0; k < 7; k++) {
+      const yy = s.y + 3 + k * ((s.h - 6) / 7);
+      ctx.fillStyle = k % 2 ? '#a08258' : '#8f7149';
+      ctx.fillRect(s.x + 3, yy, s.w - 6, (s.h - 6) / 7 - 1);
+      ctx.fillStyle = 'rgba(0,0,0,.30)';
+      ctx.fillRect(s.x + 3, yy + (s.h - 6) / 7 - 2, s.w - 6, 1);
+    }
+    ctx.fillStyle = 'rgba(232,206,164,.50)'; ctx.font = '6px Courier New';
+    ctx.fillText(s.dir === 'up' ? '↑' : '↓', s.x + s.w / 2 - 2, s.y + s.h / 2 + 2);
+  });
+
+  // подписи зон — там же, где они на эталоне
+  ctx.fillStyle = 'rgba(226,206,172,.38)'; ctx.font = '6px Courier New';
+  f.zones.forEach(z => { if (z.name) ctx.fillText(z.name, z.x + 5, z.y + 10); });
+};
+
+/* Что миссия берёт у плана: точка влезания в окно, маршруты обхода и
+   места, где может лежать имя. */
+MadPlan.entry = function (i) {
+  const v = this.floor(i).windows.find(w => w.enter) || this.floor(i).windows[0];
+  return { floor:i, x:v.x + v.w / 2, y:v.y + v.h + 22 };
+};
+MadPlan.routes = function () { return this.P.floors.map(f => f.route); };
+MadPlan.spot = function (i, id) {
+  const a = (this.floor(i).acts || []).find(x => x.id === id);
+  return { id, floor:i, x:a.at.x, y:a.at.y };
+};
+
+/* ---------------------------------------------------------------------
+   СВЕРКА С ЭТАЛОНОМ. Не «я посмотрел и похоже», а расчёт.
+
+   Два уровня, как и положено: геометрия (пообъектные отклонения с
+   допусками по типам) и пиксели (растр эталонной разметки против
+   растра реализации, попиксельная разница и процент совпадения).
+
+   Про пиксели важно понимать, что именно сравнивается. Эталон — картина
+   с текстурами дерева, тенями и подписями; игра рисует свой пиксельный
+   стиль. Сравнивать их напрямую бессмысленно: разошлась бы не геометрия,
+   а манера. Поэтому сравниваются структурные растры: стены, проёмы,
+   окна, ступени и основания мебели, разложенные по слоям. Оба растра
+   строятся одним кодом из двух наборов чисел — эталонного (поле ref у
+   каждой записи, снятое с чертежа) и реализованного. Совпадение слоёв
+   и есть совпадение планировки.                                       */
+
+MadPlan.refBox = function (o) { return o.ref || { x:o.x, y:o.y, w:o.w, h:o.h }; };
+
+/* Растр одного слоя: 1 там, где слой занимает пиксель. */
+MadPlan.mask = function (i, which, layer, opt) {
+  opt = opt || {};
+  const S = this.P.shell, f = this.floor(i);
+  /* skipNoted убирает из обоих растров записи с пометкой note: это
+     разобранные расхождения самого чертежа, а не промах реализации.
+     Цифра без них показывает, не поехало ли что-то новое. */
+  const keep = o => !(opt.skipNoted && o.note) &&
+                    !(which === 'ref' && o.extra);   // на чертеже такого нет
+  const cv = document.createElement('canvas'); cv.width = S.w; cv.height = S.h;
+  const g = cv.getContext('2d');
+  const pick = o => which === 'ref' ? this.refBox(o) : { x:o.x, y:o.y, w:o.w, h:o.h };
+  g.fillStyle = '#000'; g.fillRect(0, 0, S.w, S.h);
+  g.fillStyle = '#fff';
+  if (layer === 'walls' || layer === 'all') {
+    /* Стены эталона — те же линии, только по снятым с чертежа
+       координатам; проёмы вычитаются тем же кодом. */
+    const holes = f.doors.filter(keep).map(pick);
+    const bands = this.shellBands().concat(f.parts.filter(keep).map(pick));
+    bands.forEach(b => this.cut(b, holes).forEach(r => g.fillRect(r.x, r.y, r.w, r.h)));
+  }
+  if (layer === 'doors'  || layer === 'all') f.doors.filter(keep).forEach(d => { const b = pick(d); g.fillRect(b.x, b.y, b.w, b.h); });
+  if (layer === 'windows'|| layer === 'all') f.windows.filter(keep).forEach(v => { const b = pick(v); g.fillRect(b.x, b.y, b.w, b.h); });
+  if (layer === 'stairs' || layer === 'all') f.stairs.filter(keep).forEach(s => { const b = pick(s); g.fillRect(b.x, b.y, b.w, b.h); });
+  if (layer === 'furniture' || layer === 'all')
+    f.furniture.filter(keep).forEach(o => { const b = pick(o); g.fillRect(b.x, b.y, b.w, b.h); });
+  return cv;
+};
+
+/* Попиксельное сравнение двух растров одного размера. Возвращает числа
+   и канву различий: синий — только эталон, красный — только реализация. */
+MadPlan.comparePixels = function (refCv, gameCv) {
+  const w = refCv.width, h = refCv.height;
+  if (gameCv.width !== w || gameCv.height !== h) {
+    // привести к одному размеру, если пришёл растр другого масштаба
+    const t = document.createElement('canvas'); t.width = w; t.height = h;
+    t.getContext('2d').drawImage(gameCv, 0, 0, w, h);
+    gameCv = t;
+  }
+  const a = refCv.getContext('2d').getImageData(0, 0, w, h).data;
+  const b = gameCv.getContext('2d').getImageData(0, 0, w, h).data;
+  const diff = document.createElement('canvas'); diff.width = w; diff.height = h;
+  const dg = diff.getContext('2d'); const img = dg.createImageData(w, h);
+  let same = 0, only1 = 0, only2 = 0, ink = 0;
+  for (let p = 0; p < w * h; p++) {
+    const A = a[p * 4] > 127, B = b[p * 4] > 127, q = p * 4;
+    if (A || B) ink++;
+    if (A === B) { same++; img.data[q] = img.data[q+1] = img.data[q+2] = A ? 90 : 18; img.data[q+3] = 255; }
+    else if (A) { only1++; img.data[q] = 60;  img.data[q+1] = 120; img.data[q+2] = 255; img.data[q+3] = 255; }
+    else        { only2++; img.data[q] = 255; img.data[q+1] = 70;  img.data[q+2] = 60;  img.data[q+3] = 255; }
+  }
+  dg.putImageData(img, 0, 0);
+  const total = w * h;
+  return { total, same, only1, only2, ink,
+    /* Процент по всей площади кадра льстит: девять десятых плана — пол,
+       и он совпадает сам собой. Поэтому главная цифра — по объединению
+       занятых пикселей: сколько из нарисованного хоть кем-то совпало. */
+    similarity: ink ? (ink - only1 - only2) / ink : 1,
+    area: same / total, diff };
+};
+
+MadPlan.compareReferenceToRender = function (i, layer, opt) {
+  return this.comparePixels(this.mask(i, 'ref', layer || 'all', opt),
+                            this.mask(i, 'game', layer || 'all', opt));
+};
+
+/* --- геометрическая сверка: пообъектные отклонения ------------------ */
+
+MadPlan.tolOf = function (kind) {
+  const T = this.P.tol;
+  if (kind === 'wall') return T.wall;
+  if (kind === 'door') return T.door;
+  if (kind === 'window') return T.window;
+  if (kind === 'stair') return T.stair;
+  if (kind === 'small') return T.small;
+  return T.big;
+};
+
+/* Крупная мебель или мелкий декор — по площади основания: у ковров и
+   картин допуск не такой, как у кровати. */
+MadPlan.kindOf = function (o) {
+  const d = Art.meta(o.t);
+  if (d && (d.flat || d.wall)) return 'small';
+  return (o.w * o.h >= 900) ? 'big' : 'small';
+};
+
+MadPlan.deltas = function (i) {
+  const f = this.floor(i), out = [];
+  const add = (id, kind, o, name) => {
+    const r = this.refBox(o);
+    out.push({ id, kind, name:name || id, tol:this.tolOf(kind),
+      refX:r.x, refY:r.y, refW:r.w, refH:r.h,
+      actX:o.x, actY:o.y, actW:o.w, actH:o.h,
+      dx:o.x - r.x, dy:o.y - r.y, dw:o.w - r.w, dh:o.h - r.h,
+      note:o.note || '' });
+  };
+  f.parts.forEach(p => add(p.id, 'wall', p));
+  f.doors.forEach(d => add(d.id, 'door', d));
+  f.windows.forEach(v => add(v.id, 'window', v));
+  f.stairs.forEach(s => add(s.id, 'stair', s));
+  f.furniture.forEach(o => { if (!o.extra) add(o.id, this.kindOf(o), o, o.t); });
+  out.forEach(d => {
+    d.err = Math.max(Math.abs(d.dx), Math.abs(d.dy), Math.abs(d.dw), Math.abs(d.dh));
+    d.ok = d.err <= d.tol;
+  });
+  return out;
+};
+
+/* --- структурные проверки ------------------------------------------- */
+
+MadPlan.validateFloorplan = function (i) {
+  const f = this.floor(i), P = this.P, bad = [];
+  const say = (code, msg) => bad.push({ floor:i, code, msg });
+  const walls = this.walls(i);
+  const feet = f.furniture.map(o => ({ o, ft:this.foot(o) })).filter(r => r.ft);
+
+  // 1. мебель внутри стены
+  feet.forEach(({ o, ft }) => walls.forEach(w => {
+    if (rectHit(ft, w)) say('furn-in-wall', o.id + ' (' + o.t + ') пересекает стену ' +
+      [w.x, w.y, w.w, w.h].join(','));
+  }));
+
+  // 2. мебель в дверном проёме
+  f.doors.forEach(d => {
+    const pad = { x:d.x - 2, y:d.y - 2, w:d.w + 4, h:d.h + 4 };
+    feet.forEach(({ o, ft }) => { if (rectHit(ft, pad)) say('furn-in-door', o.id + ' стоит в проёме ' + d.id); });
+  });
+
+  // 3. окно внутри другого объекта
+  f.windows.forEach(v => {
+    feet.forEach(({ o, ft }) => { if (rectHit(v, ft)) say('window-blocked', 'окно ' + v.id + ' закрыто ' + o.id); });
+  });
+
+  // 4. пересечение стен между собой (кроме стыков с оболочкой)
+  for (let a = 0; a < f.parts.length; a++) for (let b = a + 1; b < f.parts.length; b++) {
+    const p = f.parts[a], q = f.parts[b];
+    const ov = { x:Math.max(p.x, q.x), y:Math.max(p.y, q.y) };
+    ov.w = Math.min(p.x + p.w, q.x + q.w) - ov.x; ov.h = Math.min(p.y + p.h, q.y + q.h) - ov.y;
+    if (ov.w > 0 && ov.h > 0 && ov.w * ov.h > P.metrics.WALL_T * P.metrics.WALL_T)
+      say('wall-cross', 'стены ' + p.id + ' и ' + q.id + ' налезают друг на друга');
+  }
+
+  // 5. лестница перекрыта мебелью или стеной
+  f.stairs.forEach(s => {
+    feet.forEach(({ o, ft }) => { if (rectHit(s, ft)) say('stair-blocked', 'лестницу ' + s.id + ' перекрывает ' + o.id); });
+    if (!this.free(i, s.land.x, s.land.y)) say('stair-land', 'к лестнице ' + s.id + ' не подойти: точка ' +
+      s.land.x + ',' + s.land.y + ' занята');
+  });
+
+  // 6. наложение коллизий друг на друга
+  for (let a = 0; a < feet.length; a++) for (let b = a + 1; b < feet.length; b++)
+    if (rectHit(feet[a].ft, feet[b].ft))
+      say('foot-overlap', 'коллизии ' + feet[a].o.id + ' и ' + feet[b].o.id + ' налезают друг на друга');
+
+  // 7. коллизия должна совпадать с рисунком: модель не больше и не
+  //    меньше того прямоугольника, который записан в плане
+  f.furniture.forEach(o => {
+    const d = Art.meta(o.t);
+    if (!d) return say('no-art', 'нет модели ' + o.t + ' для ' + o.id);
+    if (d.w !== o.w || d.h !== o.h)
+      say('art-size', o.id + ': модель ' + o.t + ' ' + d.w + '×' + d.h +
+          ', а в плане ' + o.w + '×' + o.h);
+    if (d.foot) {
+      const ft = this.foot(o);
+      if (ft && (ft.x < o.x - 1 || ft.y < o.y - 1 ||
+                 ft.x + ft.w > o.x + o.w + 1 || ft.y + ft.h > o.y + o.h + 1))
+        say('foot-outside', o.id + ': основание выходит за рисунок');
+    }
+  });
+
+  // 8. все зоны достижимы ногами от точки входа
+  const reach = this.reach(i);
+  f.zones.forEach(z => {
+    if (!z.w || !z.h) return;
+    let hit = false;
+    for (let y = z.y + 6; y < z.y + z.h - 2 && !hit; y += 4)
+      for (let x = z.x + 6; x < z.x + z.w - 2 && !hit; x += 4)
+        if (reach.has(((x >> 2) << 12) | (y >> 2))) hit = true;
+    if (!hit) say('zone-cut', 'зона ' + (z.id) + ' недостижима ногами');
+  });
+
+  // 9. точки подхода интерактивов и обхода хозяйки — на свободном полу
+  (f.acts || []).forEach(a => {
+    if (!this.free(i, a.at.x, a.at.y)) say('act-stuck', 'к интерактиву ' + a.id + ' не подойти');
+    else if (!reach.has(((a.at.x >> 2) << 12) | (a.at.y >> 2))) say('act-cut', 'интерактив ' + a.id + ' отрезан от входа');
+    if (a.on && !f.furniture.some(o => o.id === a.on)) say('act-orphan', 'интерактив ' + a.id + ' ссылается на ' + a.on);
+  });
+  (f.route || []).forEach((p, k) => {
+    if (!this.free(i, p.x, p.y)) say('route-stuck', 'точка обхода ' + (k + 1) + ' (' + p.x + ',' + p.y + ') в стене или в мебели');
+  });
+
+  // 10. узкие места: в проём должен проходить человек, а не курсор
+  const need = P.metrics.PLAYER_W + 4;
+  f.doors.forEach(d => {
+    const clear = d.w >= d.h ? d.w : d.h;
+    if (clear < need) say('door-narrow', 'проём ' + d.id + ' шириной ' + clear +
+      ' px — игрок (' + P.metrics.PLAYER_W + ' px) в него не пройдёт');
+  });
+  f.stairs.forEach(s2 => {
+    if (s2.w < need) say('stair-narrow', 'марш ' + s2.id + ' уже игрока');
+  });
+  return bad;
+};
+
+/* Заливка проходимого пола от точки входа — тот же ответ, который
+   получит и игрок, и тест проходимости. */
+MadPlan.reach = function (i) {
+  const f = this.floor(i), S = this.P.shell, seen = new Set(), q = [];
+  const key = (x, y) => ((x >> 2) << 12) | (y >> 2);
+  const seed = [];
+  (f.acts || []).forEach(a => seed.push(a.at));
+  f.stairs.forEach(s => seed.push(s.land));
+  seed.forEach(p => {
+    const x = p.x & ~3, y = p.y & ~3;
+    if (this.free(i, x, y) && !seen.has(key(x, y))) { seen.add(key(x, y)); q.push([x, y]); }
+  });
+  while (q.length) {
+    const [x, y] = q.pop();
+    [[4,0],[-4,0],[0,4],[0,-4]].forEach(([dx, dy]) => {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 8 || ny < 8 || nx > S.w - 8 || ny > S.h - 8) return;
+      if (seen.has(key(nx, ny)) || !this.free(i, nx, ny)) return;
+      seen.add(key(nx, ny)); q.push([nx, ny]);
+    });
+  }
+  return seen;
+};
+
+/* Совпадают ли лестницы по вертикали: один и тот же марш на двух
+   этажах обязан стоять в одном месте, иначе подъём телепортирует. */
+MadPlan.validateStairs = function () {
+  const bad = [], byLink = {};
+  this.P.floors.forEach((f, i) => f.stairs.forEach(s => {
+    (byLink[s.link] = byLink[s.link] || []).push({ i, s });
+  }));
+  Object.keys(byLink).forEach(link => {
+    const list = byLink[link];
+    if (list.length !== 2)
+      bad.push({ code:'stair-pair', msg:'марш ' + link + ' описан на ' + list.length + ' этаже(ах), а нужен на двух' });
+    for (let k = 1; k < list.length; k++) {
+      const a = list[0].s, b = list[k].s, t = this.P.tol.stair;
+      ['x', 'y', 'w', 'h'].forEach(f2 => {
+        if (Math.abs(a[f2] - b[f2]) > t)
+          bad.push({ code:'stair-align', msg:'марш ' + link + ': ' + f2 + ' расходится на ' +
+            Math.abs(a[f2] - b[f2]) + ' px между этажами ' + (list[0].i + 1) + ' и ' + (list[k].i + 1) });
+      });
+      // и обратный переход должен попадать туда, откуда пришли
+      if (Math.abs(a.toXY.x - b.land.x) > t || Math.abs(a.toXY.y - b.land.y) > t)
+        bad.push({ code:'stair-xy', msg:'марш ' + link + ': подъём приводит не туда, откуда спускаются' });
+    }
+  });
+  return bad;
+};
+
+/* --- отчёт ---------------------------------------------------------- */
+
+MadPlan.validate = function (opt) {
+  opt = opt || {};
+  const L = [], num = v => (v >= 0 ? '+' : '') + v;
+  L.push('ПРОВЕРКА ДОМА МАДЛЕН');
+  L.push('эталон ' + this.P.src.w + '×' + this.P.src.h + ' → комната ' +
+         this.P.shell.w + '×' + this.P.shell.h +
+         ' (масштаб ' + this.P.metrics.SCALE.toFixed(4) + ', отношение сторон ' +
+         (this.P.shell.w / this.P.shell.h).toFixed(4) + ' против ' +
+         (this.P.src.w / this.P.src.h).toFixed(4) + ')');
+  let fails = 0, worst = [];
+  this.P.floors.forEach((f, i) => {
+    L.push('');
+    L.push('ЭТАЖ ' + (i + 1) + ' — ' + f.sub);
+    const d = this.deltas(i), bad = this.validateFloorplan(i);
+    const group = k => d.filter(x => x.kind === k);
+    const score = arr => {
+      if (!arr.length) return '—';
+      const off = arr.filter(x => !x.ok).length;
+      const noted = arr.filter(x => !x.ok && x.note).length;
+      return (100 * (arr.length - off) / arr.length).toFixed(1) + '% (' +
+             (arr.length - off) + '/' + arr.length + ' в допуске ±' + arr[0].tol + ' px' +
+             (off ? ', вне допуска ' + off + ', из них разобрано ' + noted : '') + ')';
+    };
+    L.push('  стены:    ' + score(group('wall')));
+    L.push('  проёмы:   ' + score(group('door')));
+    L.push('  окна:     ' + score(group('window')));
+    L.push('  лестницы: ' + score(group('stair')));
+    L.push('  мебель:   ' + score(group('big').concat(group('small'))));
+    if (opt.pixels !== false) {
+      ['walls', 'doors', 'stairs', 'furniture'].forEach(layer => {
+        const c = this.compareReferenceToRender(i, layer);
+        const k = this.compareReferenceToRender(i, layer, { skipNoted:true });
+        L.push('  пиксели ' + layer.padEnd(9) + (100 * c.similarity).toFixed(1) +
+               '% совпало (без разобранных расхождений ' + (100 * k.similarity).toFixed(1) +
+               '%; только эталон ' + c.only1 + ', только игра ' + c.only2 + ' px)');
+      });
+    }
+    d.filter(x => !x.ok).forEach(x => worst.push(Object.assign({ floor:i + 1 }, x)));
+    if (bad.length) {
+      fails += bad.length;
+      L.push('  ОШИБКИ ПЛАНИРОВКИ:');
+      bad.forEach(b => L.push('    [' + b.code + '] ' + b.msg));
+    } else L.push('  планировка: ошибок нет');
+  });
+  const sb = this.validateStairs();
+  L.push('');
+  L.push('ЛЕСТНИЦЫ ПО ВЕРТИКАЛИ: ' + (sb.length ? 'РАСХОЖДЕНИЯ' : 'совпадают'));
+  sb.forEach(b => { fails++; L.push('  [' + b.code + '] ' + b.msg); });
+  const shaft = this.P.shaft;
+  L.push('  шахта сведена в колонку x ' + shaft.x + '..' + (shaft.x + shaft.w) +
+         '; на эталоне тот же марш нарисован при x 182, 252 и 205 — отклонения ниже');
+  worst.sort((a, b) => b.err - a.err);
+  const blind = worst.filter(x => !x.note);
+  L.push('');
+  L.push('НАИБОЛЬШИЕ ОТКЛОНЕНИЯ ОТ ЭТАЛОНА (' + worst.length + ' вне допуска, ' +
+         'без объяснения ' + blind.length + ')');
+  worst.slice(0, 12).forEach((x, k) => {
+    L.push('  ' + (k + 1) + '. этаж ' + x.floor + ' · ' + x.id + ' (' + x.name + ')');
+    L.push('     ΔX ' + num(x.dx) + '  ΔY ' + num(x.dy) + '  ΔW ' + num(x.dw) + '  ΔH ' + num(x.dh) +
+           '   допуск ±' + x.tol + (x.note ? '   — ' + x.note : ''));
+  });
+  L.push('');
+  const extras = [];
+  this.P.floors.forEach((f, i) => f.furniture.forEach(o => {
+    if (o.extra) extras.push('этаж ' + (i + 1) + ' · ' + o.id + ' — ' + (o.note || 'нет на чертеже'));
+  }));
+  if (extras.length) {
+    L.push('');
+    L.push('ДОБАВЛЕНО СВЕРХ ЧЕРТЕЖА (' + extras.length + ')');
+    extras.forEach(e => L.push('  ' + e));
+  }
+  L.push(fails ? 'ИТОГ: ошибок планировки ' + fails : 'ИТОГ: планировка без ошибок');
+  const txt = L.join('\n');
+  this._blind = blind;
+  if (opt.log !== false) console.log(txt);
+  return { text:txt, fails, worst };
+};
+
+/* ---------------------------------------------------------------------
+   ОТЛАДОЧНЫЙ СЛОЙ. Видно не на словах, а на кадре.
+
+   MadPlan.dbg — набор переключателей. Всё рисуется поверх комнаты в
+   overPaint, то есть в координатах комнаты, и потому ложится ровно на
+   то, что рисует фон.
+
+   REFERENCE OVERLAY. По умолчанию поверх кадра рисуется эталонная
+   разметка — те самые числа из поля ref, снятые с чертежа. Стена, которая
+   совпала, сливается с игровой; стена, уехавшая на пару пикселей, даёт
+   двойной контур. Если разработчик подсунет саму картинку чертежа
+   (MadPlan.loadReference), под разметку встанет и она: панель вырезается
+   по MADELEINE_HOUSE_PLAN.src и растягивается на комнату. Игра сама
+   ничего не загружает — ни сети, ни внешних файлов в обычном запуске. */
+
+MadPlan.dbg = { grid:false, coords:false, ref:false, collision:false,
+                bounds:false, doors:false, windows:false, diff:false };
+
+MadPlan.refImg = null;      // необязательная растровая подложка (dev)
+MadPlan.loadReference = function (src) {
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => { MadPlan.refImg = im; MadPlan.dbg.ref = true; World.invalidate && World.invalidate(); res(im); };
+    im.onerror = () => rej(new Error('не открылась картинка эталона'));
+    if (typeof src === 'string') im.src = src;
+    else { const r = new FileReader(); r.onload = () => { im.src = r.result; }; r.readAsDataURL(src); }
+  });
+};
+
+MadPlan.toggle = function (k) {
+  this.dbg[k] = !this.dbg[k];
+  if (k === 'diff' && this.dbg.diff) this._diffCache = null;
+  return this.dbg[k];
+};
+
+/* Эталонная разметка как контуры: стены заливкой, остальное рамками. */
+MadPlan.drawReference = function (ctx, i, alpha) {
+  const f = this.floor(i), S = this.P.shell;
+  ctx.save();
+  ctx.globalAlpha = alpha === undefined ? .5 : alpha;
+  if (this.refImg) {
+    const p = this.P.src.panels[i];
+    ctx.drawImage(this.refImg, p.x, p.y, this.P.src.w, this.P.src.h, 0, 0, S.w, S.h);
+    ctx.globalAlpha = Math.min(1, (alpha === undefined ? .5 : alpha) + .25);
+  }
+  const box = o => this.refBox(o);
+  // стены эталона
+  ctx.fillStyle = 'rgba(90,150,255,.55)';
+  const holes = f.doors.map(box);
+  this.shellBands().concat(f.parts.map(box)).forEach(b =>
+    this.cut(b, holes).forEach(r => ctx.fillRect(r.x, r.y, r.w, r.h)));
+  // проёмы, окна, лестницы, мебель — рамками, чтобы видеть смещение
+  const frame = (o, col) => { const b = box(o); ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.strokeRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1); };
+  f.doors.forEach(d => frame(d, 'rgba(120,255,160,.9)'));
+  f.windows.forEach(v => frame(v, 'rgba(120,220,255,.9)'));
+  f.stairs.forEach(s => frame(s, 'rgba(255,220,90,.95)'));
+  f.furniture.forEach(o => frame(o, 'rgba(200,140,255,.75)'));
+  ctx.restore();
+};
+
+MadPlan.drawDebug = function (ctx, i) {
+  const D = this.dbg, S = this.P.shell, f = this.floor(i);
+  if (D.ref) this.drawReference(ctx, i);
+  if (D.grid) {
+    ctx.save();
+    for (let x = 0; x <= S.w; x += 10) {
+      ctx.fillStyle = x % 50 ? 'rgba(120,200,220,.14)' : 'rgba(120,220,255,.34)';
+      ctx.fillRect(x, 0, 1, S.h);
+    }
+    for (let y = 0; y <= S.h; y += 10) {
+      ctx.fillStyle = y % 50 ? 'rgba(220,120,200,.14)' : 'rgba(255,120,220,.34)';
+      ctx.fillRect(0, y, S.w, 1);
+    }
+    ctx.fillStyle = 'rgba(255,255,140,.8)'; ctx.font = '5px Courier New';
+    for (let x = 0; x <= S.w; x += 50) ctx.fillText(String(x), x + 1, 6);
+    for (let y = 50; y <= S.h; y += 50) ctx.fillText(String(y), 1, y - 1);
+    ctx.restore();
+  }
+  if (D.collision) {
+    ctx.save(); ctx.fillStyle = 'rgba(255,60,60,.28)'; ctx.strokeStyle = 'rgba(255,90,90,.8)';
+    ctx.lineWidth = 1;
+    this.walls(i).forEach(w => { ctx.fillRect(w.x, w.y, w.w, w.h);
+      ctx.strokeRect(w.x + .5, w.y + .5, w.w - 1, w.h - 1); });
+    ctx.fillStyle = 'rgba(255,160,40,.30)';
+    f.furniture.forEach(o => { const ft = this.foot(o); if (ft) ctx.fillRect(ft.x, ft.y, ft.w, ft.h); });
+    ctx.restore();
+  }
+  if (D.bounds) {
+    ctx.save(); ctx.strokeStyle = 'rgba(120,255,180,.85)'; ctx.lineWidth = 1;
+    f.furniture.forEach(o => ctx.strokeRect(o.x + .5, o.y + .5, o.w - 1, o.h - 1));
+    ctx.restore();
+  }
+  if (D.doors) {
+    ctx.save(); ctx.fillStyle = 'rgba(90,255,140,.34)';
+    f.doors.forEach(d => ctx.fillRect(d.x, d.y, d.w, d.h));
+    ctx.fillStyle = 'rgba(255,230,120,.34)';
+    f.stairs.forEach(s => ctx.fillRect(s.x, s.y, s.w, s.h));
+    ctx.restore();
+  }
+  if (D.windows) {
+    ctx.save(); ctx.fillStyle = 'rgba(120,220,255,.40)';
+    f.windows.forEach(v => ctx.fillRect(v.x, v.y, v.w, v.h));
+    ctx.restore();
+  }
+  if (D.coords) {
+    ctx.save(); ctx.font = '5px Courier New';
+    f.furniture.forEach(o => {
+      const d = Art.meta(o.t);
+      ctx.fillStyle = 'rgba(8,6,10,.72)'; ctx.fillRect(o.x, o.y - 12, 60, 12);
+      ctx.fillStyle = '#9fe0ff';
+      ctx.fillText(o.id, o.x + 1, o.y - 7);
+      ctx.fillText('x' + o.x + ' y' + o.y + ' ' + o.w + '×' + o.h +
+                   ' r' + (o.rot || 0), o.x + 1, o.y - 2);
+      if (d) {} // размер модели уже проверен в validateFloorplan
+    });
+    ctx.restore();
+  }
+  if (D.diff) {
+    if (!this._diffCache || this._diffFloor !== i) {
+      this._diffCache = this.compareReferenceToRender(i, 'all').diff;
+      this._diffFloor = i;
+    }
+    ctx.save(); ctx.globalAlpha = .65; ctx.drawImage(this._diffCache, 0, 0); ctx.restore();
+  }
+};
+
+/* ---------------------------------------------------------------------
+   КОМНАТЫ ДОМА МАДЛЕН СОБИРАЮТСЯ ИЗ ПЛАНА.
+
+   Ни одной координаты здесь не написано руками: стены, пропсы, свет,
+   интерактивы и точки приземления берутся из MADELEINE_HOUSE_PLAN.
+   Поэтому «нарисовано одно, а ходишь по другому» невозможно в принципе.
+
+   Реплики и сцены — единственное, что живёт отдельно: это текст, а не
+   геометрия. Особые действия (алтарь днём, клетка с канарейкой, вход и
+   окно) перечислены в MAD_ACTS.                                        */
+
+const MAD_ACTS = {
+  'madFloor1:frontDoor': function () {
+    if (Stealth.on && !Stealth.taken)
+      return Dialogue.start([{who:'naya',expr:'normal',text:'(Уходить с пустыми руками? Нет. Не после того, как я сюда влезла.)'}]);
+    if (Stealth.on) return Stealth.leave();
+    return changeRoom('street', 282, 160);
+  },
+  'madFloor1:window': function () {
+    if (Stealth.on && Stealth.taken) return Stealth.leave();
+    if (Stealth.on) return Dialogue.start([{who:'naya',expr:'normal',text:'(Открыто. Я оставила его так, чтобы уйти быстро.)'}]);
+    Dialogue.start([{who:'naya',expr:'normal',text:'(Окно во двор. Под ним снаружи стоит ящик.)'}]);
+  },
+  'madFloor1:cage': function () {
+    if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'Птицы нет. Дверца открыта — кто-то её выпустил. Не я.'}]);
+    Dialogue.start([
+      {who:'naya',expr:'normal',text:'Канарейка. Молчит и смотрит прямо на меня.'},
+      {who:'sue',expr:'smile',text:'Она красивая. Как её зовут?'},
+      {who:'witch1',expr:'normal',name:'Мадлен',text:'Мадлен. Как меня. Так проще — когда зовёшь её, зовёшь и себя.'},
+    ]);
+  },
+  'madFloor1:armchair1': function () {
+    Dialogue.start([{who:'naya',expr:'normal',text:'Продавленное кресло. Подлокотник вытерт до дерева с одной стороны — она сидит тут одна и всегда одинаково.'}]);
+  },
+  'madFloor1:herbs1': function () {
+    Dialogue.start([{who:'naya',expr:'normal',text:'Пучки подписаны карандашом, буквы крупные — она плохо видит.'}]);
+  },
+  /* Алтарь живёт двумя жизнями: днём с него начинается «очищение»,
+     ночью это просто одно из мест, где может лежать имя. */
+  'madFloor3:altar': function (act) {
+    if (!Stealth.on) {
+      if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'Пусто. Осталась только тень на камне.'}]);
+      return Scene.play('firstAmuletScene');
+    }
+    Stealth.pick('altar', act);
+  },
+};
+
+/* Подписи к предметам: интерактив называет то, на чём лежит. */
+const MAD_PROMPTS = {
+  f1_coats:'Вешалка для одежды', f1_mirror:'Зеркало', f1_fire:'Каминная полка',
+  f1_coffee:'Журнальный столик', f1_buffet:'Буфет с посудой', f1_counter:'Кухонный шкаф',
+  f2_vanity:'Туалетный столик', f2_nsR:'Тумбочка у кровати', f2_bathSh:'Полка в ванной',
+  f2_shelfA:'Стеллаж у окна', f2_shelfB:'Стеллаж в углу', f2_desk:'Письменный стол',
+  f2_gDress:'Комод в гостевой', f2_ward:'Шкаф',
+  f3_altar:'Алтарь', f3_jars:'Стеллаж со склянками', f3_shelfCr:'Стеллаж с ящиками',
+  f3_chest:'Сундук', f3_desk3:'Письменный стол', f3_shelf3:'Книжный стеллаж',
+};
+
+function makeMadRoom(i) {
+  const P = MADELEINE_HOUSE_PLAN, f = P.floors[i], S = P.shell;
+  const tint = ['#191520', '#171420', '#151020'][i];
+  const dark = [.38, .42, .50][i];
+
+  /* Свет идёт от того, что нарисовано: лампы, свечи, камин, окна. */
+  const lights = [];
+  f.furniture.forEach(o => {
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+    if (o.t === 'mad_lamp_floor' || o.t === 'mad_hang_lamp')
+      lights.push({ x:cx, y:cy, r:52, c:'#ffd8a0', i:.30 });
+    if (o.t === 'mad_candle') lights.push({ x:cx, y:cy, r:30, c:'#ffcf90', i:.26, flicker:true });
+    if (o.t === 'mad_fireplace') lights.push({ x:cx - 8, y:cy, r:58, c:'#ff9a50', i:.36, flicker:true });
+    if (o.t === 'mad_ritual_rug') lights.push({ x:cx, y:cy, r:70, c:'#c060ff', i:.30, flicker:true });
+  });
+  f.windows.forEach(v => lights.push({ x:v.x + v.w / 2, y:v.y + v.h + 8, r:40, c:'#9fb4d0', i:.20 }));
+  f.zones.forEach(z => { if (z.name) lights.push({ x:z.x + z.w / 2, y:z.y + z.h / 2, r:Math.min(72, z.w / 2 + 14), c:'#e8d8b8', i:.16 }); });
+
+  /* Точки приземления: через окно, через дверь, с лестниц. */
+  const win = f.windows.find(v => v.enter);
+  const st = f.stairs;
+  const front = f.doors.find(d => d.kind === 'front');
+  const spawn = {};
+  if (win) spawn.fromWindow = [win.x + win.w / 2, win.y + win.h + 22];
+  if (front) spawn.fromDoor = [front.x + front.w / 2, front.y + front.h + 18];
+  st.forEach(s => { spawn[s.dir === 'up' ? 'fromAttic' : 'fromStairs'] = [s.land.x, s.land.y]; });
+  spawn.default = spawn.fromDoor || spawn.fromStairs || spawn.fromAttic || [st[0].land.x, st[0].land.y];
+  if (!spawn.fromStairs) spawn.fromStairs = spawn.default;
+
+  /* Интерактивы. Прямоугольник ставится по точке подхода, а действие —
+     по виду записи: обыскать, спрятаться, шуметь, подняться, уйти. */
+  const inter = (f.acts || []).map(a => {
+    const box = { x:a.at.x - 18, y:a.at.y - 14, w:36, h:24, name:a.id,
+                  prompt:a.prompt || (a.on ? MAD_PROMPTS[a.on] || a.id : a.id),
+                  line:a.line, planAct:a };
+    const special = MAD_ACTS[f.id + ':' + a.id];
+    if (a.kind === 'stair') {
+      const s = f.stairs.find(x => x.id === a.stair);
+      box.action = function () { return Stealth.climb(s.to, s.toXY.x, s.toXY.y); };
+    } else if (a.kind === 'hide') {
+      box.hide = true;
+      box.action = function () { Stealth.hideHere({ x:a.to.x, y:a.to.y, label:a.label }); };
+    } else if (a.kind === 'noise') {
+      box.noise = true;
+      box.action = function () { Stealth.makeNoise(a.at.x, a.at.y, a.label); };
+    } else if (a.kind === 'day') {
+      box.when = () => !Stealth.on;
+      box.action = function () { return special ? special.call(this, this) : undefined; };
+    } else if (special) {
+      box.action = function () { return special.call(this, this); };
+    } else {
+      box.action = function () { Stealth.pick(a.id, this); };
+    }
+    return box;
+  });
+
+  return {
+    name: 'Дом Мадлен. ' + f.title, music:'sad', w:S.w, h:S.h,
+    zone:'indoor', weather:{ indoor:true, rain:0, fog:i === 2 ? .10 : .06, wind:0 },
+    light:{ tint, dark }, lights,
+    madFloor: i,
+    bgPaint(ctx) { MadPlan.paint(ctx, i); },
+    overPaint(ctx) { MadPlan.drawDebug(ctx, i); },
+    objects: MadPlan.props(i),
+    walls: MadPlan.walls(i),
+    spawn,
+    interactables: inter,
+    npcs: i === 0 ? [
+      { x:200, y:250, sprite:'witch1', name:'Мадлен',
+        when:()=> !F('firstAmulet') && !Stealth.on,
+        dialogue:()=> Dialogue.start([
+          {who:'witch1',expr:'normal',name:'Мадлен',text:'Так вы от Женевьевы? Заходите, дети. Что у вас за беда?'},
+          {who:'naya',expr:'talk',text:'У подруги... зависимость. И дома проклятая вещь. Нужно очищение.'},
+          {who:'witch1',expr:'worried',name:'Мадлен',text:'Бедная девочка. Хорошо. Только алтарь у меня наверху, под самой крышей — два марша, уж прости старуху.'},
+          {who:'witch1',expr:'normal',name:'Мадлен',text:'Поднимайтесь, я чайник поставлю. Положи на алтарь то, что принесла.'},
+          {who:'naya',expr:'normal',text:'(На третий этаж. Две лестницы вверх.)'},
+        ]) },
+      { x:150, y:330, sprite:'sue', name:'Сью',
+        when:()=> !F('firstAmulet') && !Stealth.on,
+        dialogue:()=> Dialogue.start([
+          {who:'sue',expr:'worried',text:'Ная... ты уверена, что нам сюда? Она такая... обычная. Как бабушка.'},
+          {who:'naya',expr:'talk',text:'Уверена. Просто держи её за руки, когда я скажу. Это часть обряда.'},
+          {who:'sue',expr:'normal',text:'Ладно. Ты же знаешь, что делаешь.'},
+        ]) },
+    ] : [],
+  };
+}
+
+
 const Rooms = {
 
 /* ---------------------------------------------------------------- */
@@ -13393,435 +15133,9 @@ communeHall: {
    она же решает, откуда Наю видно. Диван и стеллажи режут линии обзора,
    стол в столовой заставляет обходить, шкафы годятся, чтобы переждать.  */
 
-madFloor1: {
-  /* ПЕРВЫЙ ЭТАЖ ПО ПЛАНУ: прихожая во всю ширину сверху, за ней общий
-     зал с диваном, журнальным столиком на овальном ковре, креслом и
-     камином у правой стены, под камином — лестница наверх. Внизу
-     столовая с обеденным столом и буфетом и кухня с холодильником,
-     плитой и мойкой вдоль правой стены. */
-  name:"Дом Мадлен. Первый этаж", music:'sad', w:420, h:470,
-  zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
-  light:{ tint:'#191520', dark:.38 },
-  lights:[
-    {x:120,y:96,r:44,c:'#e8c88a',i:.24},{x:300,y:96,r:40,c:'#e0c0a0',i:.20},
-    {x:160,y:230,r:66,c:'#ffd8a0',i:.32},
-    {x:370,y:186,r:52,c:'#ff9a50',i:.36,flicker:true},
-    {x:110,y:380,r:58,c:'#ffd0a8',i:.30},{x:330,y:390,r:50,c:'#e8dcc0',i:.26},
-  ],
-  bgPaint(ctx) {
-    paintHousePlan(ctx, 420, 470, {
-      wall:'#5b4a52', wall2:'#4e3f47', floor:'#7d6a58', floor2:'#6d5b4a', wallH:52,
-      zones:[
-        { x:8,   y:52,  w:404, h:80,  name:'ПРИХОЖАЯ', floor:'#6d5a48', floor2:'#5f4d3d' },
-        { x:8,   y:140, w:404, h:180, name:'ГОСТИНАЯ', floor:'#7f6c58', floor2:'#6e5c49' },
-        { x:8,   y:328, w:222, h:136, name:'СТОЛОВАЯ', floor:'#7a6650', floor2:'#6a5743' },
-        { x:238, y:328, w:174, h:136, name:'КУХНЯ',    floor:'#8a8478', floor2:'#797369', tiles:true },
-      ],
-      parts:[
-        { x:8,   y:132, w:120, h:8 }, { x:196, y:132, w:216, h:8 },
-        { x:8,   y:320, w:130, h:8 }, { x:206, y:320, w:206, h:8 },
-        { x:230, y:328, w:8, h:60 }, { x:230, y:420, w:8, h:44 },
-      ],
-    });
-    /* Дорожка от входа через прихожую — по ней и приводят гостей. */
-    ctx.fillStyle = 'rgba(122,58,52,.32)'; ctx.fillRect(132, 58, 60, 72);
-    ctx.fillStyle = 'rgba(214,176,132,.16)';
-    ctx.fillRect(136, 62, 52, 2); ctx.fillRect(136, 124, 52, 2);
-    /* Половицы общего зала. */
-    ctx.fillStyle = 'rgba(0,0,0,.10)';
-    for (let y = 146; y < 318; y += 14) ctx.fillRect(10, y, 400, 1);
-    ctx.fillStyle = 'rgba(255,240,210,.05)';
-    for (let y = 148; y < 318; y += 14) ctx.fillRect(10, y, 400, 1);
-    /* Плинтус по внутренним стенам. */
-    ctx.fillStyle = 'rgba(30,22,26,.45)';
-    ctx.fillRect(8, 138, 404, 2); ctx.fillRect(8, 326, 222, 2); ctx.fillRect(238, 326, 174, 2);
-    paintDoor(ctx, 142, 56, 40, 12);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('ГЛАВНЫЙ ВХОД', 124, 48);
-    ctx.fillText('ОКНО', 330, 48);
-    ctx.fillText('НАВЕРХ', 352, 318);
-  },
-  objects: [
-    // ПРИХОЖАЯ: вешалка для одежды, зеркало, окно
-    { t:'coat_rack', x:216, y:120 }, { t:'mirror_tall', x:330, y:126 },
-    { t:'window_in', x:336, y:34 }, { t:'curtain_win', x:336, y:36 },
-    { t:'crate_stack', x:386, y:126 }, { t:'plant_pot', x:60, y:124 },
-    { t:'painting', x:90, y:66 },
-    // ГОСТИНАЯ: диван слева, столик на овальном ковре, кресло, камин справа
-    { t:'rug_oval', x:176, y:240 },
-    { t:'sofa_old', x:68, y:226 }, { t:'table_round', x:176, y:238 },
-    { t:'flowers_pot', x:176, y:228 }, { t:'armchair', x:258, y:230 },
-    { t:'fireplace', x:370, y:178 }, { t:'lamp_floor', x:36, y:168 },
-    { t:'bookshelf', x:70, y:170 }, { t:'birdcage', x:40, y:300 },
-    { t:'stairs_up', x:370, y:290 },
-    { t:'painting', x:90, y:148 }, { t:'clock', x:262, y:148 },
-    { t:'plant_pot', x:310, y:308 },
-    // СТОЛОВАЯ: обеденный стол на ковре, стулья, буфет с посудой
-    { t:'rug_warm', x:110, y:396 },
-    { t:'table_wood', x:110, y:388 }, { t:'chair_wood', x:70, y:394 },
-    { t:'chair_wood', x:150, y:394 }, { t:'chair_wood', x:110, y:360 },
-    { t:'flowers_pot', x:110, y:378 }, { t:'sideboard', x:50, y:458 },
-    { t:'painting', x:110, y:336 }, { t:'plant_pot', x:206, y:352 },
-    // КУХНЯ: холодильник, плита, мойка вдоль правой стены
-    { t:'fridge', x:390, y:376 }, { t:'stove', x:390, y:414 },
-    { t:'sink', x:390, y:452 }, { t:'counter', x:300, y:452 },
-    { t:'cabinet', x:270, y:360 }, { t:'herb_shelf', x:330, y:340 },
-  ],
-  walls: [
-    {x:0,y:0,w:420,h:52},{x:0,y:52,w:8,h:418},{x:412,y:52,w:8,h:418},{x:0,y:464,w:420,h:6},
-    {x:8,y:132,w:120,h:8},{x:196,y:132,w:216,h:8},
-    {x:8,y:320,w:130,h:8},{x:206,y:320,w:206,h:8},
-    {x:230,y:328,w:8,h:60},{x:230,y:420,w:8,h:44},
-  ],
-  spawn:{ fromDoor:[162, 96], fromWindow:[336, 96], fromStairs:[370, 308], default:[162, 96] },
-  interactables: [
-    { x:352,y:296,w:36,h:22, name:'up', prompt:'Лестница на 2 этаж',
-      action(){ return Stealth.climb('madFloor2', 380, 268); } },
-    { x:144,y:58,w:36,h:24, name:'frontDoor', prompt:'Главный вход', action(){
-        if (Stealth.on && !Stealth.taken)
-          return Dialogue.start([{who:'naya',expr:'normal',text:'(Уходить с пустыми руками? Нет. Не после того, как я сюда влезла.)'}]);
-        if (Stealth.on) return Stealth.leave();
-        return changeRoom('street', 282, 160);
-      }},
-    { x:318,y:60,w:36,h:24, name:'window', prompt:'Окно', action(){
-        if (Stealth.on && Stealth.taken) return Stealth.leave();
-        if (Stealth.on) return Dialogue.start([{who:'naya',expr:'normal',text:'(Открыто. Я оставила его так, чтобы уйти быстро.)'}]);
-        Dialogue.start([{who:'naya',expr:'normal',text:'(Окно во двор. Под ним снаружи стоит ящик.)'}]);
-      }},
-    { x:198,y:100,w:36,h:24, name:'coats', prompt:'Вешалка для одежды',
-      line:'(Два пальто и зонт. Одно пальто мужское, и оно висит тут давно.)',
-      action(){ Stealth.pick('coats', this); } },
-    { x:312,y:100,w:36,h:24, name:'hallMirror', prompt:'Зеркало',
-      line:'(Зеркало мутное по краям. В нём я выгляжу старше, чем есть.)',
-      action(){ Stealth.pick('hallMirror', this); } },
-    { x:52,y:188,w:36,h:24, name:'livShelf', prompt:'Книжный стеллаж',
-      line:'(Травники, сонники и, зачем-то, справочник по железнодорожным узлам.)',
-      action(){ Stealth.pick('livShelf', this); } },
-    { x:352,y:194,w:36,h:24, name:'mantel', prompt:'Каминная полка',
-      line:'(Спички, сухие лепестки и одна серёжка без пары.)',
-      action(){ Stealth.pick('mantel', this); } },
-    { x:158,y:256,w:36,h:24, name:'teaTable', prompt:'Журнальный столик',
-      line:'(Чашка с недопитым чаем. Он ещё не остыл до конца.)',
-      action(){ Stealth.pick('teaTable', this); } },
-    { x:32,y:430,w:36,h:24, name:'sideboard', prompt:'Буфет с посудой',
-      line:'(Сервиз на двенадцать персон. Двенадцать — это для кого?)',
-      action(){ Stealth.pick('sideboard', this); } },
-    { x:252,y:382,w:36,h:24, name:'kitCab', prompt:'Кухонный шкаф',
-      line:'(Крупы, соль, жестянка из-под печенья. В жестянке — пуговицы.)',
-      action(){ Stealth.pick('kitCab', this); } },
-    { x:50,y:244,w:36,h:24, name:'hideSofa', prompt:'За диваном', hide:true,
-      action(){ Stealth.hideHere({ x:68, y:256, label:'Ная присела за спинкой дивана.' }); } },
-    { x:74,y:430,w:36,h:24, name:'hideSideboard', prompt:'Между буфетом и стеной', hide:true,
-      action(){ Stealth.hideHere({ x:92, y:442, label:'Ная втиснулась между буфетом и стеной.' }); } },
-    /* Укрытие было в восемнадцати пикселях от зоны лестницы, и игра
-       предлагала его вместо подъёма: встать так, чтобы сработала
-       лестница, было негде. Спрятаться теперь можно за креслом. */
-    { x:240,y:246,w:36,h:24, name:'hideArmchair', prompt:'За креслом', hide:true,
-      action(){ Stealth.hideHere({ x:258, y:258, label:'Ная присела за высокой спинкой кресла.' }); } },
-    { x:282,y:420,w:36,h:24, name:'noiseDishes', prompt:'Стопка тарелок', noise:true,
-      action(){ Stealth.makeNoise(300, 432, 'Тарелки поехали и грохнулись об пол.'); } },
-    { x:352,y:428,w:36,h:24, name:'noiseKettle', prompt:'Чайник на плите', noise:true,
-      action(){ Stealth.makeNoise(370, 440, 'Чайник с лязгом слетел с плиты.'); } },
-    /* ДНЁМ это обычный визит: Мадлен поит гостей чаем в общем зале, а
-       алтарь у неё на чердаке — туда она Наю и отправляет. Ночью, в
-       краже, этих зон нет: дом тот же, но пустой и тёмный. */
-    { x:22,y:286,w:40,h:26, name:'cage', prompt:'Клетка с канарейкой',
-      when:()=> !Stealth.on,
-      action(){
-        if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'Птицы нет. Дверца открыта — кто-то её выпустил. Не я.'}]);
-        Dialogue.start([
-          {who:'naya',expr:'normal',text:'Канарейка. Молчит и смотрит прямо на меня.'},
-          {who:'sue',expr:'smile',text:'Она красивая. Как её зовут?'},
-          {who:'witch1',expr:'normal',name:'Мадлен',text:'Мадлен. Как меня. Так проще — когда зовёшь её, зовёшь и себя.'},
-        ]);
-      }},
-    { x:14,y:210,w:40,h:26, name:'armchair1', prompt:'Кресло у окна',
-      when:()=> !Stealth.on,
-      action(){ Dialogue.start([{who:'naya',expr:'normal',text:'Продавленное кресло. Подлокотник вытерт до дерева с одной стороны — она сидит тут одна и всегда одинаково.'}]); } },
-    { x:310,y:352,w:40,h:26, name:'herbs1', prompt:'Травы над плитой',
-      when:()=> !Stealth.on,
-      action(){ Dialogue.start([{who:'naya',expr:'normal',text:'Пучки подписаны карандашом, буквы крупные — она плохо видит.'}]); } },
-  ],
-  npcs: [
-    { x:226,y:262, sprite:'witch1', name:'Мадлен',
-      when:()=> !F('firstAmulet') && !Stealth.on,
-      dialogue:()=> Dialogue.start([
-        {who:'witch1',expr:'normal',name:'Мадлен',text:'Так вы от Женевьевы? Заходите, дети. Что у вас за беда?'},
-        {who:'naya',expr:'talk',text:'У подруги... зависимость. И дома проклятая вещь. Нужно очищение.'},
-        {who:'witch1',expr:'worried',name:'Мадлен',text:'Бедная девочка. Хорошо. Только алтарь у меня наверху, под самой крышей — два марша, уж прости старуху.'},
-        {who:'witch1',expr:'normal',name:'Мадлен',text:'Поднимайтесь, я чайник поставлю. Положи на алтарь то, что принесла.'},
-        {who:'naya',expr:'normal',text:'(На третий этаж. Две лестницы вверх.)'},
-      ]) },
-    { x:120,y:270, sprite:'sue', name:'Сью',
-      when:()=> !F('firstAmulet') && !Stealth.on,
-      dialogue:()=> Dialogue.start([
-        {who:'sue',expr:'worried',text:'Ная... ты уверена, что нам сюда? Она такая... обычная. Как бабушка.'},
-        {who:'naya',expr:'talk',text:'Уверена. Просто держи её за руки, когда я скажу. Это часть обряда.'},
-        {who:'sue',expr:'normal',text:'Ладно. Ты же знаешь, что делаешь.'},
-      ]) },
-  ],
-},
-
-madFloor2: {
-  /* ВТОРОЙ ЭТАЖ ПО ПЛАНУ: ванная и спальня Мадлен наверху, библиотека
-     посередине, гостевая внизу, а справа во всю высоту лестничный холл
-     с двумя маршами — вниз и на чердак. В каждую комнату свой проём. */
-  name:"Дом Мадлен. Второй этаж", music:'sad', w:420, h:470,
-  zone:'indoor', weather:{ indoor:true, rain:0, fog:.06, wind:0 },
-  light:{ tint:'#171420', dark:.42 },
-  lights:[
-    {x:80,y:120,r:46,c:'#cfe0e8',i:.24},
-    {x:230,y:120,r:56,c:'#e8b0c0',i:.30},
-    {x:150,y:276,r:58,c:'#ffd8a8',i:.28},
-    {x:150,y:404,r:54,c:'#e0d0b8',i:.26},
-    {x:340,y:180,r:44,c:'#ffcf90',i:.24},{x:340,y:400,r:44,c:'#ffcf90',i:.22},
-  ],
-  bgPaint(ctx) {
-    paintHousePlan(ctx, 420, 470, {
-      wall:'#564650', wall2:'#493c44', floor:'#7a6858', floor2:'#6a5848', wallH:52,
-      zones:[
-        { x:8,   y:52,  w:142, h:158, name:'ВАННАЯ',        floor:'#7f8c90', floor2:'#6f7c80', tiles:true },
-        { x:158, y:52,  w:142, h:158, name:'СПАЛЬНЯ МАДЛЕН',floor:'#7d5c62', floor2:'#6c4c52' },
-        { x:8,   y:218, w:292, h:120, name:'БИБЛИОТЕКА',    floor:'#79664f', floor2:'#695742' },
-        { x:8,   y:346, w:292, h:118, name:'ГОСТЕВАЯ',      floor:'#77644f', floor2:'#675441' },
-        { x:308, y:52,  w:104, h:412, name:'ЛЕСТНИЧНЫЙ ХОЛЛ',floor:'#6f5c4a', floor2:'#604e3e' },
-      ],
-      parts:[
-        { x:300, y:52,  w:8, h:78 }, { x:300, y:190, w:8, h:90 },
-        { x:300, y:340, w:8, h:66 }, { x:300, y:446, w:8, h:18 },
-        { x:150, y:52,  w:8, h:60 }, { x:150, y:152, w:8, h:58 },
-        { x:8,   y:210, w:292, h:8 },
-        { x:8,   y:338, w:292, h:8 },
-      ],
-    });
-    /* Дорожка по холлу — между двумя маршами. */
-    ctx.fillStyle = 'rgba(110,52,60,.30)'; ctx.fillRect(314, 58, 34, 400);
-    ctx.fillStyle = 'rgba(210,170,130,.14)';
-    ctx.fillRect(316, 60, 30, 2); ctx.fillRect(316, 454, 30, 2);
-    /* Обои в спальне — тонкая полоска. */
-    ctx.fillStyle = 'rgba(255,220,230,.05)';
-    for (let x = 164; x < 298; x += 9) ctx.fillRect(x, 56, 2, 152);
-    /* Кафель в ванной. */
-    ctx.fillStyle = 'rgba(226,236,238,.10)';
-    for (let x = 14; x < 148; x += 14) ctx.fillRect(x, 56, 1, 152);
-    /* Половицы библиотеки и гостевой. */
-    ctx.fillStyle = 'rgba(0,0,0,.10)';
-    for (let y = 224; y < 336; y += 13) ctx.fillRect(10, y, 288, 1);
-    for (let y = 352; y < 462; y += 13) ctx.fillRect(10, y, 288, 1);
-    ctx.fillStyle = 'rgba(30,22,26,.45)';
-    ctx.fillRect(8, 216, 292, 2); ctx.fillRect(8, 344, 292, 2);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('ВНИЗ', 352, 278); ctx.fillText('НА ЧЕРДАК', 336, 452);
-  },
-  objects: [
-    // ВАННАЯ
-    { t:'bathtub', x:60, y:112 }, { t:'sink', x:124, y:82 },
-    { t:'toilet', x:124, y:178 }, { t:'mirror_tall', x:30, y:190 },
-    { t:'plant_pot', x:96, y:194 }, { t:'window_in', x:70, y:34 },
-    // СПАЛЬНЯ МАДЛЕН: кровать с балдахином, туалетный столик, тумбочка
-    { t:'bed_double', x:236, y:130 }, { t:'nightstand', x:284, y:126 },
-    { t:'vanity', x:186, y:130 }, { t:'rug_round', x:236, y:176 },
-    { t:'window_in', x:236, y:34 }, { t:'curtain_win', x:236, y:36 },
-    { t:'candle', x:286, y:96 }, { t:'plant_pot', x:172, y:198 },
-    { t:'painting', x:266, y:66 },
-    // БИБЛИОТЕКА: стеллажи, письменный стол, кресло
-    { t:'bookshelf', x:40, y:250 }, { t:'bookshelf', x:80, y:250 },
-    { t:'bookshelf', x:256, y:250 }, { t:'table_wood', x:170, y:296 },
-    { t:'chair_wood', x:170, y:268 }, { t:'armchair', x:60, y:316 },
-    { t:'rug_warm', x:170, y:306 }, { t:'globe_stand', x:216, y:322 },
-    { t:'painting', x:170, y:226 }, { t:'wall_lamp', x:120, y:226 },
-    // ГОСТЕВАЯ: кровать, комод, круглый ковёр, шкаф и тумбочка
-    { t:'bed_single', x:56, y:416 }, { t:'dresser', x:150, y:458 },
-    { t:'rug_round', x:150, y:408 }, { t:'wardrobe', x:250, y:404 },
-    { t:'nightstand', x:100, y:390 }, { t:'painting', x:100, y:354 },
-    { t:'plant_pot', x:276, y:458 },
-    // ЛЕСТНИЧНЫЙ ХОЛЛ: два марша у правой стены
-    { t:'stairs_up', x:380, y:250 }, { t:'stairs_up', x:380, y:420 },
-    { t:'wall_lamp', x:330, y:60 }, { t:'plant_pot', x:318, y:300 },
-    { t:'chest', x:318, y:330 }, { t:'painting', x:340, y:60 },
-  ],
-  walls: [
-    {x:0,y:0,w:420,h:52},{x:0,y:52,w:8,h:418},{x:412,y:52,w:8,h:418},{x:0,y:464,w:420,h:6},
-    {x:300,y:52,w:8,h:78},{x:300,y:190,w:8,h:90},{x:300,y:340,w:8,h:66},{x:300,y:446,w:8,h:18},
-    {x:150,y:52,w:8,h:60},{x:150,y:152,w:8,h:58},
-    {x:8,y:210,w:292,h:8},
-    {x:8,y:338,w:292,h:8},
-  ],
-  spawn:{ fromStairs:[380, 268], fromAttic:[380, 442], default:[380, 268] },
-  interactables: [
-    { x:362,y:256,w:36,h:22, name:'down', prompt:'Лестница на 1 этаж',
-      action(){ return Stealth.climb('madFloor1', 370, 308); } },
-    { x:362,y:428,w:36,h:22, name:'up', prompt:'Лестница на 3 этаж',
-      action(){ return Stealth.climb('madFloor3', 380, 442); } },
-    { x:168,y:152,w:36,h:24, name:'vanity', prompt:'Туалетный столик',
-      line:'(Гребень, шпильки, пудреница. И фотография, положенная лицом вниз.)',
-      action(){ Stealth.pick('vanity', this); } },
-    { x:266,y:150,w:36,h:24, name:'bedside', prompt:'Тумбочка у кровати',
-      line:'(Очки, стакан воды и книга, заложенная лентой на середине.)',
-      action(){ Stealth.pick('bedside', this); } },
-    { x:100,y:120,w:36,h:24, name:'bathShelf', prompt:'Полка в ванной',
-      line:'(Мыло, склянка с чем-то травяным и очень много лекарств.)',
-      action(){ Stealth.pick('bathShelf', this); } },
-    { x:22,y:280,w:36,h:24, name:'libShelfA', prompt:'Стеллаж у окна',
-      line:'(Корешки вытерты до белизны. Эти книги читали, а не расставляли.)',
-      action(){ Stealth.pick('libShelfA', this); } },
-    { x:238,y:280,w:36,h:24, name:'libShelfB', prompt:'Стеллаж в углу',
-      line:'(Подшивки газет за тридцать лет. Все за один и тот же месяц.)',
-      action(){ Stealth.pick('libShelfB', this); } },
-    { x:152,y:308,w:36,h:24, name:'libDesk', prompt:'Письменный стол',
-      line:'(Начатое письмо. «Дорогая моя девочка» — и дальше ничего.)',
-      action(){ Stealth.pick('libDesk', this); } },
-    { x:132,y:430,w:36,h:24, name:'guestDresser', prompt:'Комод в гостевой',
-      line:'(Постельное бельё, переложенное лавандой. Им давно не пользовались.)',
-      action(){ Stealth.pick('guestDresser', this); } },
-    { x:206,y:416,w:36,h:24, name:'guestWardrobe', prompt:'Шкаф',
-      line:'(Пустые плечики. Только они и звенят.)',
-      action(){ Stealth.pick('guestWardrobe', this); } },
-    { x:268,y:416,w:36,h:24, name:'hideWardrobe', prompt:'В шкафу', hide:true,
-      action(){ Stealth.hideHere({ x:286, y:428, label:'Ная забралась в шкаф и притянула дверцу.' }); } },
-    { x:238,y:180,w:36,h:24, name:'hideBed', prompt:'За кроватью', hide:true,
-      action(){ Stealth.hideHere({ x:256, y:192, label:'Ная легла между кроватью и стеной.' }); } },
-    { x:24,y:316,w:36,h:24, name:'hideArmchair', prompt:'За креслом', hide:true,
-      action(){ Stealth.hideHere({ x:42, y:328, label:'Ная присела за высокой спинкой.' }); } },
-    { x:152,y:272,w:36,h:24, name:'noiseBooks', prompt:'Стопка книг', noise:true,
-      action(){ Stealth.makeNoise(170, 284, 'Книги посыпались на пол.'); } },
-  ],
-  npcs: [],
-},
-
-madFloor3: {
-  /* ЧЕРДАК ПО ПЛАНУ: кладовая слева, ритуальная комната справа, между
-     ними дверной проём; ниже коридор с дорожкой, а под ним во всю
-     ширину кабинет. Лестница вниз — в правом холле. */
-  name:"Дом Мадлен. Чердак", music:'sad', w:420, h:470,
-  zone:'indoor', weather:{ indoor:true, rain:0, fog:.10, wind:0 },
-  light:{ tint:'#151020', dark:.50 },
-  lights:[
-    {x:84,y:130,r:46,c:'#d8c8a0',i:.22},
-    {x:290,y:132,r:62,c:'#c060ff',i:.34,flicker:true},
-    {x:150,y:264,r:44,c:'#e0d0b0',i:.20},
-    {x:150,y:388,r:56,c:'#ffd0a0',i:.28},{x:340,y:330,r:44,c:'#e0d0b0',i:.22},
-  ],
-  bgPaint(ctx) {
-    paintHousePlan(ctx, 420, 470, {
-      wall:'#4e4048', wall2:'#42363d', floor:'#736251', floor2:'#635343', wallH:52,
-      zones:[
-        { x:8,   y:52,  w:152, h:168, name:'КЛАДОВАЯ',   floor:'#6e5c4a', floor2:'#5e4c3c' },
-        { x:168, y:52,  w:244, h:168, name:'РИТУАЛЬНАЯ КОМНАТА', floor:'#5a4258', floor2:'#4c364a' },
-        { x:8,   y:228, w:292, h:72,  name:'КОРИДОР',    floor:'#6f5c4a', floor2:'#604e3e' },
-        { x:8,   y:308, w:292, h:156, name:'КАБИНЕТ',    floor:'#79664f', floor2:'#695742' },
-        { x:308, y:228, w:104, h:236, name:'ХОЛЛ',       floor:'#6f5c4a', floor2:'#604e3e' },
-      ],
-      parts:[
-        { x:160, y:52,  w:8, h:60 }, { x:160, y:172, w:8, h:48 },
-        { x:8,   y:220, w:86, h:8 }, { x:134, y:220, w:154, h:8 }, { x:328, y:220, w:84, h:8 },
-        { x:300, y:228, w:8, h:60 }, { x:300, y:348, w:8, h:116 },
-        { x:8,   y:300, w:120, h:8 }, { x:188, y:300, w:112, h:8 },
-      ],
-    });
-    /* Пентаграмма на полу ритуальной комнаты — она и есть эта комната. */
-    ctx.save();
-    const cx = 290, cy = 132, R = 62;
-    ctx.strokeStyle = 'rgba(190,120,255,.30)'; ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.283); ctx.stroke();
-    ctx.strokeStyle = 'rgba(190,120,255,.20)';
-    ctx.beginPath(); ctx.arc(cx, cy, R - 9, 0, 6.283); ctx.stroke();
-    ctx.strokeStyle = 'rgba(210,150,255,.34)'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i <= 5; i++) {
-      const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
-      const x = cx + Math.cos(a) * (R - 12), y = cy + Math.sin(a) * (R - 12) * 0.92;
-      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    }
-    ctx.closePath(); ctx.stroke();
-    ctx.fillStyle = 'rgba(190,120,255,.16)';
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * 6.283;
-      ctx.fillRect(cx + Math.cos(a) * (R - 4) - 1, cy + Math.sin(a) * (R - 4) * .92 - 1, 3, 3);
-    }
-    ctx.restore();
-    /* Дорожка в коридоре и половицы кабинета. */
-    ctx.fillStyle = 'rgba(112,50,58,.30)'; ctx.fillRect(20, 250, 268, 30);
-    ctx.fillStyle = 'rgba(214,174,134,.14)';
-    ctx.fillRect(22, 252, 264, 2); ctx.fillRect(22, 276, 264, 2);
-    ctx.fillStyle = 'rgba(0,0,0,.10)';
-    for (let y = 314; y < 462; y += 13) ctx.fillRect(10, y, 288, 1);
-    ctx.fillStyle = 'rgba(30,22,26,.45)';
-    ctx.fillRect(8, 226, 292, 2); ctx.fillRect(8, 306, 292, 2); ctx.fillRect(308, 226, 104, 2);
-    ctx.fillStyle = '#c8b8a0'; ctx.font = '6px Courier New';
-    ctx.fillText('ВНИЗ', 352, 458);
-  },
-  objects: [
-    // КЛАДОВАЯ: стеллаж с ящиками и сундук
-    { t:'crate_stack', x:44, y:104 }, { t:'crate_stack', x:44, y:150 },
-    { t:'archive_box', x:100, y:96 }, { t:'archive_box', x:130, y:96 },
-    { t:'chest', x:100, y:170 }, { t:'herb_shelf', x:130, y:64 },
-    { t:'plant_pot', x:140, y:206 },
-    // РИТУАЛЬНАЯ: алтарь в круге, свечи по углам, стеллаж со склянками
-    { t:'altar', x:290, y:138 }, { t:'candle', x:224, y:84 },
-    { t:'candle', x:356, y:84 }, { t:'candle', x:224, y:190 },
-    { t:'candle', x:356, y:190 }, { t:'jar_shelf', x:390, y:136 },
-    { t:'painting', x:290, y:62 }, { t:'crate_stack', x:190, y:206 },
-    // КАБИНЕТ: письменный стол, глобус, книжные стеллажи, кресло
-    { t:'table_wood', x:150, y:370 }, { t:'chair_wood', x:150, y:342 },
-    { t:'globe_stand', x:230, y:376 }, { t:'bookshelf', x:40, y:344 },
-    { t:'bookshelf', x:80, y:344 }, { t:'bookshelf', x:256, y:344 },
-    { t:'armchair', x:66, y:430 }, { t:'rug_warm', x:150, y:420 },
-    { t:'lamp_floor', x:210, y:340 }, { t:'archive_box', x:112, y:452 },
-    { t:'painting', x:70, y:314 },
-    // ХОЛЛ: лестница вниз
-    { t:'stairs_up', x:380, y:420 }, { t:'plant_pot', x:318, y:250 },
-    { t:'wall_lamp', x:340, y:236 },
-  ],
-  walls: [
-    {x:0,y:0,w:420,h:52},{x:0,y:52,w:8,h:418},{x:412,y:52,w:8,h:418},{x:0,y:464,w:420,h:6},
-    {x:160,y:52,w:8,h:60},{x:160,y:172,w:8,h:48},
-    {x:8,y:220,w:86,h:8},{x:134,y:220,w:154,h:8},{x:328,y:220,w:84,h:8},
-    {x:300,y:228,w:8,h:60},{x:300,y:348,w:8,h:116},
-    {x:8,y:300,w:120,h:8},{x:188,y:300,w:112,h:8},
-  ],
-  spawn:{ fromStairs:[380, 442], default:[380, 442] },
-  interactables: [
-    { x:362,y:430,w:36,h:22, name:'down', prompt:'Лестница на 2 этаж',
-      action(){ return Stealth.climb('madFloor2', 380, 442); } },
-    { x:272,y:160,w:36,h:24, name:'altar', prompt:'Алтарь',
-      line:'(Чаша, нож и соль. Всё вымыто и лежит ровно, как приборы к ужину.)',
-      action(){
-        /* Днём сюда приходят с Мадлен и Сью — здесь и начинается
-           «очищение». Ночью это просто одно из мест, где может лежать
-           имя. Комната одна, смысл разный. */
-        if (!Stealth.on) {
-          if (F('firstAmulet')) return Dialogue.start([{who:'naya',expr:'empty',text:'Пусто. Осталась только тень на камне.'}]);
-          return Scene.play('firstAmuletScene');
-        }
-        Stealth.pick('altar', this);
-      } },
-    { x:356,y:160,w:36,h:24, name:'jars', prompt:'Стеллаж со склянками',
-      line:'(Подписано её рукой: «от бессонницы», «от тоски», «на всякий случай».)',
-      action(){ Stealth.pick('jars', this); } },
-    { x:82,y:186,w:36,h:24, name:'chest', prompt:'Сундук',
-      line:'(Детские вещи. Маленькие. Их складывали аккуратно и больше не трогали.)',
-      action(){ Stealth.pick('chest', this); } },
-    { x:26,y:130,w:36,h:24, name:'crates', prompt:'Стеллаж с ящиками',
-      line:'(Банки, банки, банки. Заготовки на зиму, которой она может не застать.)',
-      action(){ Stealth.pick('crates', this); } },
-    { x:132,y:382,w:36,h:24, name:'studyDesk', prompt:'Письменный стол',
-      line:'(Счета, рецепты и список имён. Половина вычеркнута.)',
-      action(){ Stealth.pick('studyDesk', this); } },
-    { x:22,y:374,w:36,h:24, name:'studyShelf', prompt:'Книжный стеллаж',
-      line:'(Тут по алфавиту. Единственное место в доме, где хоть что-то по алфавиту.)',
-      action(){ Stealth.pick('studyShelf', this); } },
-    { x:26,y:168,w:36,h:24, name:'hideCrates', prompt:'За ящиками', hide:true,
-      action(){ Stealth.hideHere({ x:44, y:180, label:'Ная присела за ящиками.' }); } },
-    { x:172,y:210,w:36,h:24, name:'hideRitual', prompt:'За ящиком у двери', hide:true,
-      action(){ Stealth.hideHere({ x:190, y:222, label:'Ная вжалась в угол за ящиком.' }); } },
-    { x:48,y:442,w:36,h:24, name:'hideArmchair', prompt:'За креслом', hide:true,
-      action(){ Stealth.hideHere({ x:66, y:454, label:'Ная спряталась за спинкой кресла.' }); } },
-    { x:206,y:92,w:36,h:24, name:'noiseCandle', prompt:'Подсвечник', noise:true,
-      action(){ Stealth.makeNoise(224, 104, 'Подсвечник с грохотом упал.'); } },
-  ],
-  npcs: [],
-},
+madFloor1: makeMadRoom(0),
+madFloor2: makeMadRoom(1),
+madFloor3: makeMadRoom(2),
 
 /* ---------------------------------------------------------------- */
 roseFloor1: {
@@ -22513,34 +23827,17 @@ Stealth.MISSIONS = {
     goal: 'Найти амулет.', goalOut: 'Уйти из дома.',
     calm: 'sad',
     floors: ['madFloor1', 'madFloor2', 'madFloor3'],
-    start: { floor:0, x:336, y:96 },
-    witch: { sprite:'witch1', name:'Мадлен', floor:0, routes:[
-      /* Мадлен живёт внизу: общий зал, столовая, кухня, прихожая. Наверх
-         поднимается реже, на чердак — совсем редко. Каждая точка стоит
-         на свободном полу и не ближе 120 пикселей от лестничной
-         площадки: иначе Ная выходила бы прямо ей в руки. */
-      [ { x:150, y:244, dir:0,     wait:1300 },
-        { x:110, y:420, dir:1.57,  wait:1400 },
-        { x:300, y:400, dir:-1.57, wait:1200 },
-        { x:200, y:96,  dir:3.14,  wait:1100 },
-        { x:300, y:244, dir:-1.57, wait:1000, floor:1 } ],
-      [ { x:204, y:100, dir:3.14,  wait:1200 },
-        { x:80,  y:120, dir:0,     wait:1000 },
-        { x:140, y:276, dir:1.57,  wait:1400 },
-        { x:150, y:412, dir:0,     wait:1200 },
-        { x:340, y:322, dir:-1.57, wait:900, floor:0 } ],
-      [ { x:90,  y:130, dir:0,     wait:1100 },
-        { x:290, y:190, dir:-1.57, wait:1600 },
-        { x:150, y:390, dir:1.57,  wait:1300 },
-        { x:330, y:270, dir:-1.57, wait:800, floor:1 } ],
-    ]},
+    /* Ная влезает в то самое окно прихожей, которое нарисовано на
+       плане, а обход Мадлен и места амулета берутся оттуда же. Ни одной
+       координаты дома здесь больше не написано: разъехаться с
+       планировкой им теперь нечем. */
+    get start() { return MadPlan.entry(0); },
+    witch: { sprite:'witch1', name:'Мадлен', floor:0,
+             get routes() { return MadPlan.routes(); } },
     /* Два возможных места — ровно как на плане этажей: туалетный столик
        в спальне и алтарь на чердаке. Где именно лежит имя, игрок заранее
        не знает и обязан искать. */
-    spots: [
-      { id:'vanity', floor:1, x:186, y:130 },
-      { id:'altar',  floor:2, x:290, y:138 },
-    ],
+    get spots() { return [MadPlan.spot(1, 'vanity'), MadPlan.spot(2, 'altar')]; },
     spot() { const a = this.spots; return a[(Math.random() * a.length) | 0]; },
     empty: [
       '(Ничего. Только чужая жизнь, разложенная по полкам.)',
@@ -28817,6 +30114,35 @@ const DevTools = {
     });
     on('devStSue',   () => { if (Stealth.on) { Stealth.SUE.left++; Stealth.SUE.cool = 0; Stealth.SUE.busy = 0; UI.toast('Отвлечений: ' + Stealth.SUE.left, 1400); } });
     on('devStEnd',   () => { if (Stealth.on) { Stealth.taken = true; Stealth.leave(); } });
+    /* Дом Мадлен: слои поверх комнаты и сверка с чертежом. Всё, что
+       переключается тут, рисует сам план — отдельной «отладочной»
+       геометрии не существует. */
+    const layer = (id, key, name) => on(id, () => {
+      UI.toast(name + ': ' + (MadPlan.toggle(key) ? 'вкл' : 'выкл'), 1400);
+    });
+    layer('devPlanRef',    'ref',       'эталон поверх');
+    layer('devPlanGrid',   'grid',      'сетка');
+    layer('devPlanCoords', 'coords',    'координаты');
+    layer('devPlanColl',   'collision', 'коллизии');
+    layer('devPlanBounds', 'bounds',    'границы мебели');
+    layer('devPlanDoors',  'doors',     'проёмы и лестницы');
+    layer('devPlanWin',    'windows',   'окна');
+    layer('devPlanDiff',   'diff',      'карта различий');
+    on('devPlanCheck', () => {
+      const r = MadPlan.validate();
+      UI.toast(r.fails ? 'Сверка: ошибок ' + r.fails + ', подробности в консоли'
+                       : 'Сверка пройдена, подробности в консоли', 2600);
+    });
+    on('devPlanImg', () => {
+      /* Растровый чертёж игра сама не грузит: ни сети, ни внешних файлов
+         в обычном запуске. Разработчик подкладывает его вручную. */
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*';
+      inp.onchange = () => { if (inp.files[0]) MadPlan.loadReference(inp.files[0])
+        .then(() => UI.toast('Чертёж подложен под разметку', 2000))
+        .catch(e => UI.toast(e.message, 2000)); };
+      inp.click();
+    });
   },
 
   /* ---------- прослушивание саундтрека ----------

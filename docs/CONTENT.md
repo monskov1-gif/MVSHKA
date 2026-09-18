@@ -94,11 +94,13 @@ techie, keeper`.
                genLiving 260x280 гостиная · genKitchen 210x230 кухня
                genStudy 220x230 кабинет · genBed 220x220 спальня
                genBath 170x190 ванная
-               witch1House 320x340 Дом Мадлен
-               witch2House 320x340 Дом Розы · witch3House 320x340 Дом за городом
+               witch3House 320x340 Дом за городом
+               (дневные witch1House и witch2House убраны: и днём, и ночью
+                в дома ведьм ходят через madFloor1..3 и roseFloor1..3)
                nightSpot 320x320 За городом, ночь
-КРАЖА          madFloor1 360x400 · madFloor2 360x400 · madFloor3 360x340
-               (ночной дом Мадлен: три этажа по плану)
+КРАЖА          madFloor1 300x664 · madFloor2 300x664 · madFloor3 300x664
+               (ночной дом Мадлен: три этажа по эталонному чертежу
+                docs/plan_madeleine.jpg; геометрия — MADELEINE_HOUSE_PLAN)
                roseFloor1 380x420 · roseFloor2 380x420 · roseFloor3 380x380
                (ночной дом Розы: три этажа по плану)
 КОММУНА        communeRoad 380x280 · communeYard 340x300 · communeHall 300x300
@@ -124,10 +126,10 @@ techie, keeper`.
 nayaRoom      door→corridor1 (или communeRoad в финале)
 corridor1     toRoom→nayaRoom  toKitchen  toBath  toBalcony  toStairs→stairwell
 stairwell     toFlat→corridor1  toStreet→street
-street        toCafe  toHome→stairwell  toLeftHouse→witch1House
+street        toCafe  toHome→stairwell  toLeftHouse→madFloor1
               toRightHouse→genevieveHouse  toUni→uniFrontYard  uniBackYard
               toOldTown  toAlley→backAlley  toPark→parkWalk
-oldTown       toStreet  toPlayground→playgroundNow  toRose→witch2House
+oldTown       toStreet  toPlayground→playgroundNow  toRose→roseFloor1
               toNightRoad→nightSpot
 nightSpot     exit→oldTown  enter→witch3House
 genevieveHouse exit→street  toCommune→communeHall
@@ -282,5 +284,9 @@ tests/stealth.js        кража: расстановка, обход без с
                         укрытия, шум, кристалл, отвлечения Сью, три поимки
 tests/playthrough.js    обе кражи ногами от входа до выхода: лестницы дают
                         подсказку, на этаже не ловят сразу, амулет находится
+tests/madplan.js        дом Мадлен против чертежа: пообъектные отклонения с
+                        допусками, попиксельное совпадение по слоям, мебель в
+                        стенах и проёмах, достижимость зон, лестницы по
+                        вертикали. --verbose показывает все отклонения
 tests/shots.js          скриншоты комнат — визуальная проверка компоновки
 ```
