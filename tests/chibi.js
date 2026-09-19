@@ -4,15 +4,19 @@
    дороге ставит флаги — и персонаж исчезал из комнаты посреди
    собственных реплик. Виднее всего это было в выборе Сью: первой же
    командой сцена ставит persuasionDone, условие «Сью стоит в комнате»
-   становится ложным, и дальше девять реплик читались при пустой
+   становится ложным, и дальше восемь реплик читались при пустой
    комнате. Тех же граблей набиралось одиннадцать сцен.
 
-   Проверяется два уровня: сам механизм удержания и живой прогон обеих
-   веток разговора со Сью — на каждой её реплике чиби обязана быть в
-   комнате.
+   Проверяется три вещи: сам механизм удержания, живой прогон обеих
+   веток разговора со Сью (на каждой реплике чиби обязана быть в
+   комнате) и портреты — у каждой реплики в игре должен найтись портрет
+   ровно с тем выражением, которое она просит. Иначе окно диалога
+   прячет портрет, и текст идёт при пустой рамке.
 
    Запуск: node tests/chibi.js                                        */
 const H = require('./harness.js');
+const fs = require('fs');
+const path = require('path');
 
 async function main() {
   const res = await H.run('CHIBI', async page => {
@@ -81,7 +85,25 @@ async function main() {
       await page.evaluate(() => { Scene.abort(); Dialogue.cancel(); });
       await page.waitForTimeout(200);
     }
-    return { hold, branches };
+    /* --- 3. портреты: у каждой реплики своё лицо --- */
+    const have = await page.evaluate(() => Object.keys(Assets.portraitURL));
+    return { hold, branches, have };
+  });
+
+  /* Реплики берутся из исходника: пройти их все в игре нельзя, а
+     проверить обязан каждый. */
+  const src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const have = new Set(res.have);
+  const used = new Map();
+  const re = /\{\s*who:\s*'([A-Za-z0-9_]+)'(?:\s*,\s*expr:\s*'([A-Za-z0-9_]+)')?/g;
+  for (let m; (m = re.exec(src)); ) {
+    const key = m[1] + '_' + (m[2] || 'normal');
+    used.set(key, (used.get(key) || 0) + 1);
+  }
+  const noFace = [], wrongFace = [];
+  used.forEach((n, key) => {
+    if (have.has(key)) return;
+    (have.has(key.replace(/_[a-z]+$/, '_normal')) ? wrongFace : noFace).push(key + ' ×' + n);
   });
 
   let bad = 0;
@@ -106,6 +128,17 @@ async function main() {
     if (!sue.length) { console.log('  ПРОВАЛ: Сью вообще не говорила'); bad++; }
     if (blind.length) { console.log('  ПРОВАЛ: Сью говорит, а её не видно'); bad++; }
   }
+  console.log('--- портреты ---');
+  console.log(`  портретов: ${have.size}, пар «кто+выражение» в репликах: ${used.size}`);
+  if (noFace.length) {
+    console.log('  ПРОВАЛ: реплики без портрета вовсе — окно прячет лицо:');
+    noFace.forEach(x => console.log('    ' + x)); bad++;
+  }
+  if (wrongFace.length) {
+    console.log('  ПРОВАЛ: выражения нет, подставится normal:');
+    wrongFace.forEach(x => console.log('    ' + x)); bad++;
+  }
+  if (!noFace.length && !wrongFace.length) console.log('  у каждой реплики своё лицо');
   if (H.errors.length) { console.log('ОШИБКИ:'); H.errors.forEach(e => console.log('  ' + e)); bad++; }
   console.log('');
   console.log(bad ? 'СОБЕСЕДНИК: ПРОВАЛ (' + bad + ')' : 'СОБЕСЕДНИК: видно всех, кто говорит');

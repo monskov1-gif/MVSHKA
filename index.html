@@ -6546,7 +6546,8 @@ const Assets = {
                 smile:{lid:.45, brow:-1, m:'smile'}, sad:{lid:.25, brow:2, m:'frown'},
                 worried:{lid:.2, brow:2, m:'frown'}, angry:{lid:.35, brow:-3, m:'grit'},
                 shocked:{lid:-.3, brow:-2, m:'o'},  serious:{lid:.15, brow:-1, m:'flat'},
-                intimidating:{lid:.15, brow:-2, m:'flat'}, empty:{lid:.1, brow:0, m:'thin'} };
+                intimidating:{lid:.15, brow:-2, m:'flat'}, empty:{lid:.1, brow:0, m:'thin'},
+                neutral:{lid:.22, brow:0, m:'flat'} };
     const e = E[expression] || E.normal;
     [-1, 1].forEach(d => {
       const ex = 32 + d * 7.5, ey = 32;
@@ -6789,13 +6790,13 @@ const Assets = {
       {hair:'bob', band:'#f0eeee', streak:'#d99aa4', collar:'#5f7fae', bg:'#232a38'});
     P('nayaDark',  '#232a3d','#b5996f', ['normal','angry','empty','serious'], '#ff2040',
       {hair:'bob', band:'#8a8490', streak:'#8a4048', collar:'#3a4358', glowEye:'#ff3050', bg:'#150c14', aura:'#c0304d'});
-    P('sue',       '#6b4a3a','#241f28', ['normal','talk','smile','worried','sad','angry','shocked'], '#e0a040',
+    P('sue',       '#6b4a3a','#241f28', ['normal','talk','smile','worried','sad','angry','shocked','serious','empty'], '#e0a040',
       {hair:'long', sheen:'#4a4258', bow:'#f0b8ca', collar:'#f2ecec', bg:'#38282c'});
     P('sueGhost',  '#6a6068','#4a4a56', ['empty','sad','normal'], '#8090a0',
       {hair:'long', sheen:'#6a6a7a', bow:'#9a90a0', collar:'#c8c8d0', skin:'#c8c8d0', bg:'#141420'});
     P('nayaHell',  '#161a26','#8a7a5e', ['normal','empty','serious','angry'], '#ff2a40',
       {hair:'bob', band:'#5a5060', streak:'#8a2440', collar:'#2a2030', glowEye:'#ff2a40', bg:'#0e0810', aura:'#8a0020'});
-    P('chris',     '#6b5f78','#2b2530', ['normal','talk','angry','sad','serious'], '#8a7f96',
+    P('chris',     '#6b5f78','#2b2530', ['normal','talk','angry','sad','serious','smile'], '#8a7f96',
       {hair:'short', sheen:'#443c4e', collar:'#100e14', glasses:'#c8c4d0', fringe:'#221d28', bg:'#1e1a24'});
     P('friend',    '#2a262e','#b98a5a', ['normal','smile','talk','worried'], '#8a6a4a',
       {hair:'long', sheen:'#d6a874', collar:'#4a4450', hat:'cap', hatColor:'#141218',
@@ -6804,23 +6805,23 @@ const Assets = {
       {hair:'long', sheen:'#f2ecc8', collar:'#9a8ab0', glowEye:'#3f7a52', bg:'#2a2434'});
     P('stacy',     '#c07a9a','#f0e4b8', ['normal','smile','angry'], '#f0b8ca',
       {hair:'long', sheen:'#fff2cc', bow:'#f0b8ca', collar:'#f2d8e4', glowEye:'#4a8a5e', bg:'#3a2c34'});
-    P('frank',     '#5a5a52','#6a5a48', ['normal','sad','worried'], '#7d7a70', {hair:'short', bg:'#2e2e2a'});
-    P('nayaTeen',  '#4a4658','#dcc09c', ['normal','sad','angry','empty','shocked'], '#a87a84',
+    P('frank',     '#5a5a52','#6a5a48', ['normal','sad','worried','shocked'], '#7d7a70', {hair:'short', bg:'#2e2e2a'});
+    P('nayaTeen',  '#4a4658','#dcc09c', ['normal','sad','angry','empty','shocked','talk','smile'], '#a87a84',
       {hair:'bob', band:'#8a8490', streak:'#a87a84', collar:'#5a5668', bg:'#26242e'});
     P('charlotte', '#16141a','#eab8c0', ['normal','smile','serious','angry'], '#f0a0c8',
       {hair:'bob', horns:'#d8b0b0', collar:'#3a3440', glowEye:'#ff4060', bg:'#241820'});
-    P('lilith',    '#1a1418','#e0dcd8', ['neutral','intimidating','normal'], '#a01030',
+    P('lilith',    '#1a1418','#e0dcd8', ['neutral','intimidating','normal','smile'], '#a01030',
       {hair:'long', horns:'#3a2432', hornEdge:'#a88a9c', collar:'#7d3c3a', glowEye:'#c04a46', bg:'#1a1014'});
-    P('genevieve', '#20603a','#603820', ['normal','worried','angry','sad','serious'], '#20a04a', {hair:'short'});
-    P('witch1',    '#402060','#e0d0c0', ['normal','worried','shocked'], '#8060c0', {hair:'short'});
-    P('witch2',    '#603020','#301020', ['normal','worried','angry'], '#a06040', {hair:'short'});
+    P('genevieve', '#20603a','#603820', ['normal','worried','angry','sad','serious','smile'], '#20a04a', {hair:'short'});
+    P('witch1',    '#402060','#e0d0c0', ['normal','worried','shocked','angry'], '#8060c0', {hair:'short'});
+    P('witch2',    '#603020','#301020', ['normal','worried','angry','smile','sad'], '#a06040', {hair:'short'});
     P('witch3',    '#204060','#203040', ['normal','serious','angry'], '#4080c0',
       {hair:'bob', hat:'cap', hatColor:'#1e2c40', hatTrim:'#3c526e', collar:'#5f7590'});
-    P('witch4',    '#4a4450','#2b2730', ['normal','smile','worried'], '#8a8296',
+    P('witch4',    '#4a4450','#2b2730', ['normal','smile','worried','sad'], '#8a8296',
       {hair:'short', sheen:'#3d3844', collar:'#8a8296', bg:'#232028'});
     P('witch5',    '#5a4656','#3a3038', ['normal','smile','sad'], '#c0a8b8',
       {hair:'long', sheen:'#4e4048', collar:'#c0a8b8', bg:'#2a222c'});
-    P('witch6',    '#6a3a44','#4a2c32', ['normal','smile','serious'], '#d09aa4',
+    P('witch6',    '#6a3a44','#4a2c32', ['normal','smile','serious','sad'], '#d09aa4',
       {hair:'long', sheen:'#5e3a40', collar:'#d09aa4', bg:'#2c1e22'});
     P('neighbor',  '#5a5a4a','#8a8a80', ['normal'], '#8a8a70');
     /* Говорящие лица университета: у библиотекаря, преподавателя и
@@ -6845,6 +6846,10 @@ const Assets = {
       {hair:'long', sheen:'#e8c884', collar:'#f0c8dc', bg:'#2e2430'});
     P('studentD',  '#3f6a5a','#5a3a2a', ['normal'], '#7aa894');
     P('acolyte',   '#38604a','#2a2018', ['normal','worried'], '#50a070');
+    P('customer',  '#4a5548','#3f3228', ['normal','talk','worried'], '#6a7460',
+      {hair:'short', collar:'#3a4238', bg:'#2a2e2a'});
+    P('student',   '#c06a90','#8a5a30', ['normal','talk','smile','worried'], '#f0c0d0',
+      {hair:'long', sheen:'#a87848', collar:'#f0c0d0', bg:'#3a2630'});
     P('imp',       '#701020','#300810', ['normal','smile'], '#c04020', {glowEye:'#ffa020', bg:'#200408'});
     P('mother',    '#e8e6e6','#e6c2ca', ['normal','smile','talk','sad','empty','angry'], '#a8323c',
       {hair:'long', sheen:'#f6dee4', collar:'#a8323c', hat:'straw', hatColor:'#d6bb8c',
@@ -18057,7 +18062,7 @@ uniFrontYard: {
       }},
   ],
   npcs: [
-    {x:240,y:320,sprite:'studentB',name:'Студент',speed:.28,path:[[240,320],[268,320],[268,356],[240,356]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Главный вход прямо по лестнице. Не перепутайте с боковым крылом.'}])},
+    {x:240,y:320,sprite:'studentB',name:'Студент',speed:.28,path:[[240,320],[268,320],[268,356],[240,356]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'studentB',expr:'normal',name:'Студент',text:'Главный вход прямо по лестнице. Не перепутайте с боковым крылом.'}])},
     {x:400,y:320,sprite:'studentC',name:'Студентка',speed:.26,path:[[400,320],[372,320],[372,356],[400,356]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'friend',expr:'normal',name:'Студентка',text:'Осенью этот двор всегда забит листьями. Дворник сдаётся раньше всех.'}])},
     {x:160,y:300,sprite:'studentD',name:'Студентка',speed:.30,path:[[160,300],[160,264],[236,262],[236,300]],when:()=>!F('sueDead'),dialogue:()=>Dialogue.start([{who:'acolyte',expr:'normal',name:'Студентка',text:'Курить только у ворот. Тут вахтёр из окна видит всё.'}])},
   ],
@@ -18311,7 +18316,7 @@ uniHall: {
       path:[[280,210],[212,214],[212,250],[286,248]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed(); return Dialogue.start([
-        {who:'student',expr:'normal',name:'Студент',text:'Через двор быстрее, чем по коридорам. Только под дождём.'},
+        {who:'studentB',expr:'normal',name:'Студент',text:'Через двор быстрее, чем по коридорам. Только под дождём.'},
       ]); } },
   ],
   /* Первый приход в корпус после смены открывает главу; на четвёртый
@@ -18470,8 +18475,8 @@ uniWestHall: {
       path:[[110,330],[152,330],[152,520],[110,520]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed();
-        if (F('investigatedUniversity')) return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
-        return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Репетиционный — первая дверь слева. Только тихо, у них прогон.'}]);
+        if (F('investigatedUniversity')) return Dialogue.start([{who:'studentB',expr:'normal',name:'Студент',text:'Ты у Морель что-то ищешь? Она странная. В хорошем смысле. Наверное.'}]);
+        return Dialogue.start([{who:'studentB',expr:'normal',name:'Студент',text:'Репетиционный — первая дверь слева. Только тихо, у них прогон.'}]);
       }},
     { x:150, y:600, sprite:'studentC', name:'Студентка', speed:0.32,
       path:[[150,600],[112,604],[112,664],[152,660]],
@@ -18633,8 +18638,8 @@ uniEastHall: {
       path:[[112,430],[152,430],[152,600],[112,600]],
       when:()=> !F('sueDead'),
       dialogue:()=> { Campus.noticed();
-        if (F('learnedMedea')) return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Ты вчера в архиве сидела? Морель потом туда заходила. Спрашивала, кто брал папки.'}]);
-        return Dialogue.start([{who:'student',expr:'normal',name:'Студент',text:'Морель сегодня добрая. Значит, зачёт будет злой.'}]);
+        if (F('learnedMedea')) return Dialogue.start([{who:'studentB',expr:'normal',name:'Студент',text:'Ты вчера в архиве сидела? Морель потом туда заходила. Спрашивала, кто брал папки.'}]);
+        return Dialogue.start([{who:'studentB',expr:'normal',name:'Студент',text:'Морель сегодня добрая. Значит, зачёт будет злой.'}]);
       }},
     { x:150, y:170, sprite:'studentC', name:'Студентка', speed:0.38,
       path:[[150,170],[110,170],[110,280],[150,280]],
@@ -19653,7 +19658,7 @@ uniMusicRoom: {
     { x:250, y:232, sprite:'customer', name:'Студентка с папкой', speed:0.3,
       path:[[250,232],[290,232],[290,254],[250,254]],
       dialogue:()=> Dialogue.start([
-        {who:'customer',expr:'normal',name:'Студентка',text:'Сольфеджио. Я хожу и пою про себя, иначе не запоминается.'},
+        {who:'studentC',expr:'normal',name:'Студентка',text:'Сольфеджио. Я хожу и пою про себя, иначе не запоминается.'},
       ]) },
     { x:62, y:196, sprite:'neighbor', name:'Студент у стены',
       dialogue:()=> Dialogue.start([
@@ -20967,9 +20972,9 @@ uniBackYard: {
       path:[[306,262],[340,268],[340,286],[292,280]],
       when:()=> !F('sueDead'),
       dialogue:()=> Dialogue.start([
-        {who:'student',expr:'normal',name:'Студент',text:'Не сдавай окно, ладно? Иначе придётся бегать курить через весь корпус.'},
+        {who:'studentB',expr:'normal',name:'Студент',text:'Не сдавай окно, ладно? Иначе придётся бегать курить через весь корпус.'},
         {who:'naya',expr:'smile',text:'Мне-то зачем.'},
-        {who:'student',expr:'normal',name:'Студент',text:'Вот и я о том же.'},
+        {who:'studentB',expr:'normal',name:'Студент',text:'Вот и я о том же.'},
       ]) },
   ],
 },
@@ -21205,7 +21210,7 @@ const Dialogue = {
         librarian:'Библиотекарь', professor:'Преподаватель', director:'Режиссёр',
         costumer:'Костюмер', techie:'Техник', keeper:'Хранитель',
         actorM:'Актёр', actressF:'Актриса',
-        studentB:'Студент', studentC:'Студентка', studentD:'Студент',
+        student:'Студент', studentB:'Студент', studentC:'Студентка', studentD:'Студент',
         naya:'Ная', nayaDark:'Ная', nayaHell:'Ная', nayaTeen:'Ная',
         drizella:'Дризелла', stacy:'Стейси', frank:'Фрэнк',
         sue:'Сью', sueGhost:'Сью',
