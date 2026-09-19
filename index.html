@@ -1035,6 +1035,23 @@
       </div>
       <div class="devGrid" id="devStealthGrid"></div>
 
+      <div class="devSection">СЮЖЕТ ФРЕНКА</div>
+      <div class="devNow" id="devFrankNow">— линия закрыта —</div>
+      <div class="devHint">Скрытая линия отца. Открывается в первой главе репликой
+        «ты ни разу за меня не заступился», дальше идёт между сменами: звонок после
+        второй, встреча в кафе после третьей. Кнопки зовут те же функции, что и
+        игра, — отдельных тестовых диалогов у линии нет.</div>
+      <div class="devRow">
+        <button class="devMini" id="devFrUnlock">разблокировать линию</button>
+        <button class="devMini" id="devFrCall">запустить звонок</button>
+        <button class="devMini" id="devFrVisit">встреча в кафе</button>
+        <button class="devMini" id="devFrForgive">выбрать прощение</button>
+        <button class="devMini" id="devFrReject">выбрать отказ</button>
+        <button class="devMini" id="devFrHelpYes">принять помощь</button>
+        <button class="devMini" id="devFrHelpNo">отказаться от помощи</button>
+        <button class="devMini" id="devFrReset">сбросить линию</button>
+      </div>
+
       <div class="devSection">НЕСЧАСТНЫЙ СЛУЧАЙ — СЕКРЕТНАЯ КОНЦОВКА</div>
       <div class="devNow" id="devSdsNow">— система спит —</div>
       <div class="devHint">Четыре способа не дойти до своей концовки. Каждая кнопка
@@ -6936,6 +6953,12 @@ function freshState() {
       communeInvite:false,
       metSue:false, cafeSceneComplete:false,
       cafeShiftStarted:false, cafeShiftFinished:false,
+      /* Линия Френка. В старых сохранениях этих полей нет — F() вернёт
+         false, и линия просто закрыта, ничего не ломая. */
+      frankArcUnlocked:false, frankCalled:false, frankVisitAccepted:false,
+      frankVisitRejected:false, frankOfferedHelp:false, frankMetDone:false,
+      nayaForgaveFrank:false, nayaRejectedFrank:false,
+      frankHelpAccepted:false, frankHelpRejected:false,
       sueWaitingCorridor:false,
       shiftHelpSeen:false,
       // площадка в настоящем
@@ -7129,6 +7152,176 @@ function drawMover(ctx, m, camX, camY) {
   ctx.translate(Math.round(m.x - camX), 0);
   ctx.scale(-1, 1);
   ctx.drawImage(img, -d.ax, y);
+  ctx.restore();
+}
+
+
+/* =====================================================================
+   ГОРОД НА ГОРИЗОНТЕ
+
+   Три плана домов, у каждого своя плотность горящих окон: дальний в
+   дымке и почти тёмный, ближний подробный — трубы, антенны, скаты и
+   парапеты. Дом читается не силуэтом, а тем, сколько окон в нём ещё
+   горит; ореолы вокруг окон и фонари под домами не дают городу висеть
+   в воздухе.
+
+   Набор домов детерминированный: фон пишется в кэш и перерисовывается
+   только при смене флага, поэтому город обязан собираться одинаково —
+   иначе он будет каждый раз другим.
+
+   Возвращает список горящих окон: комната мигает ими в overPaint, и
+   именно это редкое мерцание делает город живым.
+
+   o = { w, hor, night, seed, moon:{x,y}|null, glowX, lamps }
+===================================================================== */
+function paintCityView(ctx, o) {
+  const W = o.w, HOR = o.hor, night = !!o.night;
+  let seed = o.seed === undefined ? 20516 : o.seed;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const lit = [];
+
+  /* НЕБО. К горизонту теплее: город подсвечивает его снизу. */
+  const sky = ctx.createLinearGradient(0, 0, 0, HOR);
+  if (night) { sky.addColorStop(0,'#06050e'); sky.addColorStop(.55,'#100c1e'); sky.addColorStop(1,'#2b1a24'); }
+  else       { sky.addColorStop(0,'#131b36'); sky.addColorStop(.55,'#232a4c'); sky.addColorStop(1,'#483b4e'); }
+  ctx.fillStyle = sky; ctx.fillRect(0,0,W,HOR);
+
+  /* Звёзды: у горизонта их съедает засветка. */
+  for (let i=0;i<96;i++) {
+    const x = rnd()*W, y = rnd()*(HOR-14);
+    const k = 1 - y/(HOR-14);
+    const a = (.18 + rnd()*.62) * (0.18 + k*0.82);
+    ctx.fillStyle = `rgba(226,232,255,${a.toFixed(2)})`;
+    ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+  }
+
+  /* Облака — тонкие полосы, подсвеченные городом снизу. */
+  for (let i=0;i<5;i++) {
+    const cy = 14 + i*17 + rnd()*5, cw = 44 + rnd()*74, cx = rnd()*W;
+    ctx.fillStyle = `rgba(96,84,112,${(0.09 + rnd()*0.09).toFixed(2)})`;
+    ctx.beginPath(); ctx.ellipse(cx, cy, cw/2, 2.5 + rnd()*2, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  /* Луна: ореол, диск, три пятна. */
+  if (o.moon) {
+    const mx = o.moon.x, my = o.moon.y;
+    const halo = ctx.createRadialGradient(mx,my,3,mx,my,32);
+    halo.addColorStop(0,'rgba(238,238,216,.20)'); halo.addColorStop(1,'rgba(238,238,216,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx,my,32,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = night ? '#e8e8d0' : '#f2ecc6';
+    ctx.beginPath(); ctx.arc(mx,my,11,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(150,150,130,.30)';
+    ctx.beginPath(); ctx.arc(mx-3.5,my-2,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx+4,my+3.5,2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx+1,my-5.5,1.4,0,Math.PI*2); ctx.fill();
+  }
+
+  /* Зарево над кварталом — поверх неба, под домами. */
+  const gx = o.glowX === undefined ? W*0.52 : o.glowX;
+  const glow = ctx.createRadialGradient(gx, HOR+6, 0, gx, HOR+6, 152);
+  glow.addColorStop(0, night ? 'rgba(214,122,58,.20)' : 'rgba(232,152,92,.15)');
+  glow.addColorStop(1, 'rgba(232,152,92,0)');
+  ctx.fillStyle = glow; ctx.fillRect(0,0,W,HOR);
+
+  /* ОДИН ПЛАН ГОРОДА.
+     p.win — доля горящих окон, p.detail — крыши с трубами и антеннами. */
+  const skyline = (p) => {
+    let x = -8;
+    while (x < W + 8) {
+      const bw = p.wMin + Math.round(rnd() * (p.wMax - p.wMin));
+      const bh = p.hMin + Math.round(rnd() * (p.hMax - p.hMin));
+      const top = HOR - bh;
+      ctx.fillStyle = p.body; ctx.fillRect(x, top, bw, bh);
+      ctx.fillStyle = p.edge; ctx.fillRect(x, top, 1, bh);          // рёбра дают объём
+      ctx.fillRect(x + bw - 1, top, 1, bh);
+
+      const roof = rnd();
+      if (p.detail && roof < .30) {                                  // скат
+        ctx.fillStyle = p.body;
+        ctx.beginPath(); ctx.moveTo(x-1, top); ctx.lineTo(x + bw/2, top - 7);
+        ctx.lineTo(x + bw + 1, top); ctx.closePath(); ctx.fill();
+      } else if (roof < .62) {                                       // парапет
+        ctx.fillStyle = p.edge; ctx.fillRect(x - 1, top - 2, bw + 2, 2);
+      }
+      if (p.detail) {
+        if (rnd() < .45) { ctx.fillStyle = p.edge;                   // труба
+          const cx = x + 3 + Math.round(rnd()*(bw-7));
+          ctx.fillRect(cx, top - 6, 3, 6); ctx.fillRect(cx-1, top-7, 5, 2); }
+        if (rnd() < .30) { ctx.fillStyle = p.edge;                   // антенна
+          const ax = x + 2 + Math.round(rnd()*(bw-4));
+          ctx.fillRect(ax, top - 9, 1, 9); ctx.fillRect(ax-2, top-7, 5, 1); }
+      }
+
+      /* ОКНА. Ряды и столбцы, часть горит. */
+      const sx = p.step, sy = p.step + 1;
+      for (let wy = top + 4; wy < HOR - 3; wy += sy) {
+        for (let wx = x + 3; wx < x + bw - 3; wx += sx) {
+          const on = rnd() < p.win;
+          if (on) {
+            const warmK = rnd();
+            const col = warmK < .18 ? '#cfe0ff' : warmK < .70 ? '#ffd68a' : '#ffb257';
+            ctx.fillStyle = col;
+            ctx.fillRect(Math.round(wx), Math.round(wy), 2, 2);
+            if (p.halo) lit.push({ x:Math.round(wx)+1, y:Math.round(wy)+1, c:col });
+          } else {
+            ctx.fillStyle = p.dark;
+            ctx.fillRect(Math.round(wx), Math.round(wy), 2, 2);
+          }
+        }
+      }
+      x += bw + 1 + Math.round(rnd()*3);
+    }
+  };
+
+  skyline({ body:'#1b2133', edge:'#232a3e', dark:'#182032', win:.10, step:5, wMin:14, wMax:26, hMin:30, hMax:62 });
+  ctx.fillStyle = night ? 'rgba(20,16,30,.42)' : 'rgba(40,44,70,.36)';   // дымка между планами
+  ctx.fillRect(0, Math.round(HOR*0.35), W, HOR - Math.round(HOR*0.35));
+  skyline({ body:'#141826', edge:'#1c2234', dark:'#111626', win:.26, step:5, wMin:16, wMax:30, hMin:24, hMax:52, halo:true });
+  ctx.fillStyle = night ? 'rgba(14,10,22,.30)' : 'rgba(28,30,52,.24)';
+  ctx.fillRect(0, Math.round(HOR*0.52), W, HOR - Math.round(HOR*0.52));
+  skyline({ body:'#0c0f19', edge:'#151a28', dark:'#0a0d16', win:.34, step:6, wMin:20, wMax:36, hMin:16, hMax:38,
+            halo:true, detail:true });
+
+  /* Фонари вдоль улицы под домами: без них город висит в воздухе. */
+  if (o.lamps !== false) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let x = 6; x < W; x += 21 + Math.round(rnd()*9)) {
+      const y = HOR - 3 - Math.round(rnd()*3);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 9);
+      g.addColorStop(0,'rgba(255,196,120,.40)'); g.addColorStop(1,'rgba(255,196,120,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffd89a'; ctx.fillRect(x, y, 1, 1);
+    }
+    ctx.restore();
+  }
+
+  /* Ореолы вокруг горящих окон — из-за них город и «светится». */
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const L of lit) {
+    const g = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, 4.5);
+    g.addColorStop(0, L.c === '#cfe0ff' ? 'rgba(150,180,255,.30)' : 'rgba(255,190,110,.34)');
+    g.addColorStop(1, 'rgba(255,190,110,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(L.x, L.y, 4.5, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  return lit;
+}
+
+/* Мигание пары окон в городе. Один и тот же код для балкона и крыши:
+   в остальном кадр статичен, и именно это движение его оживляет. */
+function drawCityTwinkle(ctx, lit, camX, camY) {
+  if (!lit || !lit.length || !FX.on()) return;
+  const t = Date.now() / 1000;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < lit.length; i++) {
+    const L = lit[i];
+    const ph = Math.sin(t * 0.7 + i * 2.3);
+    if (ph < 0.86) continue;                       // мигает редко, а не постоянно
+    const a = (ph - 0.86) / 0.14;
+    ctx.fillStyle = `rgba(255,214,138,${(a*0.55).toFixed(3)})`;
+    ctx.fillRect(L.x - 1 - (camX||0), L.y - 1 - (camY||0), 2, 2);
+  }
   ctx.restore();
 }
 
@@ -9214,6 +9407,13 @@ const World = {
       const d = Art.meta(o.t);
       if (d && d.light) out.push({ x:o.x, y:o.y + (d.light.dy||0), r:d.light.r, c:d.light.c, i:d.light.i, flicker:d.light.flicker });
     });
+    /* Светильник, который двигается: комната считает его каждый кадр
+       сама. Нужен театральной люстре — она качается, срывается и гаснет,
+       и свет в зале обязан делать то же самое. */
+    if (room.extraLights) {
+      const ex = room.extraLights();
+      if (ex) for (const L of ex) out.push(Object.assign({ r:50, c:'#ffcf7a', i:.8 }, L));
+    }
     return out;
   },
 
@@ -14058,8 +14258,12 @@ nayaRoom: {
     { x:44,y:176, sprite:'sue', name:'Сью',
       when:()=> F('sueRevived') && !F('reflectionDone'),
       dialogue:()=> Scene.play('postRevival') },
+    /* Эта Сью ждёт разговора о земной концовке и появляется только
+       когда сцена решения уже закончилась. Без reflectionDone она
+       вставала в комнату прямо посреди выбора — рядом с той Сью,
+       которая там уже стояла, и в кадре было две Сью. */
     { x:64,y:186, sprite:'sue', name:'Сью',
-      when:()=> F('chosenEarthPath') && !F('ending'),
+      when:()=> F('chosenEarthPath') && F('reflectionDone') && !F('ending'),
       dialogue:()=> Scene.play('earthEnding') },
   ],
   onEnter() {
@@ -16645,14 +16849,104 @@ parkWalk: {
   sun:{ x:330, y:34, w:52, len:150, tilt:-.3, a:.13 },
   bgPaint(ctx) {
     const W = 420, H = 300;
+    /* ЗА ПАРКОМ — НЕ ГОРОД.
+
+       Раньше горизонт закрывал ряд серых прямоугольников: парк упирался
+       в квартал и выглядел двором. Теперь за оградой открывается то, на
+       что в этом городе и смотрят: гряда гор в дымке, а под ней —
+       осенний лес двумя планами. Город остался позади, и это видно.
+
+       Набор детерминированный: фон кэшируется, поэтому гребень и лес
+       обязаны собираться одинаково при каждой перерисовке.          */
+    let pseed = 41207;
+    const prnd = () => (pseed = (pseed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+
     const sky = ctx.createLinearGradient(0,0,0,104);
-    sky.addColorStop(0,'#4e5570'); sky.addColorStop(1,'#7d7f8c');
+    sky.addColorStop(0,'#3e4a68'); sky.addColorStop(.52,'#6a6b84'); sky.addColorStop(1,'#a89184');
     ctx.fillStyle = sky; ctx.fillRect(0,0,W,104);
-    // дальняя стена парка и деревья за ней
-    ctx.fillStyle = '#3f4438';
-    for (let x=0;x<W;x+=13) { const h=30+((x*11)%30); ctx.fillRect(x,104-h,13,h); }
+
+    /* Низкое солнце у горизонта: свет в парке тёплый, и он откуда-то. */
+    const sun = ctx.createRadialGradient(330, 78, 0, 330, 78, 92);
+    sun.addColorStop(0,'rgba(255,208,150,.34)'); sun.addColorStop(1,'rgba(255,208,150,0)');
+    ctx.fillStyle = sun; ctx.fillRect(0,0,W,104);
+
+    /* ГОРЫ, дальняя гряда: в дымке, почти без деталей, со снегом. */
+    const ridge = (base, col, lit, snow, amp, step, jag) => {
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(-10, base);
+      const pts = [];
+      for (let x = -10; x <= W + 10; x += step) {
+        const y = base - amp * (0.42 + 0.58 * Math.abs(Math.sin(x * jag + pseed * 0.0007)))
+                       - prnd() * amp * 0.20;
+        pts.push([x, y]); ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W + 10, base); ctx.closePath(); ctx.fill();
+      /* Освещённый склон: без него гряда — плоское пятно. Солнце справа,
+         поэтому светлая сторона у каждой вершины правая. */
+      ctx.fillStyle = lit;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+        if (y1 >= y0) continue;                        // склон вверх — он в тени
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1, base); ctx.lineTo(x0, base);
+        ctx.closePath(); ctx.fill();
+      }
+      if (!snow) return;
+      /* Снег лежит на вершинах — по нему гряда и читается как горы.
+         Шапка строится по соседним точкам гребня, а не отдельным
+         треугольником: иначе она висит над горой, а не лежит на ней. */
+      ctx.fillStyle = snow;
+      const sw = Math.min(step * 0.30, 7), sh = sw * 1.25;
+      for (let i = 1; i < pts.length - 1; i++) {
+        const [, yp] = pts[i - 1], [x, y] = pts[i], [, yn] = pts[i + 1];
+        if (!(y < yp && y < yn)) continue;              // не вершина
+        if (y > base - amp * 0.62) continue;            // низкая — снега нет
+        /* Шапка строго по вершине и узкая. Раньше её ширина считалась
+           проекцией на соседнюю точку гребня, и на пологом склоне снег
+           растягивался через всю гряду белой лентой. */
+        ctx.beginPath();
+        ctx.moveTo(x - sw, y + sh); ctx.lineTo(x, y); ctx.lineTo(x + sw, y + sh);
+        ctx.closePath(); ctx.fill();
+      }
+    };
+    ridge(96, '#454c66', '#5a6180', '#d6dcec', 62, 34, 0.035);   // дальний хребет
+    ctx.fillStyle = 'rgba(158,150,164,.20)'; ctx.fillRect(0, 40, W, 64);   // дымка между грядами
+    ridge(99, '#2e3448', '#3d4560', '#c2c9dc', 46, 27, 0.052);   // ближний хребет
+    ctx.fillStyle = 'rgba(138,130,144,.14)'; ctx.fillRect(0, 64, W, 40);
+
+    /* ЛЕС у подножия: два плана, ближний выше и теплее. */
+    /* Лиственные вперемешку с хвойными: чистая хвоя выглядит зимней, а
+       ряд одинаковых крон — декорацией. Поэтому осень попадает в сам
+       лес, а не кладётся пятнами поверх него. */
+    const grove = (base, h1, h2, cold, warm, step) => {
+      for (let x = -6; x < W + 6; x += step) {
+        const h = h1 + Math.round(prnd() * (h2 - h1));
+        const leafy = prnd() < .42;
+        if (leafy) {                                     // лиственное: крона шаром
+          const r = h * 0.40;
+          ctx.fillStyle = warm[(x + h) % warm.length | 0];
+          ctx.beginPath(); ctx.ellipse(x + r, base - h * .62, r, r * .82, 0, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,.14)';
+          ctx.beginPath(); ctx.ellipse(x + r * .6, base - h * .52, r * .62, r * .5, 0, 0, Math.PI*2); ctx.fill();
+        } else {                                         // хвойное: ёлка
+          const w = Math.round(h * 0.52);
+          ctx.fillStyle = cold[0];
+          ctx.beginPath(); ctx.moveTo(x, base); ctx.lineTo(x + w / 2, base - h);
+          ctx.lineTo(x + w, base); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = cold[1];
+          ctx.beginPath(); ctx.moveTo(x + w / 2, base - h);
+          ctx.lineTo(x + w, base); ctx.lineTo(x + w * .70, base); ctx.closePath(); ctx.fill();
+        }
+      }
+    };
+    grove(100, 15, 25, ['#33422f','#42553a'],
+          ['#6a5030','#7a5c32','#5e4630','#70502c'], 7);
+    grove(105, 20, 34, ['#26331f','#33452b'],
+          ['#8a6428','#a07430','#7a5424','#946a2c'], 8);
+
+    // ограда парка: за ней и начинается всё вышеперечисленное
     ctx.fillStyle = '#5f5a52'; ctx.fillRect(0,96,W,10);
     ctx.fillStyle = '#6e6960'; ctx.fillRect(0,96,W,2);
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(0,104,W,3);
     // газон
     ctx.fillStyle = PAL.grassDry; ctx.fillRect(0,104,W,H-104);
     ctx.fillStyle = '#535a33';
@@ -16958,128 +17252,10 @@ balcony: {
     const W = 280, HOR = 124, night = F('thirdHouseOpen') || F('sueDead');
     let seed = 20516;
     const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-    const lit = [];                       // светящиеся окна — для ореолов и мерцания
 
-    /* НЕБО. К горизонту теплее: город подсвечивает его снизу. */
-    const sky = ctx.createLinearGradient(0, 0, 0, HOR);
-    if (night) { sky.addColorStop(0,'#06050e'); sky.addColorStop(.55,'#100c1e'); sky.addColorStop(1,'#2b1a24'); }
-    else       { sky.addColorStop(0,'#131b36'); sky.addColorStop(.55,'#232a4c'); sky.addColorStop(1,'#483b4e'); }
-    ctx.fillStyle = sky; ctx.fillRect(0,0,W,HOR);
-
-    /* Звёзды: у горизонта их съедает засветка. */
-    for (let i=0;i<96;i++) {
-      const x = rnd()*W, y = rnd()*(HOR-14);
-      const k = 1 - y/(HOR-14);
-      const a = (.18 + rnd()*.62) * (0.18 + k*0.82);
-      ctx.fillStyle = `rgba(226,232,255,${a.toFixed(2)})`;
-      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
-    }
-
-    /* Облака — тонкие полосы, подсвеченные городом снизу. */
-    for (let i=0;i<5;i++) {
-      const cy = 14 + i*17 + rnd()*5, cw = 44 + rnd()*74, cx = rnd()*W;
-      ctx.fillStyle = `rgba(96,84,112,${(0.09 + rnd()*0.09).toFixed(2)})`;
-      ctx.beginPath(); ctx.ellipse(cx, cy, cw/2, 2.5 + rnd()*2, 0, 0, Math.PI*2); ctx.fill();
-    }
-
-    /* Луна: ореол, диск, три пятна. */
-    const mx = 232, my = 34;
-    const halo = ctx.createRadialGradient(mx,my,3,mx,my,32);
-    halo.addColorStop(0,'rgba(238,238,216,.20)'); halo.addColorStop(1,'rgba(238,238,216,0)');
-    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx,my,32,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = night ? '#e8e8d0' : '#f2ecc6';
-    ctx.beginPath(); ctx.arc(mx,my,11,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(150,150,130,.30)';
-    ctx.beginPath(); ctx.arc(mx-3.5,my-2,3,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(mx+4,my+3.5,2,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(mx+1,my-5.5,1.4,0,Math.PI*2); ctx.fill();
-
-    /* Зарево над кварталом — поверх неба, под домами. */
-    const glow = ctx.createRadialGradient(146, HOR+6, 0, 146, HOR+6, 152);
-    glow.addColorStop(0, night ? 'rgba(214,122,58,.20)' : 'rgba(232,152,92,.15)');
-    glow.addColorStop(1, 'rgba(232,152,92,0)');
-    ctx.fillStyle = glow; ctx.fillRect(0,0,W,HOR);
-
-    /* ОДИН ПЛАН ГОРОДА.
-       o.win — доля горящих окон, o.detail — крыши с трубами и антеннами. */
-    const skyline = (o) => {
-      let x = -8;
-      while (x < W + 8) {
-        const bw = o.wMin + Math.round(rnd() * (o.wMax - o.wMin));
-        const bh = o.hMin + Math.round(rnd() * (o.hMax - o.hMin));
-        const top = HOR - bh;
-        ctx.fillStyle = o.body; ctx.fillRect(x, top, bw, bh);
-        ctx.fillStyle = o.edge; ctx.fillRect(x, top, 1, bh);          // рёбра дают объём
-        ctx.fillRect(x + bw - 1, top, 1, bh);
-
-        const roof = rnd();
-        if (o.detail && roof < .30) {                                  // скат
-          ctx.fillStyle = o.body;
-          ctx.beginPath(); ctx.moveTo(x-1, top); ctx.lineTo(x + bw/2, top - 7);
-          ctx.lineTo(x + bw + 1, top); ctx.closePath(); ctx.fill();
-        } else if (roof < .62) {                                       // парапет
-          ctx.fillStyle = o.edge; ctx.fillRect(x - 1, top - 2, bw + 2, 2);
-        }
-        if (o.detail) {
-          if (rnd() < .45) { ctx.fillStyle = o.edge;                   // труба
-            const cx = x + 3 + Math.round(rnd()*(bw-7));
-            ctx.fillRect(cx, top - 6, 3, 6); ctx.fillRect(cx-1, top-7, 5, 2); }
-          if (rnd() < .30) { ctx.fillStyle = o.edge;                   // антенна
-            const ax = x + 2 + Math.round(rnd()*(bw-4));
-            ctx.fillRect(ax, top - 9, 1, 9); ctx.fillRect(ax-2, top-7, 5, 1); }
-        }
-
-        /* ОКНА. Ряды и столбцы, часть горит. */
-        const sx = o.step, sy = o.step + 1;
-        for (let wy = top + 4; wy < HOR - 3; wy += sy) {
-          for (let wx = x + 3; wx < x + bw - 3; wx += sx) {
-            const on = rnd() < o.win;
-            if (on) {
-              const warmK = rnd();
-              const col = warmK < .18 ? '#cfe0ff' : warmK < .70 ? '#ffd68a' : '#ffb257';
-              ctx.fillStyle = col;
-              ctx.fillRect(Math.round(wx), Math.round(wy), 2, 2);
-              if (o.halo) lit.push({ x:Math.round(wx)+1, y:Math.round(wy)+1, c:col });
-            } else {
-              ctx.fillStyle = o.dark;
-              ctx.fillRect(Math.round(wx), Math.round(wy), 2, 2);
-            }
-          }
-        }
-        x += bw + 1 + Math.round(rnd()*3);
-      }
-    };
-
-    skyline({ body:'#1b2133', edge:'#232a3e', dark:'#182032', win:.10, step:5, wMin:14, wMax:26, hMin:30, hMax:62 });
-    ctx.fillStyle = night ? 'rgba(20,16,30,.42)' : 'rgba(40,44,70,.36)';   // дымка между планами
-    ctx.fillRect(0, 44, W, HOR-44);
-    skyline({ body:'#141826', edge:'#1c2234', dark:'#111626', win:.26, step:5, wMin:16, wMax:30, hMin:24, hMax:52, halo:true });
-    ctx.fillStyle = night ? 'rgba(14,10,22,.30)' : 'rgba(28,30,52,.24)';
-    ctx.fillRect(0, 64, W, HOR-64);
-    skyline({ body:'#0c0f19', edge:'#151a28', dark:'#0a0d16', win:.34, step:6, wMin:20, wMax:36, hMin:16, hMax:38,
-              halo:true, detail:true });
-
-    /* Фонари вдоль улицы под домами: без них город висит в воздухе. */
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    for (let x = 6; x < W; x += 21 + Math.round(rnd()*9)) {
-      const y = HOR - 3 - Math.round(rnd()*3);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 9);
-      g.addColorStop(0,'rgba(255,196,120,.40)'); g.addColorStop(1,'rgba(255,196,120,0)');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#ffd89a'; ctx.fillRect(x, y, 1, 1);
-    }
-    ctx.restore();
-
-    /* Ореолы вокруг горящих окон — из-за них город и «светится». */
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    for (const L of lit) {
-      const g = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, 4.5);
-      g.addColorStop(0, L.c === '#cfe0ff' ? 'rgba(150,180,255,.30)' : 'rgba(255,190,110,.34)');
-      g.addColorStop(1, 'rgba(255,190,110,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(L.x, L.y, 4.5, 0, Math.PI*2); ctx.fill();
-    }
-    ctx.restore();
+    /* Город рисует общий paintCityView: тот же вид открывается с крыши
+       университета, и собирать его дважды разным кодом незачем. */
+    const lit = paintCityView(ctx, { w:W, hor:HOR, night, seed:20516, moon:{x:232,y:34}, glowX:146 });
     this._lit = lit.filter((_, i) => i % 7 === 0).slice(0, 16);   // кто будет мигать
 
     /* Вывеска на ближнем доме — единственная надпись в кадре. */
@@ -17139,20 +17315,7 @@ balcony: {
   },
   /* Пара окон в городе гаснет и загорается — в остальном кадр статичен,
      и именно это движение делает город живым. */
-  overPaint(ctx, camX, camY) {
-    const lit = this._lit; if (!lit || !FX.on()) return;
-    const t = Date.now() / 1000;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < lit.length; i++) {
-      const L = lit[i];
-      const ph = Math.sin(t * 0.7 + i * 2.3);
-      if (ph < 0.86) continue;                       // мигает редко, а не постоянно
-      const a = (ph - 0.86) / 0.14;
-      ctx.fillStyle = `rgba(255,214,138,${(a*0.55).toFixed(3)})`;
-      ctx.fillRect(L.x - 1 - camX, L.y - 1 - camY, 2, 2);
-    }
-    ctx.restore();
-  },
+  overPaint(ctx, camX, camY) { drawCityTwinkle(ctx, this._lit, camX, camY); },
   ambient() { if (Math.random() < 0.05) FX.spawn(Math.random()*280, 126, 1, {color:'#2a3448', rise:-0.15, life:90}); },
   objects: [
     { t:'chest', x:44, y:196 },
@@ -19047,10 +19210,14 @@ uniTheatre: {
   name:"Университет. Театральный зал", music:'uni', w:340, h:440,
   zone:'indoor', weather:{ indoor:true, rain:0, fog:.10, wind:0 },
   light:{ tint:'#181420', dark:.36 },
+  /* Главный свет зала висит на люстре и считается в extraLights():
+     он качается вместе с ней, едет вниз при срыве и гаснет, когда она
+     разбивается. Здесь остались только прожекторы и лампы зала. */
   lights:[
-    {x:170,y:130,r:86,c:'#ffe6b0',i:.75},{x:66,y:100,r:40,c:'#ffd0a0',i:.4},
+    {x:66,y:100,r:40,c:'#ffd0a0',i:.4},
     {x:274,y:100,r:40,c:'#ffd0a0',i:.4},{x:170,y:360,r:66,c:'#e8c890',i:.20},
   ],
+  extraLights() { return SecretDeathSystem.Chandelier.lights(); },
   bgPaint(ctx) {
     const W = 340, H = 440;
     /* КОЛОСНИКИ и портал сцены: чёрный верх, из которого висит свет */
@@ -20818,15 +20985,17 @@ uniRoof: {
   lights:[{x:76,y:110,r:44,c:'#ffcf7a',i:.36},{x:340,y:110,r:36,c:'#9fb0c8',i:.22}],
   bgPaint(ctx) {
     const W = 420, H = 300;
-    /* небо и город: крыша выше всего вокруг, поэтому горизонт низкий */
-    const sky = ctx.createLinearGradient(0, 0, 0, 78);
-    sky.addColorStop(0, '#1a2030'); sky.addColorStop(1, '#4a3a44');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 78);
-    ctx.fillStyle = '#20202c';
-    for (let x = -8; x < W; x += 24) { const h = 12 + ((x * 7) % 26); ctx.fillRect(x, 78 - h, 20, h);
-      if ((x / 24 | 0) % 3 === 0) ctx.fillRect(x + 6, 78 - h - 6, 4, 6); }
-    ctx.fillStyle = '#e8c880';                                         // огни в окнах города
-    for (let i = 0; i < 52; i++) ctx.fillRect((i * 37) % W, 58 + ((i * 13) % 18), 2, 2);
+    /* ГОРОД С КРЫШИ. Тот же вид, что открывается с балкона Наи, и тем
+       же кодом: три плана домов, горящие окна, ореолы, фонари внизу.
+       Раньше здесь стоял один ряд серых прямоугольников с полусотней
+       жёлтых точек — с самой высокой точки в игре город выглядел
+       беднее, чем из окна квартиры. Крыша выше, поэтому горизонт ниже,
+       а луна с этой стороны здания в другом углу неба. */
+    const lit = paintCityView(ctx, {
+      w:W, hor:78, night: F('sueDead') || C('uniDay') >= 4,
+      seed:70921, moon:{x:64,y:26}, glowX:300,
+    });
+    this._lit = lit.filter((_, i) => i % 6 === 0).slice(0, 18);
     /* парапет по дальнему краю: за ним обрыв */
     ctx.fillStyle = '#4a4650'; ctx.fillRect(0, 72, W, 16);
     ctx.fillStyle = '#5e5a66'; ctx.fillRect(0, 72, W, 3);
@@ -20861,7 +21030,10 @@ uniRoof: {
     ctx.fillStyle = 'rgba(200,184,160,.45)';
     ctx.fillText('ВНУТРЕННИЙ ДВОР ВНИЗУ', 132, H - 20);
   },
-  overPaint(ctx) { SecretDeathSystem.Debug.draw(ctx, 'uniRoof'); },
+  overPaint(ctx, camX, camY) {
+    drawCityTwinkle(ctx, this._lit, camX, camY);
+    SecretDeathSystem.Debug.draw(ctx, 'uniRoof');
+  },
   objects: [
     /* Средний участок парапета выложен криво: шов разошёлся, верхний
        камень съехал. Это видно до того, как его тронешь. */
@@ -21104,12 +21276,38 @@ const Player = {
   /* lift — подъём над полом только для рисунка: тень остаётся на земле и
      сжимается, столкновения не меняются. Нужен качелям и зависанию в прологе. */
   lift:0,
+
+  /* ПОЗА. Только рисунок: смещение, поворот, прозрачность и масштаб
+     поверх обычной отрисовки. Коллизий, координат и логики не касается —
+     нужна роликам, где Наю сбивает машина, роняет люстра или она летит
+     с крыши. pose = null — обычная отрисовка, как была.               */
+  pose:null,
+  setPose(p) { this.pose = p ? Object.assign({ dx:0, dy:0, rot:0, a:1, s:1, shadow:true }, p) : null; },
+
   draw(ctx, camX, camY) {
     const img = Assets.images[this.currentSprite()];
     if (!img) return;
     const lift = this.lift || 0;
     const px = Math.round(this.x - 8 - camX);
     const py = Math.round(this.y - 20 - camY);
+    const p = this.pose;
+    if (p) {
+      const k = Math.max(.15, (1 - lift / 46) * (1 - Math.min(1, Math.abs(p.dy) / 70)));
+      if (p.shadow) {
+        ctx.fillStyle = `rgba(0,0,0,${(.3 * k * p.a).toFixed(2)})`;
+        ctx.beginPath(); ctx.ellipse(px + 8, py + 20, 6 * k, 2 * k, 0, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.a));
+      /* Крутим вокруг середины фигуры, а не вокруг угла картинки —
+         иначе кувырок превращается в оборот вокруг чужой точки. */
+      ctx.translate(px + 8 + p.dx, py + 12 + p.dy - lift);
+      if (p.rot) ctx.rotate(p.rot);
+      if (p.s !== 1) ctx.scale(p.s, p.s);
+      ctx.drawImage(img, -8, -12);
+      ctx.restore();
+      return;
+    }
     const k = Math.max(.35, 1 - lift / 46);
     ctx.fillStyle = `rgba(0,0,0,${(.3 * k).toFixed(2)})`;
     ctx.beginPath(); ctx.ellipse(px+8, py+20, 6 * k, 2 * k, 0, 0, Math.PI*2); ctx.fill();
@@ -21842,6 +22040,7 @@ const Scene = {
     'librarianTalk','archiveFolder15','archiveFolder5','chrisShiftDay','dailyCafeShift',
     'persuadeSue','persuadeResolve','sueHint','distractWitch2','dorothy',
     'dorothyHall','postRevival','lonerDoor','lonerCaughtScene',
+    'frankCall','frankCafeVisit',
     /* Кражу можно переигрывать: пересказ вместо сцены посреди миссии
        оставил бы игрока без объяснения, что вообще произошло. */
     'madTakeScene','madLeaveScene','rosaBreakIn','rosaBreakInAgain','rosaNight',
@@ -24490,7 +24689,10 @@ const SecretDeathSystem = {
 
   /* Люстра — предмет со своим состоянием, а не флаг в общей куче.
      HANGING · SHAKING · WARNING · FALLING · FALLEN */
-  chandelier: { state:'HANGING', x:170, y:104, hang:104, rotation:0, fallProgress:0, warningLevel:0, shake:0 },
+  /* Висит под самыми колосниками, сразу под штанкетом, а не в метре над
+     досками: оттуда и падать есть куда. hang — точка покоя, fallTo —
+     куда she едет при срыве. */
+  chandelier: { state:'HANGING', x:170, y:54, hang:54, rotation:0, fallProgress:0, warningLevel:0, shake:0 },
 
   TYPES: ['CAR_ACCIDENT', 'CHANDELIER', 'BALCONY_FALL', 'STAIR_FALL'],
 
@@ -24533,12 +24735,13 @@ const SecretDeathSystem = {
     s.chandelierTimer = 0; s.chandelierWarningLevel = 0;
     s.balconyState = 'SAFE'; s.balconyLooks = 0;
     s.studentAnnoyance = 0;
+    this.Anim.clear();
     const c = this.chandelier;
     c.state = 'HANGING'; c.rotation = 0; c.fallProgress = 0; c.shake = 0; c.warningLevel = 0;
     /* Падая, люстра съезжает к точке, где стояла Ная. Без возврата x и
        fallTo она после продолжения игры висела бы не над серединой
        сцены, а там, где её застал прошлый заход. */
-    c.x = 170; c.fallTo = undefined;
+    c.x = 170; c.y = c.hang; c.fallTo = undefined;
     this.Road.cars.length = 0; this.Road.spawnIn = 0;
   },
 
@@ -24549,6 +24752,7 @@ const SecretDeathSystem = {
     const s = this.state;
     if (!s.activeEvent && !s.triggered) return;
     s.activeEvent = null; s.triggered = false; s.currentType = null;
+    this.Anim.clear();                 // и поза, если ролик оборвали на середине
     /* Счётчики тоже на ноль: иначе оборванное событие начнётся заново на
        следующем же кадре, потому что порог всё ещё пройден. */
     s.roadTimer = 0; s.roadWarned = 0;
@@ -24696,6 +24900,7 @@ const SecretDeathSystem = {
 
   async finish(type) {
     const s = this.state;
+    this.Anim.clear();                 // ролик кончился — Ная снова рисуется обычно
     s.deathsSeen[this.KEY[type]] = true;
     s.endingUnlocked = true;
     this.save();
@@ -24744,6 +24949,37 @@ const SecretDeathSystem = {
 
 /* Короткое имя из задания: «можно ли сейчас несчастному случаю». */
 function isSecretDeathAllowed() { return SecretDeathSystem.allowed(); }
+
+/* ---------------------------------------------------------------------
+   АНИМАЦИЯ СМЕРТИ
+
+   Мигнувший экран и сразу карточка — это не смерть, а сообщение о ней.
+   Ная должна физически отлететь от машины, сложиться под люстрой,
+   перевалиться через парапет и скатиться по ступеням, и всё это игрок
+   обязан увидеть.
+
+   Anim.play(ms, fn) ведёт один проход по времени: fn(t) получает долю
+   от нуля до единицы и ставит позу. Больше ничего в игре ему не нужно —
+   рисует по-прежнему Player.draw, просто по заданной позе.           */
+SecretDeathSystem.Anim = {
+  /* Плавные кривые, чтобы движение не было линейным и мёртвым. */
+  easeOut(t) { return 1 - (1 - t) * (1 - t); },
+  easeIn(t)  { return t * t; },
+  /* Подброс: вверх и обратно вниз за один проход. */
+  arc(t) { return Math.sin(Math.PI * t); },
+
+  async play(ms, fn) {
+    const t0 = Date.now();
+    for (;;) {
+      const t = Math.min(1, (Date.now() - t0) / ms);
+      try { fn(t); } catch (e) { console.error('death anim', e); break; }
+      if (t >= 1) break;
+      await wait(16);
+    }
+  },
+  /* Кончить ролик: поза снимается, чтобы Ная снова рисовалась обычно. */
+  clear() { Player.setPose(null); },
+};
 
 /* ---------------------------------------------------------------------
    СЛУЧАЙ 1 — МАШИНА
@@ -24840,12 +25076,33 @@ SecretDeathSystem.Road = {
     const t0 = Date.now();
     while (Math.abs(car.x - Player.x) > 26 && Date.now() - t0 < 2600) await wait(30);
     car.x = Player.x;
+
+    /* УДАР. Наю подбрасывает и уносит по ходу машины, она переворачивается
+       в воздухе и падает на асфальт. Машина при этом не останавливается
+       мгновенно — она проезжает дальше и тормозит. */
+    const dir = car.direction;
     FX.addShake(8);
     Audio.thud(70, .30); Audio.noise(.35, .18, 700);
-    FX.spawn(Player.x, Player.y - 6, 14, { color:'#8a8a94', rise:.02, life:420, spread:26 });
-    await wait(260);
+    FX.spawn(Player.x, Player.y - 6, 16, { color:'#8a8a94', rise:.02, life:420, spread:26 });
+    car.speed = 0.10;
+    await S.Anim.play(620, t => {
+      const e = S.Anim.easeOut(t);
+      Player.setPose({
+        dx: dir * 44 * e,
+        dy: -34 * S.Anim.arc(t) + 6 * e,
+        rot: dir * 2.4 * e,
+        shadow: t > .8,
+      });
+    });
+    /* Приземление: ещё один удар, пыль из-под неё и короткий отскок. */
+    Audio.thud(54, .22); FX.addShake(4);
+    FX.spawn(Player.x + dir * 44, Player.y + 4, 10, { color:'#6a6a74', rise:-.02, life:500, spread:22 });
+    await S.Anim.play(240, t => {
+      Player.setPose({ dx: dir * (44 + 6 * t), dy: 6 - 5 * S.Anim.arc(t),
+                       rot: dir * (2.4 + .3 * t), shadow:true });
+    });
     car.speed = 0.02;
-    await wait(420);
+    await wait(900);
     await S.finish('CAR_ACCIDENT');
   },
 };
@@ -24900,6 +25157,29 @@ SecretDeathSystem.Chandelier = {
     }
   },
 
+  /* Свет в зале идёт отсюда. Пока люстра висит — ровный тёплый круг под
+     ней; когда качается — качается вместе с ней; падая — едет вниз и
+     разгорается; разбившись — гаснет, и зал остаётся на прожекторах. */
+  lights() {
+    const S = SecretDeathSystem, c = S.chandelier;
+    if (!S.state.enabled) return [{ x:170, y:130, r:86, c:'#ffe6b0', i:.75 }];
+    if (c.state === 'FALLEN') return [{ x:c.x, y:c.y + 8, r:34, c:'#ffb070', i:.22, flicker:true }];
+    const to = (c.fallTo === undefined) ? c.hang : c.fallTo;
+    const p = c.state === 'FALLING' ? c.fallProgress : 0;
+    const y = c.hang + (to - c.hang) * p;
+    /* Свет падает на доски ПОД люстрой, а не в её собственную точку:
+       иначе светится потолок, а сцена остаётся тёмной. Чем выше люстра,
+       тем шире и мягче пятно; опускаясь, свет собирается в узкий круг. */
+    return [{
+      x: c.x + c.rotation * 30,
+      y: y + 78 * (1 - p) + 8 * p,
+      r: 96 - 54 * p,
+      c: '#ffe6b0',
+      i: (c.state === 'HANGING' ? .62 : .66) + .30 * p,
+      flicker: c.state === 'WARNING' || c.state === 'FALLING',
+    }];
+  },
+
   /* Качание и падение: люстра не телепортируется вниз, она срывается. */
   animate(dt) {
     const c = SecretDeathSystem.chandelier, k = dt / 1000;
@@ -24928,13 +25208,28 @@ SecretDeathSystem.Chandelier = {
     c.x = Player.x;                                          // срывается ровно над ней
     c.state = 'FALLING'; c.fallProgress = 0;
     Audio.beep(90, .8, 'sawtooth', .18);
+
+    /* Ная видит её над собой и успевает поднять руки — но не успевает
+       отойти. Пока люстра летит, Ная вжимается в доски. */
     const t0 = Date.now();
-    while (c.fallProgress < 1 && Date.now() - t0 < 3000) await wait(30);
+    await S.Anim.play(560, t => {
+      Player.setPose({ dy: 2 * t, s: 1 - .06 * t, rot: .06 * Math.sin(t * 22) });
+    });
+    while (c.fallProgress < 1 && Date.now() - t0 < 3000) await wait(16);
+
+    /* УДАР. Люстра накрывает её: Ная складывается под ней и остаётся
+       лежать, а вокруг летят латунь и свечи. */
     c.state = 'FALLEN';
+    c.y = Player.y - 8;
     FX.addShake(9);
     Audio.thud(60, .34); Audio.glass();
-    FX.spawn(c.x, Player.y - 4, 18, { color:'#d8c890', rise:.02, life:600, spread:34 });
-    await wait(800);
+    FX.spawn(c.x, Player.y - 4, 22, { color:'#d8c890', rise:.02, life:600, spread:34 });
+    FX.spawn(c.x, Player.y - 2, 10, { color:'#8a7340', rise:-.02, life:800, spread:44 });
+    await S.Anim.play(260, t => {
+      const e = S.Anim.easeOut(t);
+      Player.setPose({ dy: 6 * e, s: 1 - .22 * e, rot: .9 * e, shadow:true });
+    });
+    await wait(1100);
     await S.finish('CHANDELIER');
   },
 
@@ -24948,13 +25243,22 @@ SecretDeathSystem.Chandelier = {
     const to = (c.fallTo === undefined) ? c.hang : c.fallTo;
     const p = c.state === 'FALLEN' ? 1 : (c.state === 'FALLING' ? c.fallProgress : 0);
     const y = c.hang + (to - c.hang) * p;
+    /* ВЫСОТА. Сверху вниз комната рисуется почти планом, и «высоко под
+       потолком» здесь передаётся не координатой, а размером: висящая
+       люстра мелкая и далёкая, сорвавшаяся растёт на зрителя и в момент
+       удара крупнее человека. Без этого она выглядела подвешенной в метре
+       над досками. */
+    const sc = 0.60 + 0.68 * p;
     ctx.save();
-    /* Цепь от штанкета до самой люстры: по ней и видно, что она висит. */
-    ctx.strokeStyle = 'rgba(70,62,54,.9)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(c.x - c.rotation * 10, 49);
-    ctx.lineTo(c.x, y - d.ay + 4); ctx.stroke();
+    /* Цепь от штанкета до самой люстры: по ней и видно, что она висит.
+       При срыве цепь не рвётся мгновенно — она вытягивается следом. */
+    ctx.strokeStyle = 'rgba(70,62,54,.9)';
+    ctx.lineWidth = 2 - p;
+    ctx.beginPath(); ctx.moveTo(c.x - c.rotation * 8, 44);
+    ctx.lineTo(c.x, y - d.ay * sc + 4); ctx.stroke();
     ctx.translate(c.x, y);
     ctx.rotate(c.rotation);
+    ctx.scale(sc, sc);
     ctx.drawImage(img, -d.ax, -d.ay);
     ctx.restore();
   },
@@ -25023,10 +25327,33 @@ SecretDeathSystem.Balcony = {
     Audio.thud(90, .26); Audio.noise(.5, .18, 1200);
     FX.spawn(Player.x, Player.y - 12, 16, { color:'#6a6470', rise:-.02, life:800, spread:30 });
     FX.addShake(6);
-    await wait(500);
-    /* Само падение — за кадром. */
-    Audio.thud(54, .30);
-    await wait(500);
+
+    /* Камень уходит из-под руки, Ная теряет равновесие вперёд, к краю. */
+    await S.Anim.play(380, t => {
+      const e = S.Anim.easeIn(t);
+      Player.setPose({ dy: -10 * e, rot: -.38 * e, shadow:true });
+    });
+    /* ПЕРЕВАЛИВАЕТСЯ. На крыше «вниз» — это за парапет, то есть вверх по
+       кадру: она уходит за кладку, переворачиваясь, и пропадает из виду.
+       Падение как таковое остаётся за кадром — видно то, что видно с
+       крыши. */
+    Audio.noise(.5, .12, 900);
+    await S.Anim.play(760, t => {
+      const e = S.Anim.easeIn(t);
+      Player.setPose({
+        dy: -10 - 46 * e,
+        rot: -.38 - 2.6 * e,
+        s: 1 - .34 * e,
+        a: t < .55 ? 1 : 1 - (t - .55) / .45,
+        shadow: false,
+      });
+    });
+    Player.setPose({ a:0, shadow:false });
+    await wait(420);
+    /* Удар о двор слышно, а не видно: он далеко внизу. */
+    Audio.thud(46, .30); Audio.noise(.4, .10, 500);
+    FX.addShake(3);
+    await wait(900);
     await S.finish('BALCONY_FALL');
   },
 };
@@ -25071,13 +25398,47 @@ SecretDeathSystem.Stair = {
     await new Promise(res => Dialogue.start([
       {who:'studentD',expr:'angry',name:'Студент',text:'Да отойди ты уже!'},
     ], res));
+    /* ТОЛЧОК. Не удар — отмашка: он разворачивается и задевает её плечом,
+       Ная отшатывается назад, к самому краю площадки. */
     Audio.thud(120, .18);
     FX.addShake(4);
     FX.spawn(Player.x, Player.y - 14, 8, { color:'#c8b8a0', rise:-.04, life:500, spread:18 });
-    await wait(260);
-    Audio.noise(.6, .16, 700);                              // кувырком по ступеням
-    for (let k = 0; k < 4; k++) { Audio.thud(90 - k * 8, .14); await wait(150); }
-    await wait(300);
+    const x0 = Player.x, y0 = Player.y;
+    /* Марш уходит к зрителю: «вниз по лестнице» здесь — вниз по кадру и
+       к середине пролёта. */
+    const toX = 376 - x0;
+    await S.Anim.play(300, t => {
+      const e = S.Anim.easeOut(t);
+      Player.setPose({ dx: toX * .35 * e, dy: 10 * e, rot: .5 * e, shadow:true });
+    });
+
+    /* КУВЫРКОМ. Четыре ступени, на каждой — удар, поворот на пол-оборота
+       и рывок вниз. Между ступенями она коротко подлетает, иначе это не
+       падение, а съезжание. */
+    Audio.noise(.6, .16, 700);
+    const STEPS = 5;
+    for (let k = 0; k < STEPS; k++) {
+      const from = { dx: toX * (.35 + .13 * k), dy: 10 + 13 * k, rot: .5 + Math.PI * k };
+      const to   = { dx: toX * (.35 + .13 * (k + 1)), dy: 10 + 13 * (k + 1), rot: .5 + Math.PI * (k + 1) };
+      Audio.thud(96 - k * 9, .16);
+      FX.addShake(3 - k * .4);
+      FX.spawn(x0 + from.dx, y0 + from.dy, 5,
+               { color:'#8a7458', rise:-.03, life:380, spread:14 });
+      await S.Anim.play(170, t => {
+        Player.setPose({
+          dx: from.dx + (to.dx - from.dx) * t,
+          dy: from.dy + (to.dy - from.dy) * t - 7 * S.Anim.arc(t),
+          rot: from.rot + (to.rot - from.rot) * t,
+          s: 1 - .04 * k,
+          a: k >= STEPS - 2 ? 1 - (k - (STEPS - 2)) * .35 - t * .35 : 1,
+          shadow: false,
+        });
+      });
+    }
+    /* Внизу марш уходит в тень — туда она и укатывается. */
+    Player.setPose({ a:0, shadow:false });
+    Audio.thud(58, .22);
+    await wait(1000);
     await S.finish('STAIR_FALL');
   },
 };
@@ -25251,6 +25612,124 @@ SecretDeathSystem.Debug = {
   });
 })();
 
+
+/* =====================================================================
+   ЛИНИЯ ФРЕНКА — «ТО, ЧЕГО ОН НЕ СКАЗАЛ»
+
+   Не глава и не концовка. Скрытая дуга между сменами Наи в кафе,
+   которая существует только если в первой главе Ная сказала отцу, что
+   он ни разу за неё не заступился. Эти слова он три года носил с собой
+   — и наконец позвонил.
+
+   Главный вопрос: можно ли простить человека, который слишком долго
+   ничего не делал. Ответа у линии нет. Оба варианта полноценны, и ни
+   один из них не «правильный»: простить — не значит быть хорошим,
+   не простить — не значит быть злой.
+
+   Цепочка: первая глава → слова Наи → три года → звонок после второй
+   смены → встреча после третьей → решение Наи.
+
+   Состояние живёт в обычных флагах игры, отдельной системы у линии нет.
+   Старые сохранения этих флагов не знают — тогда линия просто закрыта.
+===================================================================== */
+const FrankArc = {
+  /* Все флаги линии в одном месте: по этому списку её и сбрасывают. */
+  FLAGS: ['frankArcUnlocked','frankCalled','frankVisitAccepted','frankVisitRejected',
+          'frankOfferedHelp','nayaForgaveFrank','nayaRejectedFrank',
+          'frankHelpAccepted','frankHelpRejected','frankMetDone'],
+
+  /* Через сколько после смены звонит телефон. Не сразу: сперва надо
+     домыть кофемашину и выключить свет — иначе это не звонок в конце
+     дня, а титр «звонок в конце дня». */
+  CALL_DELAY: 4200,
+  VISIT_DELAY: 3600,
+
+  unlocked() { return F('frankArcUnlocked'); },
+
+  /* Решение Наи одной строкой — им пользуется финальный монолог. */
+  resolution() {
+    if (F('nayaForgaveFrank')) return 'FORGIVEN';
+    if (F('nayaRejectedFrank')) return 'REJECTED';
+    return 'NONE';
+  },
+
+  /* Можно ли сейчас вообще что-то показывать. Линия не лезет в чужие
+     сцены, в кражу, в погоню и в финалы. */
+  quiet() {
+    if (typeof gameState === 'undefined' || !gameState) return false;
+    if (Game.paused || Game.montage || Game.endingShown) return false;
+    if (Scene.active || Dialogue.active) return false;
+    if (Stealth.on) return false;
+    if (Game.chase && Game.chase.active) return false;
+    if (F('ending')) return false;
+    if (gameState.currentRoom !== 'cafe') return false;
+    return Game.mode === 'explore';
+  },
+
+  /* Ждать тишины, а не гадать. Если игрок в этот момент с кем-то
+     разговаривает, сцена подождёт, а не начнётся поверх. */
+  when(fn, tries) {
+    const n = (tries === undefined) ? 60 : tries;
+    if (this.quiet()) { fn(); return true; }
+    if (n <= 0) return false;
+    setTimeout(() => this.when(fn, n - 1), 500);
+    return true;
+  },
+
+  /* ---------- крючки в существующие смены ---------- */
+
+  /* Вызывается в конце ежедневной смены. День второй — звонок, день
+     третий — встреча. Больше линия ни во что не вмешивается. */
+  afterShift() {
+    if (!this.unlocked()) return;
+    const d = C('uniDay');
+    if (d === 2 && !F('frankCalled') && !F('frankVisitRejected')) {
+      setTimeout(() => this.when(() => Scene.play('frankCall')), this.CALL_DELAY);
+      return;
+    }
+    if (d === 3 && F('frankCalled') && F('frankVisitAccepted') && !F('frankMetDone')) {
+      setTimeout(() => this.when(() => Scene.play('frankCafeVisit')), this.VISIT_DELAY);
+    }
+  },
+
+  /* ---------- DEV: те же функции, что и в игре ---------- */
+  devUnlock() { setFlag('frankArcUnlocked'); return true; },
+  devCall()   { setFlag('frankArcUnlocked'); Scene.abort(); Scene.play('frankCall'); },
+  devVisit()  {
+    setFlag('frankArcUnlocked'); setFlag('frankCalled'); setFlag('frankVisitAccepted');
+    Scene.abort(); Scene.play('frankCafeVisit');
+  },
+  devForgive() {
+    setFlag('frankArcUnlocked'); setFlag('frankCalled'); setFlag('frankVisitAccepted');
+    setFlag('nayaForgaveFrank'); setFlag('nayaRejectedFrank', false); setFlag('frankMetDone');
+  },
+  devReject() {
+    setFlag('frankArcUnlocked'); setFlag('frankCalled'); setFlag('frankVisitAccepted');
+    setFlag('nayaRejectedFrank'); setFlag('nayaForgaveFrank', false); setFlag('frankMetDone');
+  },
+  devHelpYes() { setFlag('frankOfferedHelp'); setFlag('frankHelpAccepted'); setFlag('frankHelpRejected', false); },
+  devHelpNo()  { setFlag('frankOfferedHelp'); setFlag('frankHelpRejected'); setFlag('frankHelpAccepted', false); },
+  devReset()   { this.FLAGS.forEach(k => setFlag(k, false)); },
+
+  /* ---------- отладка ---------- */
+  getDebugState() {
+    return {
+      unlocked: F('frankArcUnlocked'),
+      called: F('frankCalled'),
+      visitAccepted: F('frankVisitAccepted'),
+      visitRejected: F('frankVisitRejected'),
+      offeredHelp: F('frankOfferedHelp'),
+      helpAccepted: F('frankHelpAccepted'),
+      helpRejected: F('frankHelpRejected'),
+      forgiven: F('nayaForgaveFrank'),
+      rejected: F('nayaRejectedFrank'),
+      met: F('frankMetDone'),
+      resolution: this.resolution(),
+      humanity: Math.round(S('humanity')),
+    };
+  },
+};
+
 const Endings = {
   DEFS: {
     I:   { roman:'КОНЦОВКА I',   name:'ОДИНОЧКА',
@@ -25281,7 +25760,7 @@ const Endings = {
       ? 'Она стала ровно тем, кем хотела стать.\nЭто оказалось самым точным наказанием из возможных.'
       : 'Она не хотела этого. Это ничего не меняет.\nХотеть и сделать — разные вещи только до того, как сделаешь.';
     if (id === 'IV') return t >= 60
-      ? 'Магии больше нет. Есть две девушки, которым надо о многом поговорить.\nОни начнут завтра. И послезавтра. И ещё долго.'
+      ? 'Магии больше нет. Есть две девушки, которые идут домой за руку.\nСлова у этого пока нет. Оно им пока и не нужно.'
       : 'Сью осталась. Не простила — осталась.\nНая учится понимать, что это не одно и то же.';
     if (id === 'V') return (this.secretReason || 'Ная не дошла до своей концовки.') +
       '\nНи ведьмы, ни мести, ни прощения. Просто очень глупый день.' +
@@ -25811,14 +26290,19 @@ pastFrank: [
           {who:'frank',expr:'sad',text:'...было. Было несправедливо. Доволен?'},
           {who:'nayaTeen',expr:'empty',name:'Ная',text:'(Двенадцать лет ради одного слова, сказанного с раздражением.)'},
         ]},
+      /* Эти слова и открывают линию Френка. Три года он будет их
+         помнить, и однажды позвонит. Игроку об этом нигде не сообщают:
+         он просто сказал отцу правду. */
       { text:'«Почему ты ни разу не вмешался?»',
         stats:{witchAmbition:+5, humanity:+2},
+        set:{frankArcUnlocked:true},
         then:[
           {who:'nayaTeen',expr:'normal',name:'Ная',text:'Почему ты ни разу не вмешался?'},
           {who:'frank',expr:'worried',text:'Я не хотел, чтобы всё стало ещё хуже.'},
           {who:'nayaTeen',expr:'angry',name:'Ная',text:'Хуже?'},
           {who:'frank',expr:'sad',text:'Ная...'},
-          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Ты решил, что молчать — дешевле. И оказался прав. Для себя.'},
+          {who:'nayaTeen',expr:'talk',name:'Ная',text:'Ты ни разу за меня не заступился. Ты решил, что молчать — дешевле. И оказался прав. Для себя.'},
+          {who:'frank',expr:'shocked',text:'...'},
         ]},
     ]}},
   ]},
@@ -26980,6 +27464,323 @@ roofTruth: [
   { goto:'genevieveReveal' },
 ],
 
+/* ---------------------------------------------------------------------
+   ЛИНИЯ ФРЕНКА, ЭТАП 1 — ЗВОНОК
+
+   После второй смены. Кафе закрывается, Ная домывает кофемашину — и
+   телефон звонит. На экране одно слово: «Фрэнк». Ответить или сбросить
+   — это не выбор между хорошим и плохим, и игра нигде так его не
+   называет.                                                          */
+frankCall: [
+  { music:'sad' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Смена закончена. Кофемашина домыта, стулья на столах.)'},
+  ]},
+  { sfx:'chime' },
+  { wait:500 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Телефон. На экране одно слово.)'},
+    {who:'naya',expr:'shocked',text:'(«Фрэнк».)'},
+    {who:'naya',expr:'sad',text:'(Три года. Он ни разу не звонил.)'},
+    {who:'naya',expr:'normal',text:'(Он всё ещё звонит.)'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Телефон звонит.', options:[
+      { text:'Ответить.', do(){ Scene.play('frankCallAnswer'); } },
+      { text:'Сбросить.',  do(){ Scene.play('frankCallDecline'); } },
+    ]}},
+  ]},
+],
+
+frankCallAnswer: [
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Привет, Ная.'},
+    {who:'naya',expr:'normal',text:'Привет.'},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Как ты?'},
+    {who:'naya',expr:'normal',text:'Нормально.'},
+  ]},
+  { wait:700 },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Я... давно хотел тебе позвонить.'},
+    {who:'naya',expr:'normal',text:'Почему сейчас?'},
+    {who:'frank',expr:'sad',text:'Не знаю. Наверное, потому что слишком долго откладывал.'},
+    {who:'naya',expr:'sad',text:'(Он говорит медленнее, чем я помню. Или это я стала быстрее.)'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Я хотел бы увидеться.'},
+    {who:'naya',expr:'normal',text:'Зачем?'},
+    {who:'frank',expr:'sad',text:'Поговорить.'},
+    {who:'naya',expr:'normal',text:'Мы уже разговаривали.'},
+    {who:'frank',expr:'sad',text:'Да. Но тогда я не сказал того, что должен был.'},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Я могу прийти к тебе завтра?'},
+    {choice:{ prompt:'', options:[
+      { text:'«Приходи.»',
+        set:{frankCalled:true, frankVisitAccepted:true},
+        then:[
+          {who:'naya',expr:'normal',text:'Приходи. Я работаю до шести.'},
+          {who:'frank',expr:'sad',text:'Хорошо. Спасибо.'},
+          {who:'naya',expr:'normal',text:'Не за что. Пока.'},
+          {who:'naya',expr:'sad',text:'(Я кладу трубку и минуту стою с ней в руке.)'},
+        ]},
+      { text:'«Я подумаю.»',
+        set:{frankCalled:true, frankVisitAccepted:true},
+        then:[
+          {who:'naya',expr:'normal',text:'Я подумаю.'},
+          {who:'frank',expr:'sad',text:'Конечно. Я не тороплю.'},
+          {who:'naya',expr:'sad',text:'(Я уже знаю, что скажу «приходи». Просто не хочу говорить это сразу.)'},
+          {who:'naya',expr:'normal',text:'...приходи. Завтра.'},
+          {who:'frank',expr:'sad',text:'Хорошо.'},
+        ]},
+      { text:'«Нет.»',
+        set:{frankCalled:true, frankVisitRejected:true},
+        then:[
+          {who:'naya',expr:'normal',text:'Нет.'},
+          {who:'frank',expr:'sad',text:'...понимаю.'},
+          {who:'naya',expr:'sad',text:'Не уверена, что понимаешь. Но это и не обязательно.'},
+          {who:'frank',expr:'sad',text:'Хорошо. Извини, что побеспокоил.'},
+          {who:'naya',expr:'empty',text:'(Гудки. Я кладу телефон экраном вниз.)'},
+        ]},
+    ]}},
+  ]},
+  { jump:()=> F('frankVisitRejected') ? 'frankCallDeclineTail' : null },
+  { music:'home' },
+],
+
+/* Сброшенный звонок — не окончательный отказ. Френк пишет одно
+   сообщение и больше не появляется сам: преследовать Наю он не будет. */
+frankCallDecline: [
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Я нажимаю «отклонить». Телефон затихает.)'},
+    {who:'naya',expr:'sad',text:'(Три года он не звонил. Один вечер подождёт.)'},
+  ]},
+  { wait:900 },
+  { sfx:'click' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Сообщение.)'},
+    {who:'frank',expr:'sad',text:'«Если когда-нибудь захочешь поговорить — я буду готов.»'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'', options:[
+      { text:'Перезвонить.',
+        set:{frankCalled:true, frankVisitAccepted:true},
+        then:[
+          {who:'naya',expr:'sad',text:'(Я смотрю на это сообщение дольше, чем собиралась.)'},
+          {who:'naya',expr:'normal',text:'(...ладно.)'},
+          {who:'frank',expr:'shocked',text:'Ная?'},
+          {who:'naya',expr:'normal',text:'Приходи завтра. Я работаю в кафе на Мейпл-стрит до шести.'},
+          {who:'frank',expr:'sad',text:'Буду. Спасибо.'},
+        ]},
+      { text:'Не отвечать.',
+        set:{frankCalled:true, frankVisitRejected:true},
+        then:[
+          {who:'naya',expr:'normal',text:'(Я не отвечаю.)'},
+          {who:'naya',expr:'sad',text:'(Не потому, что мне нечего сказать. Потому что мне некогда это разбирать.)'},
+        ]},
+    ]}},
+  ]},
+  { jump:()=> F('frankVisitRejected') ? 'frankCallDeclineTail' : null },
+  { music:'home' },
+],
+
+frankCallDeclineTail: [
+  { dlg:[
+    {who:'naya',expr:'sad',text:'(Сообщение остаётся в телефоне. Я его не удаляю.)'},
+  ]},
+  { music:'home' },
+],
+
+/* ---------------------------------------------------------------------
+   ЛИНИЯ ФРЕНКА, ЭТАП 2 — ВСТРЕЧА В КАФЕ
+
+   После третьей смены. Ная собирается уходить, звенит колокольчик над
+   дверью, и Френк входит — ногами, через дверь, как все остальные.  */
+frankCafeVisit: [
+  { music:'sad' },
+  { dlg:[
+    {who:'naya',expr:'normal',text:'(Смена закончена. Я развязываю фартук.)'},
+  ]},
+  { sfx:'door' },
+  { wait:400 },
+  { cast:[{ x:150, y:292, sprite:'frank', name:'Фрэнк' }] },
+  { castWalk:{ name:'Фрэнк', to:[186, 214], ms:1500 } },
+  { wait:300 },
+  { dlg:[
+    {who:'naya',expr:'shocked',text:'(Колокольчик над дверью. Я не оборачиваюсь сразу.)'},
+    {who:'frank',expr:'sad',text:'Привет.'},
+    {who:'naya',expr:'normal',text:'Привет.'},
+  ]},
+  { wait:700 },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Я... не слишком поздно?'},
+    {who:'naya',expr:'normal',text:'Нет.'},
+    {who:'naya',expr:'sad',text:'(Он не знает, куда деть руки. Сначала в карманы, потом обратно.)'},
+  ]},
+  { castWalk:{ name:'Фрэнк', to:[196, 200], ms:700 } },
+  { dlg:[
+    {who:'frank',expr:'normal',text:'Ты здесь работаешь?'},
+    {who:'naya',expr:'normal',text:'Да.'},
+    {who:'naya',expr:'talk',text:'(Он смотрит на меню на стене. Читает его целиком, хотя ничего не собирается заказывать.)'},
+    {who:'frank',expr:'sad',text:'Тебе идёт.'},
+    {who:'naya',expr:'normal',text:'Что именно?'},
+    {who:'frank',expr:'sad',text:'Не знаю. То, что ты сама себе жизнь устроила.'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'naya',expr:'talk',text:'(Я продолжаю вытирать чашку. Так проще, чем стоять просто так.)'},
+    {who:'frank',expr:'worried',text:'Давно ты тут?'},
+    {who:'naya',expr:'normal',text:'Два года.'},
+    {who:'frank',expr:'sad',text:'...два года.'},
+    {who:'frank',expr:'sad',text:'Я всё время представлял тебя маленькой.'},
+    {who:'naya',expr:'normal',text:'А я давно уже не маленькая.'},
+    {who:'frank',expr:'sad',text:'Да. Я вижу.'},
+  ]},
+  { wait:700 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Я много раз вспоминал, что ты сказала тогда.'},
+    {who:'naya',expr:'normal',text:'Что именно?'},
+    {who:'frank',expr:'sad',text:'Что я ни разу за тебя не заступился.'},
+  ]},
+  { wait:800 },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Сначала я хотел доказать себе, что это неправда.'},
+  ]},
+  { wait:700 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Потом понял, что это правда.'},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Я боялся скандалов. С Дризеллой проще было согласиться, чем спорить.'},
+    {who:'frank',expr:'sad',text:'Я всё время говорил себе, что если промолчу — станет тише.'},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'А потом понял, что тише становилось только мне.'},
+  ]},
+  { wait:500 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'А тебе от этого было не тише.'},
+    {who:'naya',expr:'shocked',text:'(Он говорит это ровно. Без слёз, без надрыва. Просто говорит.)'},
+    {who:'frank',expr:'worried',text:'Я не знаю, имею ли я право просить тебя меня простить.'},
+    {who:'naya',expr:'sad',text:'(Он несколько раз открывает рот и закрывает.)'},
+  ]},
+  { jump:()=> 'frankHelpOffer' },
+],
+
+/* Предложение помощи. Помощь не покупает прощение, и игра это прямо
+   говорит: оба ответа ни на что дальше не влияют, кроме одной строчки
+   в финале. */
+frankHelpOffer: [
+  { flag:'frankOfferedHelp' },
+  { dlg:[
+    {who:'frank',expr:'worried',text:'Если тебе что-нибудь понадобится...'},
+    {who:'naya',expr:'normal',text:'Что именно?'},
+    {who:'frank',expr:'sad',text:'Деньги. Помощь с жильём. С работой. Чем угодно.'},
+    {who:'naya',expr:'talk',text:'Ты думаешь, мне нужны твои деньги?'},
+    {who:'frank',expr:'sad',text:'Нет.'},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Я думаю, что тебе, возможно, нужна помощь.'},
+    {who:'frank',expr:'sad',text:'А я слишком долго делал вид, что тебе никто не нужен.'},
+    {who:'naya',expr:'sad',text:'(Он кладёт на стол конверт. Не пододвигает — просто кладёт.)'},
+  ]},
+  { dlg:[
+    {choice:{ prompt:'Конверт лежит на столе.', options:[
+      { text:'Взять.',
+        set:{frankHelpAccepted:true},
+        then:[
+          {who:'naya',expr:'normal',text:'Хорошо. Возьму.'},
+          {who:'frank',expr:'shocked',text:'...правда?'},
+          {who:'naya',expr:'normal',text:'Правда. Мне нужны зимние ботинки и новый замок на дверь.'},
+          {who:'naya',expr:'talk',text:'И это ничего не значит. Я беру деньги, а не прощение.'},
+          {who:'frank',expr:'sad',text:'Я знаю. Я и не покупаю.'},
+        ]},
+      { text:'Не брать.',
+        set:{frankHelpRejected:true},
+        then:[
+          {who:'naya',expr:'normal',text:'Я не возьму деньги.'},
+          {who:'frank',expr:'sad',text:'Хорошо.'},
+          {who:'naya',expr:'talk',text:'(Он убирает конверт обратно во внутренний карман. Без обиды. Как будто был к этому готов.)'},
+          {who:'frank',expr:'sad',text:'Тогда хотя бы позвони, если будет совсем тяжело.'},
+          {who:'naya',expr:'normal',text:'Хорошо.'},
+        ]},
+    ]}},
+  ]},
+  { wait:600 },
+  { jump:()=> 'frankDecision' },
+],
+
+/* Главный выбор. Ни один из вариантов нигде не назван правильным, и
+   человечность за них начисляется одинаково: Ная не «становится
+   хорошей», она перестаёт откладывать. */
+frankDecision: [
+  { dlg:[
+    {who:'naya',expr:'sad',text:'(Он ждёт. Впервые за всю жизнь он чего-то от меня ждёт, а не отмахивается.)'},
+    {choice:{ prompt:'', options:[
+      { text:'«Я могу тебя простить.»',
+        stats:{humanity:+5},
+        set:{nayaForgaveFrank:true},
+        then:[
+          {who:'naya',expr:'sad',text:'Я не могу изменить прошлое.'},
+          {who:'naya',expr:'normal',text:'Но я могу тебя простить.'},
+          {who:'frank',expr:'shocked',text:'...'},
+          {who:'naya',expr:'talk',text:'Только это не значит, что всё было нормально.'},
+          {who:'frank',expr:'sad',text:'Я знаю.'},
+          {who:'naya',expr:'talk',text:'И это не значит, что ты можешь просто вернуться в мою жизнь, будто ничего не было.'},
+          {who:'frank',expr:'sad',text:'Я не прошу об этом.'},
+          {who:'naya',expr:'normal',text:'Тогда... наверное, я попробую.'},
+          {who:'frank',expr:'sad',text:'Спасибо.'},
+          {who:'naya',expr:'normal',text:'Не благодари. Я делаю это не для тебя.'},
+          {who:'naya',expr:'sad',text:'Я просто больше не хочу таскать это за собой.'},
+        ]},
+      { text:'«Я не могу тебя простить.»',
+        stats:{humanity:+5},
+        set:{nayaRejectedFrank:true},
+        then:[
+          {who:'naya',expr:'normal',text:'Я не могу тебя простить.'},
+          {who:'frank',expr:'sad',text:'Я понимаю.'},
+          {who:'naya',expr:'talk',text:'Ты слишком поздно пришёл.'},
+          {who:'frank',expr:'sad',text:'Да.'},
+          {who:'naya',expr:'normal',text:'Три года — это очень долго.'},
+          {who:'frank',expr:'sad',text:'Я знаю.'},
+          {who:'naya',expr:'sad',text:'Я научилась жить без тебя.'},
+          {who:'frank',expr:'sad',text:'Я вижу.'},
+          {who:'naya',expr:'talk',text:'(Он не спорит. Не говорит «но я же пришёл». Просто стоит и слушает.)'},
+        ]},
+    ]}},
+  ]},
+  { wait:600 },
+  { dlg:[
+    {who:'frank',expr:'sad',text:'Если когда-нибудь передумаешь — ты знаешь, где меня найти.'},
+    {who:'naya',expr:'normal',text:'Знаю.'},
+  ]},
+  { castWalk:{ name:'Фрэнк', to:[150, 290], ms:1600 } },
+  { sfx:'door' },
+  async ()=>{ await Prologue.castFade('Фрэнк', 500); },
+  { uncast:true },
+  { wait:900 },
+  { flag:'frankMetDone' },
+  { dlg:[
+    {if:()=> F('nayaForgaveFrank'), then:[
+      {who:'naya',expr:'normal',text:'Странно.'},
+      {who:'naya',expr:'sad',text:'Я думала, что буду чувствовать что-нибудь другое.'},
+      {who:'naya',expr:'empty',text:'А я просто устала.'},
+    ], else:[
+      {who:'naya',expr:'sad',text:'Он пришёл слишком поздно.'},
+      {who:'naya',expr:'normal',text:'Но хотя бы пришёл.'},
+    ]},
+  ]},
+  { music:'home' },
+],
+
 /* ЕЖЕДНЕВНАЯ СМЕНА. Дни 2 и 3 нельзя пропустить ради расследования:
    игрок приходит в кафе, получает короткую реплику по текущему дню и
    проходит тот же полноценный рабочий мини-цикл. */
@@ -27005,6 +27806,10 @@ dailyCafeShift: [
     {who:'chris',expr:'normal',text:'Смена закончена.'},
     {who:'naya',expr:'normal',text:'Теперь можно ехать.'},
   ]},
+  /* Линия Френка живёт между сменами: после второй звонит телефон,
+     после третьей он приходит сам. Сюда она только заглядывает — и
+     только если игрок в первой главе сказал ему то самое. */
+  async ()=>{ FrankArc.afterShift(); },
 ],
 
 /* Конец смены на второй, третий и четвёртый день главы. Крис не
@@ -28849,6 +29654,10 @@ reflectionScene: [
   { chapter:'12alive' },
   { checkpoint:'Последнее решение' },
   { music:'sad' },
+  /* Шарлотта говорит всю сцену, и выбор прямо называет, кто где стоит:
+     «Шарлотта справа. Сью слева». Модели у неё не было вовсе — реплики
+     шли из пустого угла. Ставим её справа, между зеркалом и шкафом. */
+  { cast:[{ x:176, y:182, sprite:'charlotte', name:'Шарлотта' }] },
   { dlg:[
     {who:'charlotte',expr:'normal',text:'Сестра. Пора.'},
     {who:'naya',expr:'shocked',text:'Шарлотта? Ты... ты в моей комнате.'},
@@ -28919,6 +29728,7 @@ reflectionScene: [
     ]}},
   ]},
   { flag:'reflectionDone' },
+  { uncast:true },
   { jump:()=> F('chosenWitchPath') ? 'hellFinalScene' : 'earthEnding' },
 ],
 
@@ -29018,7 +29828,9 @@ earthEnding: [
     {who:'naya',expr:'normal',text:'(Я не хочу такую силу. Мне и своей хватило, чтобы всё сломать.)'},
   ]},
   { sfx:'chime' },
-  { magic:'#80c0a0', dur:1800 },
+  /* Голубой, а не бирюзовый: у ведьминской магии фиолетовый, у адской —
+     красный, у отказа от силы — холодный дневной свет. */
+  { magic:'#8ac8f0', dur:1800 },
   { flash:'#ffffff', dur:700, peak:0.75 },
   { removeItem:'Амулет I' }, { removeItem:'Амулет II' }, { removeItem:'Амулет III' },
   { dlg:[
@@ -29060,15 +29872,57 @@ earthEnding: [
       {who:'naya',expr:'normal',text:'М?'},
       {who:'sue',expr:'smile',text:'В следующий раз, когда захочешь убежать в другую жизнь — просто скажи мне. Убежим вместе. Куда-нибудь поближе.'},
       {who:'naya',expr:'smile',text:'...договорились.'},
+      {who:'naya',expr:'normal',text:'(Она берёт меня за руку. Не за плечо и не под локоть. За руку.)'},
+      {who:'naya',expr:'shocked',text:'(Пятнадцать лет мы ходили рядом. Так — ни разу.)'},
+      {who:'sue',expr:'normal',text:'Скажи, если не надо.'},
+      {who:'naya',expr:'sad',text:'Надо.'},
+      {who:'sue',expr:'smile',text:'Хорошо.'},
+      {who:'naya',expr:'talk',text:'(Она не отпускает. И я не отпускаю.)'},
+      {who:'naya',expr:'sad',text:'Сью. Я месяц открывала дверь в ад, чтобы вернуть жизнь, в которой мне было хорошо.'},
+      {who:'naya',expr:'normal',text:'А она всё это время шла рядом и несла пакет с продуктами.'},
+      {who:'sue',expr:'smile',text:'Два пакета. Ты всегда забываешь про второй.'},
+      {who:'naya',expr:'smile',text:'(Вот ради чего я отказалась от силы. Ради второго пакета.)'},
+      {who:'sue',expr:'sad',text:'Ная, я не знаю, как это называется. У меня нет слова.'},
+      {who:'naya',expr:'normal',text:'У меня тоже нет.'},
+      {who:'sue',expr:'normal',text:'Тогда давай пока без слова.'},
+      {who:'naya',expr:'smile',text:'Давай.'},
+      {who:'naya',expr:'talk',text:'(Она сжимает пальцы чуть крепче. Слово подождёт. Ему некуда торопиться — мы теперь оба никуда не уходим.)'},
     ], else:[
       {who:'sue',expr:'sad',text:'Я пока не могу быть такой, как раньше. Ты понимаешь?'},
       {who:'naya',expr:'sad',text:'Понимаю. Я подожду. Я умею ждать, у меня опыт.'},
       {who:'sue',expr:'normal',text:'...хорошо.'},
+      {who:'naya',expr:'sad',text:'(Мы идём по одной аллее и не касаемся друг друга. Но идём по одной.)'},
+      {who:'naya',expr:'normal',text:'(Когда-нибудь я скажу ей то, что так и не сказала. Не сегодня. Но когда-нибудь.)'},
     ]},
+  ]},
+  /* Линия Френка сюда только добавляет мысль, а не приводит игрока:
+     решение остаться он уже принял сам, выше по сцене. Если линии не
+     было — этого куска просто нет, и финал ничего не теряет. */
+  { dlg:[
+    {if:()=> FrankArc.resolution() === 'FORGIVEN', then:[
+      {who:'naya',expr:'sad',text:'(Я столько лет думала, что если уйти достаточно далеко, прошлое перестанет существовать.)'},
+      {who:'naya',expr:'sad',text:'(Оно всё равно шло со мной. Всю дорогу.)'},
+      {who:'naya',expr:'normal',text:'(Френк не исправил того, что было. Он и не может.)'},
+      {who:'naya',expr:'normal',text:'(Но мне больше не нужно, чтобы он всю жизнь за это отвечал.)'},
+      {who:'naya',expr:'smile',text:'(Я могу жить дальше.)'},
+    ], else:[
+      {if:()=> FrankArc.resolution() === 'REJECTED', then:[
+        {who:'naya',expr:'normal',text:'(Я не простила его.)'},
+        {who:'naya',expr:'sad',text:'(Наверное, и не обязана.)'},
+        {who:'naya',expr:'normal',text:'(Но я всё равно не хочу становиться такой, как люди, которые сделали мне больно.)'},
+      ], else:[]},
+    ]},
+    {if:()=> F('frankHelpAccepted'), then:[
+      {who:'naya',expr:'normal',text:'(У меня всё ещё есть люди, которым я могу позвонить. Их немного. Но они есть.)'},
+    ], else:[]},
   ]},
   { dlg:[
     {who:'narrator',expr:'normal',name:'',text:'Никакой магии. Никакого ада.'},
-    {who:'narrator',expr:'normal',name:'',text:'Просто две девушки идут домой.'},
+    {if:()=> S('trustSue') >= 60, then:[
+      {who:'narrator',expr:'normal',name:'',text:'Просто две девушки идут домой. За руку.'},
+    ], else:[
+      {who:'narrator',expr:'normal',name:'',text:'Просто две девушки идут домой.'},
+    ]},
   ]},
   { fadeOut:2200 },
   { wait:800 },
@@ -30709,6 +31563,7 @@ const DevTools = {
     this.fromMainMenu = !!fromMainMenu;
     this.render();
     this.sdsMark();
+    this.frankMark();
     const screen = document.getElementById('devToolsScreen');
     screen.classList.add('show');
     Game.paused = true;
@@ -31224,6 +32079,18 @@ const DevTools = {
       UI.toast(r.fails ? 'Сверка: ошибок ' + r.fails + ', подробности в консоли'
                        : 'Сверка пройдена, подробности в консоли', 2600);
     });
+    /* Линия Френка. Кнопки ставят те же флаги и запускают те же сцены,
+       что и обычное прохождение. */
+    const fr = (id, fn) => on(id, () => { fn(); this.frankMark(); });
+    fr('devFrUnlock',  () => { FrankArc.devUnlock(); UI.toast('Линия Френка открыта.', 1500); });
+    fr('devFrCall',    () => { this.close(); FrankArc.devCall(); });
+    fr('devFrVisit',   () => { this.close(); FrankArc.devVisit(); });
+    fr('devFrForgive', () => { FrankArc.devForgive(); UI.toast('Решение: прощение.', 1500); });
+    fr('devFrReject',  () => { FrankArc.devReject();  UI.toast('Решение: отказ.', 1500); });
+    fr('devFrHelpYes', () => { FrankArc.devHelpYes();  UI.toast('Помощь принята.', 1500); });
+    fr('devFrHelpNo',  () => { FrankArc.devHelpNo();   UI.toast('Помощь отклонена.', 1500); });
+    fr('devFrReset',   () => { FrankArc.devReset();    UI.toast('Линия Френка сброшена.', 1500); });
+
     /* Несчастный случай. Кнопки зовут те же функции, что и игра: ни
        одной отдельной «тестовой» ветки у системы нет. */
     const sds = (id, fn) => on(id, () => { fn(); this.sdsMark(); });
@@ -31257,6 +32124,24 @@ const DevTools = {
         .catch(e => UI.toast(e.message, 2000)); };
       inp.click();
     });
+  },
+
+  /* Состояние линии Френка: ровно то, что отдаёт её getDebugState(). */
+  frankMark() {
+    const el = document.getElementById('devFrankNow');
+    if (!el) return;
+    if (!gameState) { el.textContent = '— нет игры —'; return; }
+    const d = FrankArc.getDebugState();
+    const yn = v => v ? 'да' : 'нет';
+    el.textContent =
+      'FRANK ARC  ·  решение: ' + d.resolution +
+      '\nоткрыта ' + yn(d.unlocked) + '  ·  звонок ' + yn(d.called) +
+      '  ·  встреча принята ' + yn(d.visitAccepted) + '  ·  отклонена ' + yn(d.visitRejected) +
+      '\nпомощь предложена ' + yn(d.offeredHelp) + '  ·  принята ' + yn(d.helpAccepted) +
+      '  ·  отклонена ' + yn(d.helpRejected) +
+      '\nпрощён ' + yn(d.forgiven) + '  ·  отказ ' + yn(d.rejected) +
+      '  ·  встреча пройдена ' + yn(d.met) +
+      '\nчеловечность: ' + d.humanity + '%';
   },
 
   /* Состояние пасхалки одной строкой: без неё «работает» пришлось бы
@@ -31370,6 +32255,8 @@ const DevTools = {
       '\nДень университета: ' + C('uniDay') +
       '\nЦель: ' + (g ? g.t : '—') +
       '\nСмена кафе: ' + (F('cafeShiftFinished') ? 'пройдена' : 'не пройдена') +
+      '\nЛиния Френка: ' + (F('frankArcUnlocked') ? 'открыта' : 'закрыта') +
+        ', решение ' + FrankArc.resolution() +
       '\nНесчастный случай: ' + (SecretDeathSystem.state.enabled ? 'вкл' : 'выкл') +
         ', случаев ' + SecretDeathSystem.seenCount() + '/4' +
         ', концовка ' + (SecretDeathSystem.state.endingUnlocked ? 'открыта' : 'закрыта') +
