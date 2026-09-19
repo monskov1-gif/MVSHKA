@@ -1035,6 +1035,24 @@
       </div>
       <div class="devGrid" id="devStealthGrid"></div>
 
+      <div class="devSection">НЕСЧАСТНЫЙ СЛУЧАЙ — СЕКРЕТНАЯ КОНЦОВКА</div>
+      <div class="devNow" id="devSdsNow">— система спит —</div>
+      <div class="devHint">Четыре способа не дойти до своей концовки. Каждая кнопка
+        переносит Наю в нужную комнату и запускает тот же ролик, что и в игре, —
+        отдельного «тестового» пути не существует. «Опасные зоны» рисует границы
+        прямо поверх комнаты, вместе со счётчиком той опасности, что считается
+        здесь.</div>
+      <div class="devRow">
+        <button class="devMini" id="devSdsCar">дорога</button>
+        <button class="devMini" id="devSdsChand">люстра</button>
+        <button class="devMini" id="devSdsRail">перила</button>
+        <button class="devMini" id="devSdsStair">студент</button>
+        <button class="devMini" id="devSdsZones">опасные зоны</button>
+        <button class="devMini" id="devSdsReset">сбросить счётчики</button>
+        <button class="devMini" id="devSdsOff">выключить систему</button>
+        <button class="devMini" id="devSdsAnnoy">+1 раздражение</button>
+      </div>
+
       <div class="devSection">ОБЩИЕ ТЕСТЫ</div>
       <div class="devGrid">
         <button class="devBtn devDanger" id="devFresh">
@@ -1058,6 +1076,7 @@
     <div id="endingSub"></div>
     <div id="endingBody"></div>
     <div id="endingStats"></div>
+    <button class="menuBtn small" id="btnEndLoad">ПРОДОЛЖИТЬ С СОХРАНЕНИЯ</button>
     <button class="menuBtn small" id="btnRewind">ВЕРНУТЬСЯ К ПОСЛЕДНЕМУ ВЫБОРУ</button>
     <button class="menuBtn small" id="btnEndNew">НОВАЯ ИГРА</button>
     <button class="menuBtn small" id="btnEndMenu">В ГЛАВНОЕ МЕНЮ</button>
@@ -1135,6 +1154,13 @@ const Audio = {
   shatter(){ this.noise(0.8,.26,6000); for(let i=0;i<6;i++) setTimeout(()=>this.beep(1600-i*180,0.06,'square',.09), i*45); },
   chime() { [523,659,784,1047].forEach((f,i)=>setTimeout(()=>this.beep(f,0.5,'sine',.11), i*130)); },
   low()   { this.beep(70, 0.9, 'sine', .18); },
+  /* Глухой удар: низкий тон, быстро уходящий вниз, и короткий шум под
+     ним. Нужен везде, где что-то тяжёлое встречается с чем-то твёрдым. */
+  thud(f=80, vol=0.22) {
+    this.beep(f, 0.22, 'sine', vol);
+    setTimeout(() => this.beep(Math.max(28, f * 0.62), 0.30, 'sine', vol * 0.7), 40);
+    this.noise(0.18, vol * 0.5, 320);
+  },
   talk()  { this.beep(400 + Math.random()*180, 0.02, 'square', 0.05); },
   rune()  { this.beep(330,0.25,'triangle',.12); setTimeout(()=>this.beep(247,0.3,'triangle',.10),120); },
 };
@@ -6844,7 +6870,7 @@ const Assets = {
     P('studentB',  '#4a6a9a','#33261e', ['normal'], '#8ab0e0');
     P('studentC',  '#8a5a7a','#d8b060', ['normal','smile'], '#f0c8dc',
       {hair:'long', sheen:'#e8c884', collar:'#f0c8dc', bg:'#2e2430'});
-    P('studentD',  '#3f6a5a','#5a3a2a', ['normal'], '#7aa894');
+    P('studentD',  '#3f6a5a','#5a3a2a', ['normal','talk','worried','angry'], '#7aa894');
     P('acolyte',   '#38604a','#2a2018', ['normal','worried'], '#50a070');
     P('customer',  '#4a5548','#3f3228', ['normal','talk','worried'], '#6a7460',
       {hair:'short', collar:'#3a4238', bg:'#2a2e2a'});
@@ -6970,7 +6996,11 @@ function loadMeta() {
     if (raw) {
       const m = JSON.parse(raw);
       META = { endings:m.endings||{}, memories:m.memories||{}, endingStats:m.endingStats||{},
-               hints:m.hints||{}, display:m.display||{} };
+               hints:m.hints||{}, display:m.display||{},
+               /* Секретная концовка открывается насовсем, но старые META
+                  этих полей не знают — тогда всё закрыто, и это нормально. */
+               secretEndingUnlocked:!!m.secretEndingUnlocked,
+               secretDeaths:m.secretDeaths||{} };
     }
   } catch(e) {}
 }
@@ -7087,6 +7117,20 @@ const Art = {
     ctx.drawImage(img, Math.round(o.x - d.ax - camX), Math.round(o.y - d.ay - camY));
   }
 };
+
+/* Подвижный предмет комнаты: тот же Art, но его можно зеркалить —
+   машина, едущая влево, не может выглядеть как едущая вправо. */
+function drawMover(ctx, m, camX, camY) {
+  const img = Art.get(m.t); if (!img) return;
+  const d = Art.meta(m.t);
+  const y = Math.round(m.y - d.ay - camY);
+  if (!m.flip) { ctx.drawImage(img, Math.round(m.x - d.ax - camX), y); return; }
+  ctx.save();
+  ctx.translate(Math.round(m.x - camX), 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(img, -d.ax, y);
+  ctx.restore();
+}
 
 /* --- little drawing helpers shared by the props --- */
 function shadowEllipse(g, cx, cy, rx, ry, a) {
@@ -14203,7 +14247,11 @@ street: {
       ctx.fillStyle = 'rgba(192,48,77,' + (0.14 + 0.09*Math.sin(Date.now()/500)).toFixed(3) + ')';
       ctx.fillRect(2,252,42,60);
     }
+    SecretDeathSystem.Debug.draw(ctx, 'street');
   },
+  /* Улица живая: по двум полосам между припаркованными машинами идёт
+     поток. Это фон, а не ловушка, — но стоять посреди него не стоит. */
+  movers() { return SecretDeathSystem.Road.movers(); },
   objects: [
     { t:'house_b', x:74,  y:120 },                                   // Naya's block
     { t:'shop',    x:186, y:120 },                                   // the cafe
@@ -19056,6 +19104,13 @@ uniTheatre: {
     ctx.lineTo(238, 226); ctx.lineTo(102, 226); ctx.closePath(); ctx.fill();
     ctx.restore();
   },
+  /* Люстра висит под колосниками и потому не может быть обычным
+     предметом комнаты: у неё нет точки опоры на полу, и рисовать её надо
+     поверх всех, кто по сцене ходит. */
+  overPaint(ctx) {
+    SecretDeathSystem.Chandelier.draw(ctx);
+    SecretDeathSystem.Debug.draw(ctx, 'uniTheatre');
+  },
   objects: [
     { t:'stage_curtain', x:34, y:58 }, { t:'stage_curtain', x:306, y:58 },
     { t:'spotlight', x:68, y:26 }, { t:'spotlight', x:170, y:22 }, { t:'spotlight', x:272, y:26 },
@@ -20065,7 +20120,13 @@ uniCorr2: {
     { x:600, y:250, sprite:'studentB', name:'Студент', speed:0.5,
       path:[[600,250],[460,250],[460,222],[600,222]],
       when:()=> !F('sueDead') },
+    /* Студент у самой лестницы. Никуда не идёт, к сюжету отношения не
+       имеет, отвечает на вопросы и постепенно устаёт отвечать. */
+    { x:322, y:230, sprite:'studentD', name:'Студент у лестницы',
+      when:()=> !F('sueDead'),
+      dialogue:()=> SecretDeathSystem.Stair.talk() },
   ],
+  overPaint(ctx) { SecretDeathSystem.Debug.draw(ctx, 'uniCorr2'); },
   /* Отметка «я тут была»: по ней цель ведёт игрока дальше. */
   onEnter() { setFlag('sawFloor2'); },
 },
@@ -20800,8 +20861,11 @@ uniRoof: {
     ctx.fillStyle = 'rgba(200,184,160,.45)';
     ctx.fillText('ВНУТРЕННИЙ ДВОР ВНИЗУ', 132, H - 20);
   },
+  overPaint(ctx) { SecretDeathSystem.Debug.draw(ctx, 'uniRoof'); },
   objects: [
-    { t:'parapet', x:200, y:96 }, { t:'parapet', x:290, y:96 }, { t:'parapet', x:380, y:96 },
+    /* Средний участок парапета выложен криво: шов разошёлся, верхний
+       камень съехал. Это видно до того, как его тронешь. */
+    { t:'parapet', x:200, y:96 }, { t:'rail_weak', x:290, y:96 }, { t:'parapet', x:380, y:96 },
     { t:'vent_block', x:186, y:150 }, { t:'vent_block', x:336, y:170 },
     { t:'pole_power', x:388, y:150 },
     { t:'crate_stack', x:130, y:196 },
@@ -20823,6 +20887,8 @@ uniRoof: {
           {who:'naya',expr:'talk',text:'(Раньше мне казалось, что мой мир большой.)'},
         ]);
       }},
+    { x:262,y:96,w:56,h:32, name:'weakRail', prompt:'Расшатанный парапет',
+      action(){ SecretDeathSystem.Balcony.look(); }},
     { x:120,y:262,w:180,h:30, name:'yardEdge', prompt:'Край над двором', action(){
         Dialogue.start([
           {who:'naya',expr:'normal',text:'С этой стороны крыша обрывается во внутренний двор. Фонтан отсюда размером с монету.'},
@@ -24360,6 +24426,831 @@ const Chapters = {
 /* =====================================================================
    ENDINGS
 ===================================================================== */
+/* =====================================================================
+   СЕКРЕТНАЯ ПЯТАЯ КОНЦОВКА — «НЕСЧАСТНЫЙ СЛУЧАЙ»
+
+   Пасхалка, а не вторая игра. Ная может не дойти до своей сюжетной
+   концовки, если игрок сам, своими руками, создаст опасную ситуацию и
+   будет в ней упорствовать. Четыре способа, одна концовка.
+
+   Правила, на которых всё держится:
+
+   • Ни одной мгновенной случайной смерти. Каждый случай сначала
+     предупреждает — словами, звуком, картинкой, — и уйти можно в любой
+     момент. Дорогу можно спокойно перейти: десять секунд — очень долго,
+     если просто идёшь.
+   • Система молчит везде, кроме четырёх разрешённых комнат, и молчит
+     во время сцен, диалогов, кражи, погони и финалов. Сюжет о ней не
+     знает и знать не должен.
+   • Состояние живёт в одном месте. Ни roadTimer, ни studentAnnoyance не
+     размазаны по проекту.
+   • Концовка показывается существующей системой концовок, а не своим
+     экраном. Пятая не перезаписывает четыре основные: она отдельная
+     запись в META, не трогает сюжетные флаги и не стирает сохранение —
+     после неё можно вернуться туда, где был.
+
+   Устройство: SecretDeathSystem владеет состоянием и общим API, а
+   четыре случая (Road, Chandelier, Balcony, Stair), карточка концовки
+   (Ending) и отладка (Debug) лежат внутри него отдельными частями.
+===================================================================== */
+
+/* Числа вынесены наружу: их правят, не трогая логику. */
+const SECRET_DEATH_CONFIG = {
+  road:       { enabled:true, warningStart:5, dangerStart:7, criticalStart:9, triggerTime:10 },
+  chandelier: { enabled:true, requiredWarningLevel:3, warnEvery:4.5, afterLastWarning:6 },
+  balcony:    { enabled:true, requireInteraction:true },
+  stairs:     { enabled:true, annoyanceThreshold:5 },
+  graceMs:    2500,          // после загрузки система молчит: не убивать на первом кадре
+};
+
+const SecretDeathSystem = {
+
+  /* ---------- состояние: единственный владелец ---------- */
+  state: {
+    enabled:true,
+    activeEvent:null,
+    triggered:false,
+    currentType:null,
+    grace:0,
+
+    roadTimer:0,
+    roadWarned:0,
+
+    chandelierTimer:0,
+    chandelierWarningLevel:0,
+
+    balconyState:'SAFE',          // SAFE · WEAK · BREAKING · BROKEN
+    balconyLooks:0,
+
+    studentAnnoyance:0,
+
+    endingUnlocked:false,
+    deathsSeen: { car:false, chandelier:false, balcony:false, stairs:false },
+  },
+
+  /* Люстра — предмет со своим состоянием, а не флаг в общей куче.
+     HANGING · SHAKING · WARNING · FALLING · FALLEN */
+  chandelier: { state:'HANGING', x:170, y:104, hang:104, rotation:0, fallProgress:0, warningLevel:0, shake:0 },
+
+  TYPES: ['CAR_ACCIDENT', 'CHANDELIER', 'BALCONY_FALL', 'STAIR_FALL'],
+
+  /* Какой случай в какой комнате возможен. Это и есть whitelist: в любой
+     другой комнате update() не запускает ничего. */
+  ROOMS: {
+    CAR_ACCIDENT: 'street',
+    CHANDELIER:   'uniTheatre',
+    BALCONY_FALL: 'uniRoof',
+    STAIR_FALL:   'uniCorr2',
+  },
+  KEY:  { CAR_ACCIDENT:'car', CHANDELIER:'chandelier', BALCONY_FALL:'balcony', STAIR_FALL:'stairs' },
+  NAME: { CAR_ACCIDENT:'дорога', CHANDELIER:'люстра', BALCONY_FALL:'перила', STAIR_FALL:'лестница' },
+
+  /* Опасные зоны — только геометрия, снятая с того, что уже нарисовано в
+     этих комнатах: асфальт между бордюрами, доски сцены, полоса у
+     парапета и площадка перед лестницей вниз. */
+  ZONES: {
+    ROAD:    { room:'street',     x:8,   y:154, w:624, h:90 },
+    STAGE:   { room:'uniTheatre', x:52,  y:66,  w:232, h:154 },
+    BALCONY: { room:'uniRoof',    x:252, y:93,  w:76,  h:40 },
+    STAIR:   { room:'uniCorr2',   x:312, y:232, w:124, h:74 },
+  },
+
+  /* Куда ставит игрока DEV-меню, чтобы случай можно было увидеть, не
+     разыгрывая его руками. Точки стоят на полу, а не в стене. */
+  DEV_AT: { CAR_ACCIDENT:[320,200], CHANDELIER:[170,150], BALCONY_FALL:[290,112], STAIR_FALL:[352,250] },
+
+  /* ---------- жизненный цикл ---------- */
+  enable()  { this.state.enabled = true;  return true; },
+  disable() { this.state.enabled = false; this.abort(); return false; },
+
+  /* Сброс счётчиков — но не пройденных случаев: те живут в META и
+     принадлежат игроку, а не текущему заходу. */
+  reset() {
+    const s = this.state;
+    s.activeEvent = null; s.triggered = false; s.currentType = null;
+    s.grace = SECRET_DEATH_CONFIG.graceMs;
+    s.roadTimer = 0; s.roadWarned = 0;
+    s.chandelierTimer = 0; s.chandelierWarningLevel = 0;
+    s.balconyState = 'SAFE'; s.balconyLooks = 0;
+    s.studentAnnoyance = 0;
+    const c = this.chandelier;
+    c.state = 'HANGING'; c.rotation = 0; c.fallProgress = 0; c.shake = 0; c.warningLevel = 0;
+    /* Падая, люстра съезжает к точке, где стояла Ная. Без возврата x и
+       fallTo она после продолжения игры висела бы не над серединой
+       сцены, а там, где её застал прошлый заход. */
+    c.x = 170; c.fallTo = undefined;
+    this.Road.cars.length = 0; this.Road.spawnIn = 0;
+  },
+
+  /* Оборвать начатое событие, ничем его не завершая. Нужен disable() и
+     аварийному выходу: игра не должна остаться с отобранным управлением,
+     если ролик почему-то не доиграл. */
+  abort() {
+    const s = this.state;
+    if (!s.activeEvent && !s.triggered) return;
+    s.activeEvent = null; s.triggered = false; s.currentType = null;
+    /* Счётчики тоже на ноль: иначе оборванное событие начнётся заново на
+       следующем же кадре, потому что порог всё ещё пройден. */
+    s.roadTimer = 0; s.roadWarned = 0;
+    s.chandelierTimer = 0; s.chandelierWarningLevel = 0;
+    s.balconyState = 'SAFE';
+    this.chandelier.state = 'HANGING'; this.chandelier.fallProgress = 0;
+    this.chandelier.rotation = 0; this.chandelier.warningLevel = 0;
+    if (Game.mode === 'cutscene' && !Scene.active) { Game.mode = 'explore'; UI.dimControls(false); }
+  },
+
+  /* Прочитать, что игрок уже открыл. META переживает новую игру, и это
+     правильно: пасхалка открывается насовсем. В старых сохранениях этих
+     полей нет — тогда всё закрыто, и ничего не ломается. */
+  load() {
+    const s = this.state;
+    const m = (typeof META !== 'undefined' && META && META.secretDeaths) || {};
+    s.endingUnlocked = !!(typeof META !== 'undefined' && META && META.secretEndingUnlocked);
+    s.deathsSeen = {
+      car:        !!m.car,
+      chandelier: !!m.chandelier,
+      balcony:    !!m.balcony,
+      stairs:     !!m.stairs,
+    };
+  },
+  save() {
+    try {
+      META.secretEndingUnlocked = this.state.endingUnlocked;
+      META.secretDeaths = Object.assign({}, this.state.deathsSeen);
+      saveMeta();
+    } catch (e) { console.warn('secret death save failed', e); }
+  },
+  seenCount() { return this.TYPES.filter(t => this.state.deathsSeen[this.KEY[t]]).length; },
+
+  /* ---------- можно ли вообще ---------- */
+
+  /* Сюжет главнее пасхалки. Ни одно событие не начинается, пока игрок не
+     стоит ногами в обычной комнате и не управляет собой сам. */
+  allowed() {
+    const s = this.state;
+    if (!s.enabled) return false;
+    if (typeof gameState === 'undefined' || !gameState) return false;
+    if (s.grace > 0) return false;
+    if (Game.mode !== 'explore') return false;          // катсцена, диалог, меню, переход, смена
+    if (Game.paused || Game.montage || Game.endingShown) return false;
+    if (Scene.active || Dialogue.active) return false;
+    if (Stealth.on) return false;                       // кража живёт по своим правилам
+    if (Game.chase && Game.chase.active) return false;
+    if (F('ending')) return false;
+    return true;
+  },
+
+  roomOf(type) { return this.ROOMS[type]; },
+  cfgOf(type) {
+    return { CAR_ACCIDENT:SECRET_DEATH_CONFIG.road,    CHANDELIER:SECRET_DEATH_CONFIG.chandelier,
+             BALCONY_FALL:SECRET_DEATH_CONFIG.balcony, STAIR_FALL:SECRET_DEATH_CONFIG.stairs }[type];
+  },
+
+  canTrigger(type) {
+    if (this.TYPES.indexOf(type) < 0) return false;
+    const cfg = this.cfgOf(type);
+    if (!cfg || !cfg.enabled) return false;
+    if (this.state.activeEvent || this.state.triggered) return false;   // одно событие за раз
+    if (!this.allowed()) return false;
+    if (gameState.currentRoom !== this.roomOf(type)) return false;
+    return true;
+  },
+
+  inZone(z) {
+    if (!z || typeof gameState === 'undefined' || !gameState) return false;
+    if (gameState.currentRoom !== z.room) return false;
+    return Player.x >= z.x && Player.x <= z.x + z.w &&
+           Player.y >= z.y && Player.y <= z.y + z.h;
+  },
+  /* Стоит ли игрок прямо сейчас в опасном месте. Нужно и отладке, и
+     тестам: «опасно» должно быть проверяемым, а не на слово. */
+  isDangerousZone() {
+    const k = Object.keys(this.ZONES);
+    for (let i = 0; i < k.length; i++) if (this.inZone(this.ZONES[k[i]])) return true;
+    return false;
+  },
+
+  /* ---------- общий ход ---------- */
+  update(dt, room) {
+    const s = this.state;
+    if (s.grace > 0) s.grace = Math.max(0, s.grace - dt);
+    if (!s.enabled || !room) return;
+    const key = gameState && gameState.currentRoom;
+
+    /* Поток и качание люстры живут, даже когда идёт диалог: улица не
+       замирает оттого, что Ная с кем-то говорит. Опасность — замирает. */
+    if (key === 'street')          this.Road.animate(dt);
+    else if (this.Road.cars.length) this.Road.cars.length = 0;
+    if (key === 'uniTheatre')      this.Chandelier.animate(dt);
+
+    if (s.activeEvent) return;
+    if (!this.allowed()) { this.cool(dt); return; }
+    if (key === 'street')          this.Road.update(dt);
+    else if (key === 'uniTheatre') this.Chandelier.update(dt);
+    else this.cool(dt);
+  },
+
+  /* Вне опасной комнаты счётчики остывают, а не держатся вечно. */
+  cool(dt) {
+    const s = this.state, k = dt / 1000;
+    if (s.roadTimer > 0) s.roadTimer = Math.max(0, s.roadTimer - k * 2);
+    if (s.roadTimer === 0) s.roadWarned = 0;
+    if (s.chandelierTimer > 0) s.chandelierTimer = Math.max(0, s.chandelierTimer - k);
+  },
+
+  /* ---------- запуск и завершение ---------- */
+  trigger(type) {
+    if (!this.canTrigger(type)) return false;
+    const s = this.state;
+    s.triggered = true; s.activeEvent = type; s.currentType = type;
+    /* Управление отбирается сразу: дальше играет ролик, а не игрок. */
+    Game.mode = 'cutscene';
+    Player.moving = false;
+    UI.dimControls(true);
+    try { Music.stop(); } catch (e) {}
+    const start = { CAR_ACCIDENT:'startCarAccident', CHANDELIER:'startChandelierAccident',
+                    BALCONY_FALL:'startBalconyAccident', STAIR_FALL:'startStairAccident' }[type];
+    Promise.resolve()
+      .then(() => this[start]())
+      .catch(e => { console.error('secret death', type, e); this.abort(); });
+    return true;
+  },
+
+  /* Запуск из диалогового выбора. В момент, когда отрабатывает o.do(),
+     диалог ещё активен, и canTrigger() честно отказывает. Ждём, пока
+     реплика закроется, и только тогда пробуем — но не вечно. */
+  triggerSoon(type, onFail, tries) {
+    const n = (tries === undefined) ? 40 : tries;
+    if (this.trigger(type)) return true;
+    if (n <= 0) { if (onFail) { try { onFail(); } catch (e) {} } return false; }
+    setTimeout(() => this.triggerSoon(type, onFail, n - 1), 60);
+    return true;
+  },
+
+  /* Ролики живут в своих частях — здесь только переадресация, чтобы API
+     из задания существовало ровно под этими именами. */
+  startCarAccident()        { return this.Road.play(); },
+  startChandelierAccident() { return this.Chandelier.play(); },
+  startBalconyAccident()    { return this.Balcony.play(); },
+  startStairAccident()      { return this.Stair.play(); },
+
+  async finish(type) {
+    const s = this.state;
+    s.deathsSeen[this.KEY[type]] = true;
+    s.endingUnlocked = true;
+    this.save();
+    s.activeEvent = null;
+    await this.Ending.show(type);
+    s.triggered = false; s.currentType = null;
+  },
+
+  /* Запуск из DEV-меню: довести до нужной комнаты и точки, снять паузу
+     защиты и вызвать тот же trigger(), что и в игре. */
+  async devRun(type) {
+    if (typeof gameState === 'undefined' || !gameState) return false;
+    if (this.TYPES.indexOf(type) < 0) return false;
+    const at = this.DEV_AT[type], room = this.roomOf(type);
+    if (gameState.currentRoom !== room) await changeRoom(room, at[0], at[1]);
+    else { Player.x = at[0]; Player.y = at[1]; }
+    this.state.grace = 0;
+    if (type === 'BALCONY_FALL') this.state.balconyState = 'WEAK';
+    /* После перехода комната может доигрывать свой onEnter — тогда защита
+       честно откажет. Ждём её, как и при запуске из диалога, и говорим
+       вслух, если так и не дождались. */
+    return this.triggerSoon(type,
+      () => UI.toast('Случай «' + this.NAME[type] + '» сейчас невозможен: идёт сцена или диалог.', 2400));
+  },
+
+  /* ---------- отладка ---------- */
+  getDebugState() {
+    const s = this.state, C2 = SECRET_DEATH_CONFIG;
+    return {
+      enabled: s.enabled,
+      activeEvent: s.activeEvent || 'NONE',
+      room: (typeof gameState !== 'undefined' && gameState) ? gameState.currentRoom : '—',
+      allowed: this.allowed(),
+      inDangerZone: this.isDangerousZone(),
+      road: s.roadTimer.toFixed(1) + ' / ' + C2.road.triggerTime + ' (предупр. ' + s.roadWarned + '/3)',
+      traffic: this.Road.cars.length,
+      chandelier: s.chandelierTimer.toFixed(1) + ' · уровень ' + s.chandelierWarningLevel +
+                  '/' + C2.chandelier.requiredWarningLevel + ' · ' + this.chandelier.state,
+      balcony: s.balconyState + ' (осмотров ' + s.balconyLooks + ')',
+      student: s.studentAnnoyance + ' / ' + C2.stairs.annoyanceThreshold,
+      ending: s.endingUnlocked ? 'открыта' : 'закрыта',
+      seen: this.seenCount() + ' / 4',
+    };
+  },
+};
+
+/* Короткое имя из задания: «можно ли сейчас несчастному случаю». */
+function isSecretDeathAllowed() { return SecretDeathSystem.allowed(); }
+
+/* ---------------------------------------------------------------------
+   СЛУЧАЙ 1 — МАШИНА
+
+   На Мейпл-стрит уже нарисована настоящая проезжая часть: тротуар,
+   бордюр, асфальт между бордюрами, второй тротуар. Не хватало движения.
+   Машины ездят по двум полосам всегда, когда игрок на улице, — не ради
+   смерти, а ради того, чтобы улица была живой: опасность должна быть
+   видна до того, как станет опасностью.                               */
+SecretDeathSystem.Road = {
+  /* Дальняя полоса едет вправо, ближняя — влево. Обе стоят между
+     припаркованными машинами, чтобы поток проходил мимо них, а не
+     сквозь. */
+  LANES: [ { y:172, dir: 1, from:-70 }, { y:228, dir:-1, from:710 } ],
+  SPRITES: ['traffic_car_a', 'traffic_car_b', 'traffic_car_c'],
+  cars: [], spawnIn: 0, nextId: 1, MAX: 3,
+
+  animate(dt) {
+    const k = dt / 1000;
+    for (const c of this.cars) c.x += c.speed * c.direction * dt;
+    this.cars = this.cars.filter(c => c.x > -140 && c.x < 780);
+    this.spawnIn -= k;
+    if (this.spawnIn <= 0 && this.cars.length < this.MAX) {
+      this.spawn();
+      this.spawnIn = 2.4 + Math.random() * 3.6;
+    }
+  },
+  spawn(lane) {
+    const li = (lane === undefined) ? (Math.random() < .5 ? 0 : 1) : lane;
+    const L = this.LANES[li];
+    const c = {
+      id: this.nextId++, x: L.from, y: L.y, lane: li, direction: L.dir,
+      speed: 0.075 + Math.random() * 0.035,
+      t: this.SPRITES[(Math.random() * this.SPRITES.length) | 0],
+      flip: L.dir < 0,
+    };
+    this.cars.push(c);
+    return c;
+  },
+  /* Комната отдаёт поток в общую сортировку по глубине: машина, что
+     ближе к зрителю, проезжает перед Наей, дальняя — за ней. */
+  movers() { return SecretDeathSystem.state.enabled ? this.cars : []; },
+
+  playerInsideRoadZone() { return SecretDeathSystem.inZone(SecretDeathSystem.ZONES.ROAD); },
+
+  update(dt) {
+    const S = SecretDeathSystem, s = S.state, C2 = SECRET_DEATH_CONFIG.road;
+    if (!C2.enabled) return;
+    if (!this.playerInsideRoadZone()) { s.roadTimer = 0; s.roadWarned = 0; return; }
+    s.roadTimer += dt / 1000;
+
+    /* Три предупреждения, каждое громче прошлого. После первого до
+       события ещё пять секунд — уйти успеет кто угодно. */
+    if (s.roadTimer >= C2.warningStart && s.roadWarned < 1) {
+      s.roadWarned = 1;
+      Audio.beep(300, .10, 'sawtooth', .07);
+      UI.toast('Ная: «Так... лучше бы мне отсюда уйти.»', 2200);
+    }
+    if (s.roadTimer >= C2.dangerStart && s.roadWarned < 2) {
+      s.roadWarned = 2;
+      if (!this.cars.length) this.spawn();
+      Audio.beep(220, .28, 'sawtooth', .12);
+      UI.toast('Ная: «Ой.»', 1800);
+    }
+    if (s.roadTimer >= C2.criticalStart && s.roadWarned < 3) {
+      s.roadWarned = 3;
+      Audio.beep(520, .22, 'square', .16);
+      setTimeout(() => Audio.beep(440, .30, 'square', .14), 180);
+      FX.addShake(1.5);
+      UI.toast('Ная: «Чёрт!»', 1600);
+    }
+    if (s.roadTimer >= C2.triggerTime) S.trigger('CAR_ACCIDENT');
+  },
+
+  /* Столкновения не видно: машина закрывает Наю, экран трясёт и гаснет.
+     Крови и подробностей здесь нет и не нужно. */
+  async play() {
+    const S = SecretDeathSystem;
+    /* Бьёт та машина, что ближе по полосе; если подходящей нет — выезжает
+       новая, чтобы удар не случился из ниоткуда. */
+    const lane = Player.y > 200 ? 1 : 0;
+    let car = this.cars.filter(c => c.lane === lane)
+      .sort((a, b) => Math.abs(a.x - Player.x) - Math.abs(b.x - Player.x))[0];
+    if (!car || Math.abs(car.x - Player.x) < 70) {
+      this.cars = this.cars.filter(c => c !== car);
+      car = this.spawn(lane);
+      car.x = this.LANES[lane].dir > 0 ? Player.x - 280 : Player.x + 280;
+    }
+    car.y = this.LANES[lane].y;
+    car.speed = 0.26;
+    Audio.beep(520, .5, 'square', .18);                     // сигнал
+    await wait(420);
+    Audio.noise(.5, .16, 900);                              // торможение
+    const t0 = Date.now();
+    while (Math.abs(car.x - Player.x) > 26 && Date.now() - t0 < 2600) await wait(30);
+    car.x = Player.x;
+    FX.addShake(8);
+    Audio.thud(70, .30); Audio.noise(.35, .18, 700);
+    FX.spawn(Player.x, Player.y - 6, 14, { color:'#8a8a94', rise:.02, life:420, spread:26 });
+    await wait(260);
+    car.speed = 0.02;
+    await wait(420);
+    await S.finish('CAR_ACCIDENT');
+  },
+};
+
+/* ---------------------------------------------------------------------
+   СЛУЧАЙ 2 — ЛЮСТРА
+
+   Театральный зал, старая люстра под колосниками над серединой сцены.
+   Она предупреждает трижды: скрипом, качанием и пылью, — и только потом
+   срывается. Сойти со сцены можно в любую секунду, и счётчик остынет. */
+SecretDeathSystem.Chandelier = {
+  WARNINGS: [
+    { level:1, sfx: () => Audio.beep(180, .30, 'sawtooth', .08),
+      line:'Ная: «Что это сейчас было?..»' },
+    { level:2, sfx: () => { Audio.beep(150, .40, 'sawtooth', .10); Audio.noise(.25, .07, 1800); },
+      line:'Ная: «Эта люстра выглядит не очень надёжно.»' },
+    { level:3, sfx: () => { Audio.noise(.45, .12, 2600); Audio.beep(120, .5, 'sawtooth', .12); },
+      line:'Ная: «Ладно. Наверное, мне всё-таки стоит отойти.»' },
+  ],
+
+  playerInsideStageZone() { return SecretDeathSystem.inZone(SecretDeathSystem.ZONES.STAGE); },
+
+  update(dt) {
+    const S = SecretDeathSystem, s = S.state, C2 = SECRET_DEATH_CONFIG.chandelier;
+    if (!C2.enabled) return;
+    if (!this.playerInsideStageZone()) {
+      /* Ушла — люстра успокаивается, но предупреждения не забываются
+         совсем: вернёшься — она уже знакомо скрипнет. */
+      s.chandelierTimer = Math.max(0, s.chandelierTimer - dt / 500);
+      if (S.chandelier.state === 'SHAKING' && s.chandelierTimer <= 0) S.chandelier.state = 'HANGING';
+      return;
+    }
+    s.chandelierTimer += dt / 1000;
+
+    const next = this.WARNINGS[s.chandelierWarningLevel];
+    if (next && s.chandelierTimer >= C2.warnEvery * (s.chandelierWarningLevel + 1)) {
+      s.chandelierWarningLevel = next.level;
+      S.chandelier.warningLevel = next.level;
+      S.chandelier.state = next.level >= 3 ? 'WARNING' : 'SHAKING';
+      S.chandelier.shake = 1;
+      next.sfx();
+      if (next.level === 3) {
+        FX.spawn(S.chandelier.x, S.chandelier.y + 26, 10,
+                 { color:'#b8ac96', rise:-.05, life:900, spread:14 });
+        FX.addShake(1.2);
+      }
+      UI.toast(next.line, 2400);
+    }
+    if (s.chandelierWarningLevel >= C2.requiredWarningLevel &&
+        s.chandelierTimer >= C2.warnEvery * 3 + C2.afterLastWarning) {
+      S.trigger('CHANDELIER');
+    }
+  },
+
+  /* Качание и падение: люстра не телепортируется вниз, она срывается. */
+  animate(dt) {
+    const c = SecretDeathSystem.chandelier, k = dt / 1000;
+    if (c.shake > 0) c.shake = Math.max(0, c.shake - k * .6);
+    if (c.state === 'HANGING') { c.rotation *= 0.94; return; }
+    if (c.state === 'SHAKING' || c.state === 'WARNING') {
+      const amp = (c.state === 'WARNING' ? .16 : .08) * (0.4 + c.shake);
+      c.rotation = Math.sin(Date.now() / 260) * amp;
+      return;
+    }
+    if (c.state === 'FALLING') {
+      c.fallProgress = Math.min(1, c.fallProgress + k * 1.7);
+      c.rotation = Math.sin(Date.now() / 90) * .3 * (1 - c.fallProgress);
+    }
+  },
+
+  async play() {
+    const S = SecretDeathSystem, c = S.chandelier;
+    c.state = 'WARNING'; c.shake = 1;
+    c.fallTo = Player.y - 8;
+    Audio.beep(140, .6, 'sawtooth', .14);                   // трещит крепление
+    await wait(520);
+    Audio.noise(.3, .16, 3200);                             // цепь
+    FX.spawn(c.x, c.y + 24, 12, { color:'#b8ac96', rise:-.04, life:700, spread:16 });
+    await wait(420);
+    c.x = Player.x;                                          // срывается ровно над ней
+    c.state = 'FALLING'; c.fallProgress = 0;
+    Audio.beep(90, .8, 'sawtooth', .18);
+    const t0 = Date.now();
+    while (c.fallProgress < 1 && Date.now() - t0 < 3000) await wait(30);
+    c.state = 'FALLEN';
+    FX.addShake(9);
+    Audio.thud(60, .34); Audio.glass();
+    FX.spawn(c.x, Player.y - 4, 18, { color:'#d8c890', rise:.02, life:600, spread:34 });
+    await wait(800);
+    await S.finish('CHANDELIER');
+  },
+
+  /* Рисуется поверх всех: люстра висит под колосниками, а не стоит на
+     сцене. При падении едет вниз, к точке, где стоит Ная. */
+  draw(ctx) {
+    const c = SecretDeathSystem.chandelier;
+    if (!SecretDeathSystem.state.enabled) return;
+    const img = Art.get('uni_chandelier'); if (!img) return;
+    const d = Art.meta('uni_chandelier');
+    const to = (c.fallTo === undefined) ? c.hang : c.fallTo;
+    const p = c.state === 'FALLEN' ? 1 : (c.state === 'FALLING' ? c.fallProgress : 0);
+    const y = c.hang + (to - c.hang) * p;
+    ctx.save();
+    /* Цепь от штанкета до самой люстры: по ней и видно, что она висит. */
+    ctx.strokeStyle = 'rgba(70,62,54,.9)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(c.x - c.rotation * 10, 49);
+    ctx.lineTo(c.x, y - d.ay + 4); ctx.stroke();
+    ctx.translate(c.x, y);
+    ctx.rotate(c.rotation);
+    ctx.drawImage(img, -d.ax, -d.ay);
+    ctx.restore();
+  },
+};
+
+/* ---------------------------------------------------------------------
+   СЛУЧАЙ 3 — ПЕРИЛА
+
+   Крыша университета. Один участок парапета выложен криво, шов разошёлся
+   — это видно до того, как его тронешь. Первый осмотр честно говорит,
+   что камень шатается. Дальше игра спрашивает прямо: опереться или
+   отойти. Само по себе не происходит ничего.                          */
+SecretDeathSystem.Balcony = {
+  /* Вызывается интерактивом «Расшатанный участок парапета». */
+  look() {
+    const S = SecretDeathSystem, s = S.state, C2 = SECRET_DEATH_CONFIG.balcony;
+    s.balconyLooks++;
+
+    /* Выключенная система оставляет от парапета обычную декорацию. */
+    if (!C2.enabled) {
+      return Dialogue.start([
+        {who:'naya',expr:'normal',text:'Верхний камень сидит криво, шов разошёлся. Кто-то давно собирался это починить.'},
+      ]);
+    }
+    /* requireInteraction — нужен ли отдельный предварительный осмотр.
+       При false вопрос задаётся сразу, но задаётся всё равно: само по
+       себе на перила никто не опирается. */
+    if (s.balconyLooks === 1 && C2.requireInteraction) {
+      s.balconyState = 'WEAK';
+      Audio.beep(160, .35, 'sawtooth', .10);
+      FX.spawn(Player.x, Player.y - 10, 5, { color:'#8a8290', rise:-.03, life:500, spread:12 });
+      return Dialogue.start([
+        {who:'naya',expr:'normal',text:'Верхний камень сидит криво, и шов между плитами разошёлся.'},
+        {who:'naya',expr:'worried',text:'(Он шатается. Держится, кажется, на честном слове.)'},
+      ]);
+    }
+    /* Второй раз и дальше — прямой вопрос. Нажать надо самому. */
+    s.balconyState = 'WEAK';
+    Audio.beep(150, .30, 'sawtooth', .10);
+    FX.addShake(1.2);
+    return Dialogue.start([
+      {who:'naya',expr:'worried',text:'Тот самый кусок парапета. Он всё так же шатается.'},
+      {choice:{ prompt:'Опереться на него?', options:[
+        { text:'Опереться всем весом', do: () => {
+            SecretDeathSystem.triggerSoon('BALCONY_FALL', () =>
+              Dialogue.start([{who:'naya',expr:'normal',text:'(Не сейчас.)'}]));
+          }},
+        { text:'Отойти от края', do: () => {
+            SecretDeathSystem.state.balconyState = 'SAFE';
+          }, then:[
+            {who:'naya',expr:'normal',text:'(Нет уж. Мне ещё пригодятся ноги.)'},
+          ]},
+      ]}},
+    ]);
+  },
+
+  async play() {
+    const S = SecretDeathSystem, s = S.state;
+    s.balconyState = 'BREAKING';
+    Audio.beep(150, .5, 'sawtooth', .12);
+    await wait(420);
+    Audio.noise(.4, .16, 2400);                             // трещит кладка
+    FX.addShake(3);
+    await wait(360);
+    s.balconyState = 'BROKEN';
+    Audio.thud(90, .26); Audio.noise(.5, .18, 1200);
+    FX.spawn(Player.x, Player.y - 12, 16, { color:'#6a6470', rise:-.02, life:800, spread:30 });
+    FX.addShake(6);
+    await wait(500);
+    /* Само падение — за кадром. */
+    Audio.thud(54, .30);
+    await wait(500);
+    await S.finish('BALCONY_FALL');
+  },
+};
+
+/* ---------------------------------------------------------------------
+   СЛУЧАЙ 4 — СТУДЕНТ У ЛЕСТНИЦЫ
+
+   Обычный второстепенный NPC на втором этаже, к сюжету отношения не
+   имеет. Он отвечает вежливо, потом устало, потом раздражённо — и если
+   подойти к нему ещё раз, стоя прямо на площадке над маршем, он
+   отмахнётся. Это бытовая реакция, а не убийство: в двух шагах от
+   лестницы не произойдёт вообще ничего.                              */
+SecretDeathSystem.Stair = {
+  LINES: [
+    [ {who:'naya',expr:'talk',text:'Привет. Не подскажешь, тут вниз — в главный холл?'},
+      {who:'studentD',expr:'normal',name:'Студент',text:'В холл. По лестнице и направо.'} ],
+    [ {who:'naya',expr:'talk',text:'А Сью ты тут не видел?'},
+      {who:'studentD',expr:'normal',name:'Студент',text:'Не видел. Я вообще мало кого запоминаю.'} ],
+    [ {who:'naya',expr:'talk',text:'Извини, ещё раз: вниз — сюда?'},
+      {who:'studentD',expr:'talk',name:'Студент',text:'Сюда. Мы уже это обсуждали.'} ],
+    [ {who:'studentD',expr:'worried',name:'Студент',text:'Слушай, ты стоишь ровно на проходе.'} ],
+    [ {who:'studentD',expr:'worried',name:'Студент',text:'У меня пара через минуту. Правда.'} ],
+    [ {who:'studentD',expr:'angry',name:'Студент',text:'Отойди, пожалуйста. Я серьёзно.'} ],
+  ],
+
+  playerInsideStairDangerZone() { return SecretDeathSystem.inZone(SecretDeathSystem.ZONES.STAIR); },
+
+  talk() {
+    const S = SecretDeathSystem, s = S.state, C2 = SECRET_DEATH_CONFIG.stairs;
+    if (C2.enabled && s.studentAnnoyance >= C2.annoyanceThreshold &&
+        this.playerInsideStairDangerZone() && S.canTrigger('STAIR_FALL')) {
+      s.studentAnnoyance++;
+      return S.trigger('STAIR_FALL');
+    }
+    const i = Math.min(s.studentAnnoyance, this.LINES.length - 1);
+    s.studentAnnoyance++;
+    return Dialogue.start(this.LINES[i]);
+  },
+
+  async play() {
+    const S = SecretDeathSystem;
+    await new Promise(res => Dialogue.start([
+      {who:'studentD',expr:'angry',name:'Студент',text:'Да отойди ты уже!'},
+    ], res));
+    Audio.thud(120, .18);
+    FX.addShake(4);
+    FX.spawn(Player.x, Player.y - 14, 8, { color:'#c8b8a0', rise:-.04, life:500, spread:18 });
+    await wait(260);
+    Audio.noise(.6, .16, 700);                              // кувырком по ступеням
+    for (let k = 0; k < 4; k++) { Audio.thud(90 - k * 8, .14); await wait(150); }
+    await wait(300);
+    await S.finish('STAIR_FALL');
+  },
+};
+
+/* ---------------------------------------------------------------------
+   ПЯТАЯ КОНЦОВКА
+
+   Своего экрана у неё нет и не должно быть: карточку рисует та же
+   система, что и четыре основные. Отличий ровно два — она не ставит
+   сюжетный флаг конца и не стирает сохранение, потому что это шутка, а
+   не финал истории: после неё игрок возвращается туда, где был.      */
+SecretDeathSystem.Ending = {
+  REASON: {
+    CAR_ACCIDENT: 'Ная слишком долго стояла посреди проезжей части.',
+    CHANDELIER:   'Ная решила, что скрип над сценой — это просто часть атмосферы театра.',
+    BALCONY_FALL: 'Ная всем весом доверилась камню, который сама назвала шатающимся.',
+    STAIR_FALL:   'Ная подошла к студенту у лестницы ещё один раз.',
+  },
+  show(type) {
+    return Endings.show('V', { reason:this.REASON[type] || '', keepSave:true, keepFlags:true });
+  },
+};
+
+/* ---------------------------------------------------------------------
+   ОТЛАДКА. Видно не на словах: зоны, счётчики и радиус разговора прямо
+   на кадре комнаты.                                                   */
+SecretDeathSystem.Debug = {
+  zones:false,
+  toggleZones() { this.zones = !this.zones; return this.zones; },
+
+  draw(ctx, roomKey) {
+    if (!this.zones) return;
+    const S = SecretDeathSystem;
+    ctx.save();
+    ctx.font = '5px Courier New';
+    Object.keys(S.ZONES).forEach(k => {
+      const z = S.ZONES[k];
+      if (z.room !== roomKey) return;
+      const hot = S.inZone(z);
+      ctx.fillStyle = hot ? 'rgba(255,70,60,.26)' : 'rgba(255,190,60,.14)';
+      ctx.fillRect(z.x, z.y, z.w, z.h);
+      ctx.strokeStyle = hot ? 'rgba(255,90,80,.95)' : 'rgba(255,200,80,.7)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(z.x + .5, z.y + .5, z.w - 1, z.h - 1);
+      ctx.fillStyle = '#ffe08a';
+      ctx.fillText(k + ' ' + z.x + ',' + z.y + ' ' + z.w + '×' + z.h, z.x + 2, z.y + 7);
+    });
+    /* Счётчик той опасности, что считается именно здесь. */
+    const s = S.state, C2 = SECRET_DEATH_CONFIG;
+    const line = roomKey === 'street'     ? 'дорога ' + s.roadTimer.toFixed(1) + '/' + C2.road.triggerTime
+               : roomKey === 'uniTheatre' ? 'люстра ' + s.chandelierTimer.toFixed(1) + ' ур.' + s.chandelierWarningLevel + ' ' + S.chandelier.state
+               : roomKey === 'uniRoof'    ? 'перила ' + s.balconyState + ' осмотров ' + s.balconyLooks
+               : roomKey === 'uniCorr2'   ? 'студент ' + s.studentAnnoyance + '/' + C2.stairs.annoyanceThreshold
+               : null;
+    if (line) {
+      /* overPaint рисует в координатах комнаты, а строка должна висеть в
+         углу кадра: на длинной улице иначе уезжает за край. */
+      const hx = Game.cam.x + 4, hy = Game.cam.y + 4;
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(hx, hy, 150, 10);
+      ctx.fillStyle = '#9fe0ff';
+      ctx.fillText(line + (S.allowed() ? '  [активна]' : '  [спит]'), hx + 2, hy + 7);
+    }
+    /* Радиус разговора со студентом: толчок возможен только внутри
+       лестничной зоны, и это должно быть видно. */
+    if (roomKey === 'uniCorr2') {
+      const n = (Rooms.uniCorr2.npcs || []).find(x => x.name === 'Студент у лестницы');
+      if (n) {
+        ctx.strokeStyle = 'rgba(120,220,255,.8)';
+        ctx.beginPath(); ctx.arc(n.x, n.y, 30, 0, 6.3); ctx.stroke();
+        ctx.fillStyle = '#9fe0ff';
+        ctx.fillText('студент ' + n.x + ',' + n.y, n.x - 22, n.y - 34);
+      }
+    }
+    ctx.restore();
+  },
+};
+
+/* =====================================================================
+   АССЕТЫ ДЛЯ СЕКРЕТНЫХ СЛУЧАЕВ
+
+   Люстра, уличные машины и расшатанный участок парапета. Рисуются тем же
+   кодом и в той же манере, что и вся остальная графика игры.
+===================================================================== */
+(function defineSecretDeathArt() {
+  const D = (k, m, f) => Art.def(k, m, f);
+
+  /* Театральная люстра: старая, латунная, в три яруса, с настоящими
+     рожками и свечами. Висит под колосниками над серединой сцены. */
+  D('uni_chandelier', { w:58, h:40, ax:29, ay:2, foot:null, wall:true }, g => {
+    const cx = 29;
+    const brass = '#a8863c', brassD = '#6d5524', brassL = '#d8b45a';
+    g.fillStyle = 'rgba(255,214,140,.10)';                       // общий ореол
+    g.beginPath(); g.ellipse(cx, 18, 29, 20, 0, 0, 6.3); g.fill();
+    g.fillStyle = brassD; g.fillRect(cx - 2, 0, 4, 8);           // подвес
+    g.fillStyle = brassL; g.fillRect(cx - 1, 0, 1, 8);
+    g.fillStyle = brass;                                          // корона
+    g.beginPath(); g.ellipse(cx, 10, 9, 4, 0, 0, 6.3); g.fill();
+    g.fillStyle = brassD; g.fillRect(cx - 9, 10, 18, 2);
+    const tier = (y, r, n, len) => {
+      g.strokeStyle = brass; g.lineWidth = 2;                     // обруч
+      g.beginPath(); g.ellipse(cx, y, r, r * .34, 0, 0, 6.3); g.stroke();
+      g.strokeStyle = brassD; g.lineWidth = 1;
+      g.beginPath(); g.ellipse(cx, y + 1.5, r, r * .34, 0, 0, 6.3); g.stroke();
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const ax2 = cx + Math.cos(a) * r, ay2 = y + Math.sin(a) * r * .34;
+        g.strokeStyle = brass; g.lineWidth = 2;                   // рожок
+        g.beginPath(); g.moveTo(cx, y - 2); g.quadraticCurveTo(ax2, y - 4, ax2, ay2 - len); g.stroke();
+        g.fillStyle = '#e8ddc4'; g.fillRect(ax2 - 1.5, ay2 - len - 5, 3, 6);   // свеча
+        g.fillStyle = '#ffce7a'; g.fillRect(ax2 - 1, ay2 - len - 8, 2, 3);     // огонь
+        g.fillStyle = '#fff2c8'; g.fillRect(ax2 - .5, ay2 - len - 7, 1, 1);
+        g.fillStyle = 'rgba(255,206,122,.22)';
+        g.beginPath(); g.arc(ax2, ay2 - len - 6, 5, 0, 6.3); g.fill();
+      }
+    };
+    tier(20, 24, 8, 5);                                           // нижний, широкий
+    tier(15, 15, 6, 4);                                           // средний
+    tier(11, 7,  4, 3);                                           // верхний
+    g.fillStyle = brass;                                          // подвески
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      g.fillRect(cx + Math.cos(a) * 22 - 1, 24 + Math.abs(Math.sin(a)) * 3, 2, 5);
+    }
+    g.fillStyle = brassD;
+    g.beginPath(); g.ellipse(cx, 32, 5, 3, 0, 0, 6.3); g.fill();  // нижний шар
+    g.fillStyle = brassL; g.fillRect(cx - 1, 29, 1, 4);
+  });
+
+  /* Уличные машины: три окраски, чтобы поток не выглядел одинаковым.
+     Вид сбоку, как у припаркованных на Мейпл-стрит. */
+  const car = (key, body, roof, trim) => D(key, { w:64, h:34, ax:32, ay:32, foot:null }, g => {
+    shadowEllipse(g, 32, 31, 28, 3, .30);
+    g.fillStyle = body; g.fillRect(2, 12, 60, 15);                // кузов
+    g.fillStyle = roof; g.fillRect(14, 4, 34, 10);                // крыша
+    g.fillStyle = shade(body, 1.16); g.fillRect(2, 12, 60, 2);
+    g.fillStyle = '#2a3038';                                      // стёкла
+    g.fillRect(17, 6, 12, 7); g.fillRect(32, 6, 13, 7);
+    g.fillStyle = 'rgba(190,215,235,.45)'; g.fillRect(18, 7, 5, 5); g.fillRect(33, 7, 6, 5);
+    g.fillStyle = shade(body, .72); g.fillRect(2, 25, 60, 2);
+    g.fillStyle = trim; g.fillRect(2, 18, 60, 1);                 // молдинг
+    g.fillStyle = '#1b1b20';                                      // колёса
+    g.beginPath(); g.arc(16, 27, 5, 0, 6.3); g.fill();
+    g.beginPath(); g.arc(48, 27, 5, 0, 6.3); g.fill();
+    g.fillStyle = '#4a4a52';
+    g.beginPath(); g.arc(16, 27, 2, 0, 6.3); g.fill();
+    g.beginPath(); g.arc(48, 27, 2, 0, 6.3); g.fill();
+    g.fillStyle = '#ffe6a8'; g.fillRect(60, 15, 3, 4);            // фара
+    g.fillStyle = '#c04030'; g.fillRect(2, 15, 3, 4);             // габарит
+    g.fillStyle = 'rgba(255,230,168,.16)'; g.fillRect(63, 13, 1, 8);
+  });
+  car('traffic_car_a', '#4a5a72', '#3c4a5e', '#8a97ad');
+  car('traffic_car_b', '#6a4148', '#54333a', '#a2818a');
+  car('traffic_car_c', '#4e5a48', '#3e4a3a', '#8ea084');
+
+  /* Расшатанный участок парапета: та же кладка, но шов разошёлся и
+     верхний камень сидит криво. Видно до того, как его трогаешь. */
+  D('rail_weak', { w:56, h:26, ax:28, ay:22, foot:{x:-28,y:-8,w:56,h:10} }, g => {
+    g.fillStyle = '#4a4650'; g.fillRect(2, 6, 52, 14);
+    g.fillStyle = '#5e5a66'; g.fillRect(2, 6, 52, 3);
+    g.fillStyle = '#3a3742';                                       // разошедшийся шов
+    g.fillRect(18, 6, 2, 14); g.fillRect(36, 6, 2, 14);
+    g.save(); g.translate(28, 8); g.rotate(-.055);                 // съехавший камень
+    g.fillStyle = '#6a6672'; g.fillRect(-16, -6, 32, 8);
+    g.fillStyle = '#7c7886'; g.fillRect(-16, -6, 32, 2);
+    g.fillStyle = '#4e4a56'; g.fillRect(-16, 1, 32, 1);
+    g.restore();
+    g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(2, 18, 52, 2);
+    g.fillStyle = '#8a8290';                                       // осыпавшаяся крошка
+    for (let i = 0; i < 7; i++) g.fillRect(6 + i * 7, 21 + (i % 2), 2, 1);
+    g.fillStyle = '#6f6a78'; g.fillRect(4, 23, 3, 1); g.fillRect(44, 24, 4, 1);
+  });
+})();
+
 const Endings = {
   DEFS: {
     I:   { roman:'КОНЦОВКА I',   name:'ОДИНОЧКА',
@@ -24370,7 +25261,14 @@ const Endings = {
            sub:'«Она получила всё, чего хотела. Кроме той, ради кого всё начиналось.»' },
     IV:  { roman:'КОНЦОВКА IV',  name:'ОСТАТЬСЯ',
            sub:'«Иногда самая трудная магия — отказаться от силы.»' },
+    /* Пятая — не финал истории, а её обрыв. Поэтому у неё нет номера в
+       ряду четырёх: в галерее она стоит отдельной строкой. */
+    V:   { roman:'НЕСЧАСТНЫЙ СЛУЧАЙ', name:'КОНЕЦ',
+           sub:'«История закончилась не там, где собиралась.»', secret:true },
   },
+  /* Последняя причина смерти: её подставляет SecretDeathSystem, чтобы на
+     карточке было написано ровно то, что игрок сделал. */
+  secretReason:'',
   bodyFor(id) {
     const t = S('trustSue'), w = S('witchAmbition');
     if (id === 'I')  return t >= 55
@@ -24385,17 +25283,27 @@ const Endings = {
     if (id === 'IV') return t >= 60
       ? 'Магии больше нет. Есть две девушки, которым надо о многом поговорить.\nОни начнут завтра. И послезавтра. И ещё долго.'
       : 'Сью осталась. Не простила — осталась.\nНая учится понимать, что это не одно и то же.';
+    if (id === 'V') return (this.secretReason || 'Ная не дошла до своей концовки.') +
+      '\nНи ведьмы, ни мести, ни прощения. Просто очень глупый день.' +
+      '\n\n(Это не конец истории. Её можно продолжить с последнего сохранения.)';
     return '';
   },
   /* У каждой концовки своя тема, и она должна звучать без шва: начаться
      на последнем монологе и доиграть на карточке. Раньше show() гасил
      музыку, и ровно в момент, ради которого тема и написана, наступала
      тишина. */
-  TRACK: { I:'endLoner', II:'endWitch', III:'endRevenge', IV:'endStay' },
-  async show(id) {
+  TRACK: { I:'endLoner', II:'endWitch', III:'endRevenge', IV:'endStay', V:'sad' },
+  /* opts нужны ровно одной концовке — пятой, секретной:
+       keepFlags — не ставить сюжетный флаг конца, история не закончилась;
+       keepSave  — не стирать сохранение, к нему можно вернуться;
+       reason    — строка о том, что именно игрок сделал.
+     Для четырёх основных всё остаётся ровно как было.                */
+  async show(id, opts) {
+    const o = opts || {};
+    this.secretReason = o.reason || '';
     Game.endingShown = true;
     try { Chase.stop(); } catch(e) {}
-    setFlag('ending');
+    if (!o.keepFlags) setFlag('ending');
     /* play() не перезапускает уже играющую тему, поэтому если сцена
        включила её раньше, переход на карточку музыку не заденет. */
     try { Music.play(this.TRACK[id] || 'sad'); } catch(e) {}
@@ -24404,7 +25312,7 @@ const Endings = {
       META.endings[id] = true;
       META.endingStats[id] = { trustSue:S('trustSue'), witchAmbition:S('witchAmbition'), humanity:S('humanity'), hellAffinity:S('hellAffinity') };
       saveMeta();
-      localStorage.removeItem(CONFIG.SAVE_KEY);
+      if (!o.keepSave) localStorage.removeItem(CONFIG.SAVE_KEY);
     } catch(e) { console.warn('ending bookkeeping failed', e); }
 
     await fadeOut(700);
@@ -24437,6 +25345,10 @@ const Endings = {
     });
     try { document.getElementById('btnRewind').style.display = hasCheckpoint() ? '' : 'none'; }
     catch(e) { document.getElementById('btnRewind').style.display = 'none'; }
+    /* «Продолжить» появляется только там, где сохранение уцелело, то
+       есть после секретной концовки. Четыре основные его стирают. */
+    try { document.getElementById('btnEndLoad').style.display = hasSave() ? '' : 'none'; }
+    catch(e) {}
   },
   /* аварийный показ: концовка засчитана, но карточка почему-то не открылась */
   forceCard() {
@@ -24451,15 +25363,23 @@ const Endings = {
   renderList() {
     const wrap = document.getElementById('endingsList');
     wrap.innerHTML = '';
-    ['I','II','III','IV'].forEach(id => {
+    /* Пятая показывается в списке всегда — но до открытия у неё вместо
+       номера стоит «???». Так видно, что список не кончается четырьмя, и
+       при этом не сказано ничего лишнего. */
+    const ids = ['I','II','III','IV','V'];
+    ids.forEach(id => {
       const d = this.DEFS[id], got = !!META.endings[id];
       const b = document.createElement('button');
       b.className = 'listItem' + (got ? '' : ' locked');
-      b.innerHTML = `<span class="idx">${id}</span><span>${got ? d.name : '????????'}</span>` +
+      const idx = (d.secret && !got) ? '???' : id;
+      b.innerHTML = `<span class="idx">${idx}</span><span>${got ? d.name : '????????'}</span>` +
                     (got ? '<span class="tick">✓</span>' : '<span class="tick">?</span>');
       if (got) b.addEventListener('click', () => {
         const s = META.endingStats[id] || {};
+        const seen = (typeof SecretDeathSystem !== 'undefined')
+          ? '\n\nСекретные случаи: ' + SecretDeathSystem.seenCount() + ' / 4' : '';
         Dialogue0Alert(d.roman + ' — ' + d.name + '\n\n' + d.sub +
+          (d.secret ? seen : '') +
           '\n\nПуть ведьмы: ' + Math.round(s.witchAmbition||0) + '%' +
           '\nДоверие Сью: ' + Math.round(s.trustSue||0) + '%' +
           '\nЧеловечность: ' + Math.round(s.humanity||0) + '%');
@@ -24478,7 +25398,10 @@ function Dialogue0Alert(msg) {
 }
 function updateEndingCount() {
   const n = ['I','II','III','IV'].filter(i => META.endings[i]).length;
-  document.getElementById('menuEndCount').textContent = 'КОНЦОВКИ: ' + n + ' / 4';
+  /* Пятая не входит в «из четырёх»: она не одна из основных, поэтому
+     дописывается хвостом и только после того, как её увидели. */
+  const extra = META.endings.V ? '  +  ???' : '';
+  document.getElementById('menuEndCount').textContent = 'КОНЦОВКИ: ' + n + ' / 4' + extra;
 }
 
 /* =====================================================================
@@ -29173,6 +30096,10 @@ function drawRoom() {
   }
   for (const n of roomNPCs(room)) draws.push({ y:n.y, npc:n });
   for (const n of roomCast()) draws.push({ y:n.y, npc:n });
+  /* Подвижные предметы комнаты — например, поток машин на улице. Они
+     обязаны попасть в ту же сортировку, что и люди: иначе машина либо
+     всегда наезжает на Наю, либо всегда проезжает у неё за спиной. */
+  if (room.movers) { const mv = room.movers(); for (const m of mv) draws.push({ y:m.y, mover:m }); }
   if (!room.cinematic) draws.push({ y:Player.y, player:true });
   draws.sort((a, b) => a.y - b.y);
   for (const d of draws) {
@@ -29189,6 +30116,7 @@ function drawRoom() {
       continue;
     }
     if (d.player) { Player.draw(ctx, camX, camY); continue; }
+    if (d.mover) { drawMover(ctx, d.mover, camX, camY); continue; }
     const n = d.npc, img = Assets.images[n.sprite];
     if (!img) continue;
     // катсценная фигура может уходить в прозрачность — так она исчезает
@@ -29339,6 +30267,7 @@ function tick(t) {
     if (room) { FX.fogA *= 0.9; FX.ambient(room); Weather.update(dt, room); Patrol.update(dt, room); CrystalSense.update(dt, room); Quests.refresh(true); Cam.update(dt);
                  Music.updateNear(room, Player.x, Player.y);
                  Stealth.update(dt);
+                 SecretDeathSystem.update(dt, room);
                  Prologue.updateSwing(dt); Prologue.updateLegend(dt); }
     drawRoom();
   }
@@ -29779,6 +30708,7 @@ const DevTools = {
   open(fromMainMenu=false) {
     this.fromMainMenu = !!fromMainMenu;
     this.render();
+    this.sdsMark();
     const screen = document.getElementById('devToolsScreen');
     screen.classList.add('show');
     Game.paused = true;
@@ -30294,6 +31224,29 @@ const DevTools = {
       UI.toast(r.fails ? 'Сверка: ошибок ' + r.fails + ', подробности в консоли'
                        : 'Сверка пройдена, подробности в консоли', 2600);
     });
+    /* Несчастный случай. Кнопки зовут те же функции, что и игра: ни
+       одной отдельной «тестовой» ветки у системы нет. */
+    const sds = (id, fn) => on(id, () => { fn(); this.sdsMark(); });
+    /* Ролик нельзя запустить из открытого DEV-меню: игра на паузе, и
+       защита честно откажет. Поэтому меню сначала закрывается. */
+    const sdsRun = (id, type) => sds(id, () => { this.close(); SecretDeathSystem.devRun(type); });
+    sdsRun('devSdsCar',   'CAR_ACCIDENT');
+    sdsRun('devSdsChand', 'CHANDELIER');
+    sdsRun('devSdsRail',  'BALCONY_FALL');
+    sdsRun('devSdsStair', 'STAIR_FALL');
+    sds('devSdsZones', () => UI.toast('Опасные зоны: ' +
+      (SecretDeathSystem.Debug.toggleZones() ? 'вкл' : 'выкл'), 1400));
+    sds('devSdsReset', () => { SecretDeathSystem.reset(); UI.toast('Счётчики сброшены.', 1400); });
+    sds('devSdsOff',   () => {
+      const on2 = SecretDeathSystem.state.enabled
+        ? SecretDeathSystem.disable() : SecretDeathSystem.enable();
+      UI.toast('Секретные случаи: ' + (on2 ? 'включены' : 'выключены'), 1600);
+    });
+    sds('devSdsAnnoy', () => {
+      SecretDeathSystem.state.studentAnnoyance++;
+      UI.toast('Раздражение студента: ' + SecretDeathSystem.state.studentAnnoyance +
+               ' / ' + SECRET_DEATH_CONFIG.stairs.annoyanceThreshold, 1600);
+    });
     on('devPlanImg', () => {
       /* Растровый чертёж игра сама не грузит: ни сети, ни внешних файлов
          в обычном запуске. Разработчик подкладывает его вручную. */
@@ -30304,6 +31257,21 @@ const DevTools = {
         .catch(e => UI.toast(e.message, 2000)); };
       inp.click();
     });
+  },
+
+  /* Состояние пасхалки одной строкой: без неё «работает» пришлось бы
+     проверять на глаз. Показывает ровно то, что отдаёт getDebugState(). */
+  sdsMark() {
+    const el = document.getElementById('devSdsNow');
+    if (!el) return;
+    const d = SecretDeathSystem.getDebugState();
+    el.textContent = (d.enabled ? (d.allowed ? '● активна' : '○ ждёт') : '✕ выключена') +
+      '  ·  ' + d.room + (d.inDangerZone ? ' (в опасной зоне)' : '') +
+      '  ·  событие: ' + d.activeEvent +
+      '\nдорога ' + d.road + '  ·  поток ' + d.traffic +
+      '\nлюстра ' + d.chandelier +
+      '\nперила ' + d.balcony + '  ·  студент ' + d.student +
+      '\nконцовка ' + d.ending + '  ·  случаев ' + d.seen;
   },
 
   /* ---------- прослушивание саундтрека ----------
@@ -30402,6 +31370,9 @@ const DevTools = {
       '\nДень университета: ' + C('uniDay') +
       '\nЦель: ' + (g ? g.t : '—') +
       '\nСмена кафе: ' + (F('cafeShiftFinished') ? 'пройдена' : 'не пройдена') +
+      '\nНесчастный случай: ' + (SecretDeathSystem.state.enabled ? 'вкл' : 'выкл') +
+        ', случаев ' + SecretDeathSystem.seenCount() + '/4' +
+        ', концовка ' + (SecretDeathSystem.state.endingUnlocked ? 'открыта' : 'закрыта') +
       '\nФлаги университета: ' +
       ['uniArrived','uniTeacherList','sawRehearsal','metGenevieveUni','symbolPhoto','libAsked',
        'libPeriods','propsSymbol','propsMorel','morelKnowsName','basementFound','archiveMedeaFound',
@@ -30459,6 +31430,10 @@ function beginPlay() {
   Ambience.set(room.zone || (room.weather && room.weather.indoor ? 'indoor' : 'street'));
   Ambience.setProfile.apply(Ambience, Ambience.profileFor(gameState.currentRoom, room));
   World.invalidate();
+  /* Пасхалка начинает с чистого листа на каждом входе в игру, но помнит
+     через META, какие случаи игрок уже видел. */
+  SecretDeathSystem.reset();
+  SecretDeathSystem.load();
   requestAnimationFrame(tick);
   Stealth.resumeIfNeeded();
   if (!F('prologueComplete')) { Scene.play('prologue'); saveGame(); return; }
@@ -30592,6 +31567,9 @@ window.addEventListener('load', () => {
   Game.ctx = Game.canvas.getContext('2d');
   Game.ctx.imageSmoothingEnabled = false;
   loadMeta();
+  /* Галерея концовок открывается из главного меню, до любой игры, и
+     должна знать, сколько секретных случаев игрок уже видел. */
+  SecretDeathSystem.load();
   UIScale.load();                 // масштабы нужны до первого расчёта экрана
   resizeCanvas();
   /* Пересчёт на всё, что меняет размер: поворот, изменение окна, выезд
@@ -30732,6 +31710,14 @@ window.addEventListener('load', () => {
   });
   wire('btnToMenu', () => { saveGame(); location.reload(); });
 
+  /* После секретной концовки сохранение цело: карточка уходит, экран
+     светлеет, игра продолжается ровно оттуда, где оборвалась. */
+  wire('btnEndLoad', async () => {
+    document.getElementById('endingScreen').classList.remove('show');
+    if (!hasSave()) { location.reload(); return; }
+    continueGame();
+    await fadeIn(400);
+  });
   wire('btnRewind', rewindToCheckpoint);
   wire('btnEndNew', () => { document.getElementById('endingScreen').classList.remove('show'); startNewGame(); });
   wire('btnEndMenu', () => location.reload());

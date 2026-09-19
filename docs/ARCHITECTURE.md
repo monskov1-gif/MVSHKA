@@ -29,7 +29,10 @@
 10791..10905  Player, tryMove, changeRoom          движение и переходы
 10907..11150  Dialogue, doInteract                 реплики, выборы, взаимодействие
 11150..11310  Scene                                движок сцен
-11308..12340  Prologue, FXScenes, Chase, Montage, Memories, Chapters, Endings
+11308..12340  Prologue, FXScenes, Chase, Montage, Memories, Chapters,
+              SecretDeathSystem, Endings                SecretDeathSystem — секретная
+                                                   пятая концовка: состояние, четыре
+                                                   случая, зоны, отладка, свои ассеты
 12352..12425  сохранения                           serializeState, applyState, чекпоинты
 12425..16019  Scripts                              125 сценариев — главный массив текста
 16019..16340  Input, Game, drawRoom, Cam, tick     ввод и главный цикл
@@ -218,6 +221,11 @@ revenge_of_witch_save_v2        текущее сохранение
 revenge_of_witch_checkpoint_v2  последний важный выбор (кнопка «вернуться»)
 revenge_of_witch_meta_v2        открытые концовки и воспоминания, переживает сброс
 ```
+
+В `meta` рядом с `endings`/`memories` лежат `secretEndingUnlocked` и
+`secretDeaths` — какие из четырёх несчастных случаев игрок уже видел.
+Старые META этих полей не знают: `loadMeta()` подставляет закрытое
+состояние, и ничего не ломается.
 
 ## Комната
 
