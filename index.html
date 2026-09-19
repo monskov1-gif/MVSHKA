@@ -9168,7 +9168,10 @@ const World = {
     return out;
   },
 
-  objectsOf(room) { return (room.objects || []).filter(o => !o.when || o.when()); },
+  objectsOf(room) {
+    return (room.objects || []).filter(o =>
+      (!o.when || o.when()) || Hold.kept(room, Hold.objs, o));
+  },
 
   /* Props block movement through their own declared footprint, so level
      collision follows the art instead of a parallel list of rectangles. */
@@ -10831,7 +10834,36 @@ function paintRunes(ctx, pts, color='#40a0ff', t=0) {
    NPCs and interactables may carry `when()` — evaluated from flags, so
    the world rebuilds itself correctly after any save/load.
 ===================================================================== */
-function roomNPCs(room) { return (room.npcs || []).filter(n => !n.when || n.when()); }
+/* ПОКА ИДЁТ СЦЕНА, ИЗ КОМНАТЫ НИКТО НЕ ИСЧЕЗАЕТ.
+
+   Видимость NPC и предметов пересчитывается каждый кадр по их when(), а
+   сцена по дороге ставит флаги. Получалось так: в сцене выбора Сью
+   первой же командой ставится persuasionDone — и условие, по которому
+   Сью стоит в комнате, тут же становится ложным. Дальше она произносит
+   восемь реплик, которых игрок не видит: чиби со сцены уже убрали.
+   Ровно то же с предметами — у части из них тоже есть when.
+
+   Hold запоминает, кто и что было в комнате на момент начала сцены, и
+   держит их до конца. Держит только на исчезновение: если флаг кого-то,
+   наоборот, добавляет, он появится как обычно — войти посреди сцены
+   можно, пропасть посреди своей же реплики нельзя. */
+const Hold = {
+  room:null, npcs:null, objs:null,
+  begin() {
+    const room = (typeof gameState !== 'undefined' && gameState) ? Rooms[gameState.currentRoom] : null;
+    if (!room) return this.end();
+    this.room = room;
+    this.npcs = new Set((room.npcs || []).filter(n => !n.when || n.when()));
+    this.objs = new Set((room.objects || []).filter(o => !o.when || o.when()));
+  },
+  end() { this.room = null; this.npcs = null; this.objs = null; },
+  kept(room, set, item) { return this.room === room && set && set.has(item); },
+};
+
+function roomNPCs(room) {
+  return (room.npcs || []).filter(n =>
+    (!n.when || n.when()) || Hold.kept(room, Hold.npcs, n));
+}
 /* Фоновые NPC ходят по заранее заданным точкам: сложный AI ради трёх
    студентов не нужен, а коридор от этого сразу становится живым.
    Маршруты замкнутые, поэтому персонаж может ходить по кругу бесконечно. */
@@ -21103,6 +21135,9 @@ async function changeRoom(roomKey, x, y) {
   Game.zoom = 1; Game.zoomTo = 1;
   Game.cast = [];
   const room = Rooms[roomKey];
+  /* Сцена могла увести в другую комнату: состав запоминается заново,
+     иначе удержание осталось бы от прошлой и ничего бы не держало. */
+  if (Scene.active) Hold.begin(); else Hold.end();
   Patrol.reset(room);
   /* Погода считается раньше музыки: тема улицы зависит от того, идёт ли
      дождь, и на старом порядке она всегда читала погоду прошлой комнаты. */
@@ -21133,6 +21168,7 @@ const Dialogue = {
     this.active = true;
     this.awaitingChoice = false;
     this.onComplete = onComplete || null;
+    if (!Scene.active) Hold.begin();
     if (Game.mode !== 'cutscene') Game.mode = 'dialogue';
     document.getElementById('dialogueBox').classList.add('active');
     document.getElementById('tapCatcher').classList.add('show');
@@ -21309,6 +21345,7 @@ const Dialogue = {
   cancel() {
     this.queue = []; this.index = 0; this.onComplete = null;
     this.active = false; this.currentLine = null; this.awaitingChoice = false;
+    if (!Scene.active) Hold.end();
     document.getElementById('dialogueBox').classList.remove('active');
     document.getElementById('dialogueBox').classList.remove('shakeText');
     document.getElementById('tapCatcher').classList.remove('show');
@@ -21320,6 +21357,7 @@ const Dialogue = {
 
   end() {
     this.active = false; this.currentLine = null; this.awaitingChoice = false;
+    if (!Scene.active) Hold.end();
     document.getElementById('dialogueBox').classList.remove('active');
     document.getElementById('dialogueBox').classList.remove('shakeText');
     document.getElementById('tapCatcher').classList.remove('show');
@@ -21751,6 +21789,7 @@ const Scene = {
     this.pending = null;
     this._cur = null;
     Dialogue.cancel();
+    Hold.end();
     Game.cast = [];
     if (Game.mode === 'cutscene' || Game.mode === 'transition' || Game.mode === 'dialogue')
       Game.mode = 'explore';
@@ -21771,6 +21810,7 @@ const Scene = {
     this._cur = name;
     this.active = true;
     Game.mode = 'cutscene';
+    Hold.begin();
     UI.dimControls(true);
     const era = this.epoch;
     this._runList(scr).then(res => {
@@ -21778,6 +21818,7 @@ const Scene = {
       this.mark(name);
       if (typeof Theater !== 'undefined' && Theater.active) Theater.stop();
       this.active = false;
+      Hold.end();
       Game.cast = [];
       if (Game.mode === 'cutscene') Game.mode = 'explore';
       if (!Dialogue.active) UI.dimControls(false);
@@ -21792,6 +21833,7 @@ const Scene = {
       console.error('Scene error', e);
       if (typeof Theater !== 'undefined' && Theater.active) Theater.stop();
       this.active = false;
+      Hold.end();
       const cardUp = document.getElementById('endingScreen').classList.contains('show');
       if (!cardUp) {
         if (Game.mode === 'cutscene' || Game.mode === 'menu') Game.mode = 'explore';
