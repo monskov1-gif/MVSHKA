@@ -92,10 +92,10 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   if (!st.j)      bad.push('находка не попала в журнал');
 
   /* Роза жива: она на месте и в своём доме, и в коммуне. */
-  await p.evaluate(async () => { await DevTools.teleport('witch2House'); });
+  await p.evaluate(async () => { await DevTools.teleport('roseFloor1'); });
   await p.waitForTimeout(600);
   const rosaHome = await p.evaluate(() =>
-    (Rooms.witch2House.npcs || []).some(n => n.name === 'Роза' && (!n.when || n.when())));
+    ((Rooms.roseFloor1 || {}).npcs || []).some(n => n.name === 'Роза' && (!n.when || n.when())));
   console.log('Роза дома: %s', rosaHome);
   if (!rosaHome) bad.push('Роза исчезла из своего дома, хотя жива');
   console.log('разговор с Розой:', await talk('Роза'));

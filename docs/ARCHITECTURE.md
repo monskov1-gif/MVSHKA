@@ -20,11 +20,19 @@
  4292..4790   Campus, Shift                        внимание охраны, мини-игра смены
  4788..5090   Quests, UniDay, Journal, Recap       цели, четыре дня, журнал, пересказы
  5104..5340   Patrol, paintHousePlan, paintPlayground
+ 5340..10760  MADELEINE_HOUSE_PLAN, MadPlan        канонический план дома Мадлен:
+                                                   геометрия, отрисовка, сверка с
+                                                   эталоном, отладочный слой;
+                                                   модели мебели mad_*;
+                                                   makeMadRoom собирает madFloor1..3
  5340..10760  Rooms                                55 комнат — главный массив данных
 10791..10905  Player, tryMove, changeRoom          движение и переходы
 10907..11150  Dialogue, doInteract                 реплики, выборы, взаимодействие
 11150..11310  Scene                                движок сцен
-11308..12340  Prologue, FXScenes, Chase, Montage, Memories, Chapters, Endings
+11308..12340  Prologue, FXScenes, Chase, Montage, Memories, Chapters,
+              SecretDeathSystem, Endings                SecretDeathSystem — секретная
+                                                   пятая концовка: состояние, четыре
+                                                   случая, зоны, отладка, свои ассеты
 12352..12425  сохранения                           serializeState, applyState, чекпоинты
 12425..16019  Scripts                              125 сценариев — главный массив текста
 16019..16340  Input, Game, drawRoom, Cam, tick     ввод и главный цикл
@@ -213,6 +221,11 @@ revenge_of_witch_save_v2        текущее сохранение
 revenge_of_witch_checkpoint_v2  последний важный выбор (кнопка «вернуться»)
 revenge_of_witch_meta_v2        открытые концовки и воспоминания, переживает сброс
 ```
+
+В `meta` рядом с `endings`/`memories` лежат `secretEndingUnlocked` и
+`secretDeaths` — какие из четырёх несчастных случаев игрок уже видел.
+Старые META этих полей не знают: `loadMeta()` подставляет закрытое
+состояние, и ничего не ломается.
 
 ## Комната
 
