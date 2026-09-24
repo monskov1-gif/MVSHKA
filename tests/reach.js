@@ -15,7 +15,7 @@ const ENTRY = {
   uniMusicRoom:[28,130], uniArtRoom:[28,140],
   uniCorr2:[312,238], uniWest2:[130,280], uniEast2:[130,280],
   uniOldWing:[468,226], uniServiceStair:[110,92], uniBasement:[60,190],
-  uniArchive:[42,220], uniRoof:[60,210], uniBackYard:[44,262],
+  uniArchive:[120,600], uniRoof:[60,210], uniBackYard:[44,262],
   forestEdge:[196,140], communeRoad:[30,180], communeYard:[40,220], trialRoom:[130,230],
   hellStreet:[60,220],
 };
