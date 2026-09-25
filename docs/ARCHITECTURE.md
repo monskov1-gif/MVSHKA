@@ -493,7 +493,7 @@ PropZone           зона у предмета: at:'id' вместо коорд
 { at:'bedDresser', kind:'search', name:'bedDresser', prompt:'Комод у кровати', line:'(...)' }
 { at:'wardrobeB', kind:'hide', hideTo:'into', name:'hideWardrobe', prompt:'В шкафу', label:'...' }
 { at:'mirror', kind:'noise', name:'noiseMirror', prompt:'Зеркало', label:'...' }
-{ stand:{x:344,y:281}, name:'up', prompt:'Лестница наверх', stairTo:'roseFloor2', action(){...} }
+{ stand:{x:378,y:434}, name:'up', prompt:'Лестница наверх', stairTo:'roseFloor2', action(){...} }
 ```
 
 `at` — `id` предмета в `objects`, `side` — front (по умолчанию), back, left,
