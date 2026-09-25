@@ -2,7 +2,7 @@ const H = require('./harness.js');
 const ENTRY = {
   nayaRoom:[120,255], corridor1:[120,210], street:[120,210], cafe:[120,268],
   hell:[160,240], lilithHall:[180,340], genevieveHouse:[100,180], communeHall:[150,268],
-  witch1House:[120,258], witch2House:[120,258], nightSpot:[120,268], witch3House:[120,262],
+  nightSpot:[120,268], witch3House:[120,262],
   genLiving:[130,240], genKitchen:[110,200], genStudy:[110,196], genBed:[110,186], genBath:[85,160],
   backAlley:[120,280], hellFinal:[150,300], parkWalk:[120,290],
   kitchen:[120,258], bathroom:[120,240], balcony:[120,192], stairwell:[120,108], oldTown:[30,280],
@@ -15,7 +15,7 @@ const ENTRY = {
   uniMusicRoom:[28,130], uniArtRoom:[28,140],
   uniCorr2:[312,238], uniWest2:[130,280], uniEast2:[130,280],
   uniOldWing:[468,226], uniServiceStair:[110,92], uniBasement:[60,190],
-  uniArchive:[42,220], uniRoof:[60,210], uniBackYard:[44,262],
+  uniArchive:[120,600], uniRoof:[60,210], uniBackYard:[44,262],
   forestEdge:[196,140], communeRoad:[30,180], communeYard:[40,220], trialRoom:[130,230],
   hellStreet:[60,220],
 };

@@ -294,6 +294,11 @@ async function main() {
           const wp = M.witch.routes[fi][0];
           if (gameState.currentRoom !== key) await changeRoom(key, wp.x, wp.y);
           const gr = Stealth.nav.grid(key);
+          /* Здесь проверяется геометрия укрытий, а не хозяйка: рядом с ней
+             выйти нельзя нарочно (это проверяется ниже), и если она стоит
+             у лестницы, «Под лестницей» не выпустит — по делу. */
+          const wasOn = Stealth.W.active;
+          Stealth.W.active = false;
           for (const it of (Rooms[key].interactables || [])) {
             if (!it.hide) continue;
             let ok = false;
@@ -311,6 +316,7 @@ async function main() {
             if (Math.hypot(Player.x - bx, Player.y - by) > 40)
               res.push(`${key}: после «${it.prompt}» Наю отбросило далеко от укрытия`);
           }
+          Stealth.W.active = wasOn;
           return res;
         }, [id, fi]);
         укрытия.push(...bad);

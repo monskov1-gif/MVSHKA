@@ -80,9 +80,13 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
          знало только про верхнюю полосу и потому всегда было красным на
          домах ведьм. Считаем законной опорой любую стену, к лицевой
          стороне которой предмет примыкает снизу. */
+      /* Третий случай — стена с лицевой полосой не у края комнаты: дом
+         Розы стоит посреди участка, и его задняя стена начинается ниже
+         забора сада. Предмет, целиком лежащий на такой полосе, висит. */
       const onPartition = (o) => (room.walls || []).some(w =>
-        o.x + o.w > w.x && o.x < w.x + w.w &&           // перекрывается по горизонтали
-        o.y + o.h >= w.y + w.h - 2 && o.y + o.h <= w.y + w.h + 26);
+        (o.x + o.w > w.x && o.x < w.x + w.w &&           // перекрывается по горизонтали
+         o.y + o.h >= w.y + w.h - 2 && o.y + o.h <= w.y + w.h + 26) ||
+        (w.h >= 24 && o.x >= w.x && o.x + o.w <= w.x + w.w && o.y >= w.y && o.y + o.h <= w.y + w.h));
       boxes.forEach(o => {
         if (wallH && ART.includes(o.t) && o.y + o.h > wallH + 2 && !onPartition(o))
           lowArt.push({ room:rk, t:o.t, bottom:(o.y + o.h) | 0, wallH });
